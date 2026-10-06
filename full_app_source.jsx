@@ -243,11 +243,11 @@
     function getSupabaseClient() {
       if (_supabaseClient) return _supabaseClient;
       
-      const url = window.ENV?.SUPABASE_URL;
-      const key = window.ENV?.SUPABASE_KEY;
+      const url = window.ENV?.SUPABASE_URL || 'https://mgywbrmneeorynisujkf.supabase.co';
+      const key = window.ENV?.SUPABASE_KEY || 'sb_publishable_BT_1lHhvJerwY0k4fWzIbg_51-VQ7V5';
 
       if (!url || !key) {
-        console.warn("Supabase URL / Key tidak ditemukan di .env!");
+        console.warn("Supabase URL / Key tidak ditemukan!");
         return null;
       }
 

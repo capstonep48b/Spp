@@ -1,0 +1,813 @@
+/* Custom Design System - Royal Blue & Cloud Aesthetics for SPP App */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
+:root {
+  --blue-primary: #2563eb;
+  --blue-hover: #1d4ed8;
+  --blue-deep: #1e40af;
+  --blue-light: #eff6ff;
+  --blue-tint: #dbeafe;
+  --sky-accent: #0ea5e9;
+  --navy-sidebar: #0b132b;
+  --navy-card: #0f172a;
+  --canvas-bg: #f8fafc;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(rgba(37, 99, 235, 0.04) 1.5px, transparent 1.5px),
+    radial-gradient(rgba(15, 23, 42, 0.02) 1.5px, #f8fafc 1.5px);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+
+/* Watermark & Soft Accent Mesh */
+.bg-aesthetic-pattern {
+  background-image: 
+    radial-gradient(circle at 5% 10%, rgba(37, 99, 235, 0.04) 0%, transparent 45%),
+    radial-gradient(circle at 95% 85%, rgba(14, 165, 233, 0.04) 0%, transparent 45%),
+    radial-gradient(rgba(37, 99, 235, 0.03) 1.5px, transparent 1.5px);
+  background-size: 100% 100%, 100% 100%, 24px 24px;
+}
+
+/* Custom Refined Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b82f6;
+}
+
+/* Spacer Card & Input Aesthetic */
+.card-spacer {
+  background: #ffffff;
+  border-radius: 32px;
+  box-shadow: 0 25px 60px -15px rgba(30, 64, 175, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.8);
+}
+
+.spacer-hero-bg {
+  background: linear-gradient(145deg, #1d4ed8 0%, #2563eb 55%, #1e40af 100%);
+}
+
+.spacer-pill-primary {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 10px 25px -4px rgba(37, 99, 235, 0.4);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.spacer-pill-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px -4px rgba(37, 99, 235, 0.5);
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+}
+
+.spacer-pill-primary:active {
+  transform: translateY(1px);
+}
+
+.spacer-pill-secondary {
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  color: #475569;
+  transition: all 0.25s ease;
+}
+
+.spacer-pill-secondary:hover {
+  border-color: #3b82f6;
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+/* Underline Clean Input Style */
+.spacer-line-input {
+  border: none;
+  border-bottom: 2px solid #e2e8f0;
+  border-radius: 0;
+  padding: 10px 0;
+  font-weight: 600;
+  color: #0f172a;
+  background: transparent;
+  transition: all 0.2s ease;
+}
+
+.spacer-line-input:focus {
+  outline: none;
+  border-bottom-color: #2563eb;
+  box-shadow: 0 2px 0 0 rgba(37, 99, 235, 0.2);
+}
+
+/* Rounded Clean Input Style */
+.spacer-rounded-input {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px 16px;
+  background: #ffffff;
+  font-weight: 600;
+  color: #0f172a;
+  transition: all 0.2s ease;
+}
+
+.spacer-rounded-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
+}
+
+/* Modern Card Drop Shadow */
+.modern-card-shadow {
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.04), 0 0 0 1px rgba(241, 245, 249, 1);
+}
+
+.luxury-gradient {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 50%, #1e40af 100%) !important;
+  color: #ffffff !important;
+  border-radius: 28px;
+  box-shadow: 0 15px 35px -5px rgba(29, 78, 216, 0.35);
+}
+
+/* Timer Countdown Pulse */
+@keyframes timerPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.98); }
+}
+
+.animate-timer-pulse {
+  animation: timerPulse 1.5s ease-in-out infinite;
+}
+
+/* Toast Slide-In from Right Animation */
+@keyframes slideInRight {
+  0% {
+    opacity: 0;
+    transform: translateX(110%) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Page Loading Bar Animation */
+@keyframes loadingProgress {
+  0% { width: 0%; }
+  50% { width: 75%; }
+  100% { width: 100%; }
+}
+
+.animate-loading-bar {
+  animation: loadingProgress 1.4s ease-in-out forwards;
+}
+
+/* Print Styling - Clean, Comprehensive, Reliable */
+@media print {
+  @page {
+    size: auto;
+    margin: 10mm 12mm 10mm 12mm;
+  }
+  
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Sembunyikan elemen navigasi dan tombol saat print */
+  aside, nav, header, footer, button, .print\:hidden, [class*="print:hidden"], [class*="print\\:hidden"] {
+    display: none !important;
+  }
+
+  /* Reset semua wrapper parent flex & grid */
+  #root, #root > div, main {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: static !important;
+    overflow: visible !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .printable-area {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    visibility: visible !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    overflow: visible !important;
+  }
+
+  .printable-area * {
+    visibility: visible !important;
+  }
+
+  /* Print Kuitansi Modal Area */
+  .printable-kuitansi {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 480px !important;
+    margin: 0 auto !important;
+    padding: 16px !important;
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 16px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    visibility: visible !important;
+  }
+  .printable-kuitansi * {
+    visibility: visible !important;
+  }
+}
+
+/* =======================================================
+   MODERN GLASSMORPHISM & TICKET RECEIPT AESTHETICS (IMAGE 2 & 3)
+   ======================================================= */
+
+/* Receipt Ticket Styles */
+.ticket-wrapper {
+  position: relative;
+  background: #ffffff;
+  border-radius: 28px;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(226, 232, 240, 0.8);
+}
+
+.ticket-divider-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 24px;
+  overflow: visible;
+}
+
+.ticket-notch {
+  width: 24px;
+  height: 24px;
+  background-color: #0f172a; /* matches modal backdrop */
+  border-radius: 9999px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+}
+
+.ticket-notch-left {
+  left: -12px;
+  box-shadow: inset -3px 0 4px rgba(0, 0, 0, 0.15);
+}
+
+.ticket-notch-right {
+  right: -12px;
+  box-shadow: inset 3px 0 4px rgba(0, 0, 0, 0.15);
+}
+
+.ticket-perforation {
+  width: 100%;
+  border-top: 2px dashed #cbd5e1;
+  margin: 0 12px;
+}
+
+/* Scalloped / Serrated Bottom Edge */
+.ticket-bottom-sawtooth {
+  width: 100%;
+  height: 12px;
+  background-image: radial-gradient(circle at 8px 12px, transparent 8px, #ffffff 8.5px);
+  background-size: 16px 12px;
+  background-repeat: repeat-x;
+  transform: rotate(180deg);
+}
+
+/* Ultra Modern Glassmorphism System */
+.glass-panel-modern {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(226, 232, 240, 0.8);
+}
+
+.glass-panel-dark {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+}
+
+.card-glow-cyan {
+  box-shadow: 0 10px 30px -5px rgba(6, 182, 212, 0.2), 0 0 0 1px rgba(6, 182, 212, 0.15);
+}
+
+.card-glow-purple {
+  box-shadow: 0 10px 30px -5px rgba(168, 85, 247, 0.2), 0 0 0 1px rgba(168, 85, 247, 0.15);
+}
+
+.card-glow-emerald {
+  box-shadow: 0 10px 30px -5px rgba(16, 185, 129, 0.2), 0 0 0 1px rgba(16, 185, 129, 0.15);
+}
+
+.card-glow-amber {
+  box-shadow: 0 10px 30px -5px rgba(245, 158, 11, 0.2), 0 0 0 1px rgba(245, 158, 11, 0.15);
+}
+
+.card-glow-rose {
+  box-shadow: 0 10px 30px -5px rgba(244, 63, 94, 0.2), 0 0 0 1px rgba(244, 63, 94, 0.15);
+}
+
+/* Shimmer animations */
+@keyframes shimmerSweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+.animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.animate-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: shimmerSweep 2s infinite ease-in-out;
+}
+
+@keyframes pulseHalo {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.3;
+  }
+}
+
+.animate-pulse-halo {
+  animation: pulseHalo 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* =======================================================
+   SCOOPED TAB CUTOUT & ROYAL BLUE DASHBOARD (REFERENCE IMAGE)
+   ======================================================= */
+
+.royal-blue-sidebar {
+  background: linear-gradient(180deg, #1d4ed8 0%, #2563eb 50%, #1e40af 100%);
+  color: #ffffff;
+}
+
+/* Floating App Card Container */
+.app-floating-card {
+  background: #ffffff;
+  box-shadow: 0 25px 60px -15px rgba(29, 78, 216, 0.12), 0 0 0 1px rgba(226, 232, 240, 0.9);
+}
+
+@media (min-width: 768px) {
+  .scooped-tab-active {
+    position: relative;
+    background-color: #ffffff !important;
+    color: #1d4ed8 !important;
+    font-weight: 900 !important;
+    border-top-left-radius: 28px !important;
+    border-bottom-left-radius: 28px !important;
+    border-top-right-radius: 0px !important;
+    border-bottom-right-radius: 0px !important;
+    margin-right: -1px !important;
+    width: calc(100% + 1px) !important;
+    padding-right: 24px !important;
+    z-index: 25;
+    box-shadow: -4px 0 15px rgba(0, 0, 0, 0.03);
+  }
+
+  .scooped-tab-active::before {
+    content: '';
+    position: absolute;
+    top: -26px;
+    right: 0;
+    width: 26px;
+    height: 26px;
+    background: radial-gradient(circle at 0 0, transparent 25.5px, #ffffff 26px);
+    pointer-events: none;
+    z-index: 25;
+  }
+
+  .scooped-tab-active::after {
+    content: '';
+    position: absolute;
+    bottom: -26px;
+    right: 0;
+    width: 26px;
+    height: 26px;
+    background: radial-gradient(circle at 0 100%, transparent 25.5px, #ffffff 26px);
+    pointer-events: none;
+    z-index: 25;
+  }
+}
+
+/* Pill Tabs for Sub-options */
+.sub-pill-btn {
+  padding: 10px 22px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 800;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sub-pill-btn-active {
+  background: #1d4ed8;
+  color: #ffffff;
+  box-shadow: 0 4px 14px -2px rgba(29, 78, 216, 0.35);
+}
+
+.sub-pill-btn-inactive {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+.sub-pill-btn-inactive:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Floating Table Row Highlight (Reference Image) */
+.table-row-highlight {
+  background: linear-gradient(90deg, #2563eb 0%, #1d4ed8 100%) !important;
+  color: #ffffff !important;
+  border-radius: 16px;
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.45);
+  transform: scale(1.005);
+}
+
+/* =======================================================
+   LUXURY WATERMARK & BACKGROUND AESTHETICS
+   ======================================================= */
+.luxury-watermark-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.luxury-school-watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(85vw, 680px);
+  height: min(85vw, 680px);
+  opacity: 0.038;
+  pointer-events: none;
+  user-select: none;
+  mix-blend-mode: multiply;
+  transition: opacity 0.5s ease;
+}
+
+/* Luxury View Transition Animation for switching menu/tabs */
+@keyframes luxuryViewFade {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.996);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-luxury-view {
+  animation: luxuryViewFade 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Luxury Input & Select Focus Effects */
+.luxury-input {
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1.5px solid #cbd5e1;
+  background-color: #f8fafc;
+}
+
+.luxury-input:hover {
+  border-color: #94a3b8;
+  background-color: #ffffff;
+}
+
+.luxury-input:focus {
+  outline: none !important;
+  border-color: #2563eb !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14), 0 2px 8px -2px rgba(37, 99, 235, 0.1) !important;
+}
+
+/* Luxury Loading Screen Special Animations */
+@keyframes orbitRingSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes orbitRingCounter {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+.loading-orbit-ring {
+  animation: orbitRingSpin 12s linear infinite;
+}
+
+.loading-orbit-counter {
+  animation: orbitRingCounter 16s linear infinite;
+}
+
+@keyframes laserShimmer {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 140%;
+  }
+}
+
+.animate-laser-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.75) 50%,
+    transparent 100%
+  );
+  animation: laserShimmer 1.6s infinite cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* =======================================================
+   LUXURY TAB TRANSITIONS & MODERN VIEW ANIMATIONS
+   ======================================================= */
+@keyframes modernPageSlide {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.988);
+    filter: blur(6px);
+  }
+  50% {
+    opacity: 0.9;
+    filter: blur(1px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+.animate-tab-switch {
+  animation: modernPageSlide 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+.animate-modern-fade {
+  animation: modernPageSlide 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+/* Staggered card cascade for modern lively dashboards */
+.stagger-card-1 {
+  animation: modernPageSlide 0.36s cubic-bezier(0.16, 1, 0.3, 1) 0.04s both;
+}
+.stagger-card-2 {
+  animation: modernPageSlide 0.36s cubic-bezier(0.16, 1, 0.3, 1) 0.09s both;
+}
+.stagger-card-3 {
+  animation: modernPageSlide 0.36s cubic-bezier(0.16, 1, 0.3, 1) 0.14s both;
+}
+.stagger-card-4 {
+  animation: modernPageSlide 0.36s cubic-bezier(0.16, 1, 0.3, 1) 0.19s both;
+}
+
+/* Modern Card Hover Elevation */
+.modern-hover-card {
+  transition: all 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.modern-hover-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 36px -8px rgba(30, 64, 175, 0.12), 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+/* Pure White Background Theme for Loading Screen */
+.loading-screen-pure-white {
+  background-color: #ffffff !important;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(37, 99, 235, 0.03) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(14, 165, 233, 0.03) 0%, transparent 40%),
+    radial-gradient(rgba(37, 99, 235, 0.02) 1.5px, transparent 1.5px) !important;
+  background-size: 100% 100%, 100% 100%, 28px 28px !important;
+}
+
+.loading-pure-white-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  box-shadow: 0 25px 70px -15px rgba(30, 58, 138, 0.12), 0 0 0 1px rgba(241, 245, 249, 1) !important;
+}
+
+@keyframes subTabSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-sub-tab {
+  animation: subTabSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Scooped tab active item glow & transition */
+.scooped-tab-active {
+  position: relative;
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scooped-tab-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 5px;
+  border-radius: 0 6px 6px 0;
+  background: linear-gradient(to bottom, #2563eb, #38bdf8);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.7);
+}
+
+/* Sub-pill button fluid physics */
+.sub-pill-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sub-pill-btn:hover {
+  transform: translateY(-1px);
+}
+
+.sub-pill-btn:active {
+  transform: scale(0.96);
+}
+
+.sub-pill-btn-active {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 16px -2px rgba(29, 78, 216, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.3) inset !important;
+}
+
+/* Pulse Glow Effect for Badges and Rings */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.3), 0 0 35px rgba(56, 189, 248, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(37, 99, 235, 0.5), 0 0 50px rgba(56, 189, 248, 0.3);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2.5s infinite ease-in-out;
+}
+
+/* Waving Greeting Mascot & Character Animations */
+@keyframes waveHand {
+  0% { transform: rotate(0deg); }
+  10% { transform: rotate(16deg); }
+  20% { transform: rotate(-10deg); }
+  30% { transform: rotate(16deg); }
+  40% { transform: rotate(-6deg); }
+  50% { transform: rotate(12deg); }
+  60% { transform: rotate(0deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes gentleMascotBounce {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-5px) rotate(2deg);
+  }
+  50% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  75% {
+    transform: translateY(-3px) rotate(1deg);
+  }
+}
+
+@keyframes mascotShadowPulse {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scaleX(0.85);
+    opacity: 0.15;
+  }
+}
+
+.animate-waving-hand {
+  display: inline-block;
+  transform-origin: 70% 70%;
+  animation: waveHand 2.2s infinite ease-in-out;
+}
+
+.animate-mascot-sway {
+  animation: gentleMascotBounce 3.2s infinite ease-in-out;
+  transform-origin: bottom center;
+}
+
+.animate-mascot-shadow {
+  animation: mascotShadowPulse 3.2s infinite ease-in-out;
+}
+
+/* Luxury Greeting Card Styling */
+.greeting-welcome-banner {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 249, 255, 0.9) 100%);
+  border: 1.5px solid rgba(219, 234, 254, 0.8);
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.08), 0 8px 10px -6px rgba(37, 99, 235, 0.04);
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+
+.greeting-welcome-banner::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, #2563eb, #38bdf8, #10b981);
+}

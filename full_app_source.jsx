@@ -509,7 +509,7 @@
           {/* Official PAUD SETIA BHAKTI Logo as Faint Luxury Watermark */}
           <div className="luxury-school-watermark flex items-center justify-center">
             <img 
-              src="/logo.png" 
+              src="logo.png" 
               alt="Watermark PAUD Setia Bhakti" 
               className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none drop-shadow-sm" 
             />
@@ -566,7 +566,7 @@
           {/* Faint School Watermark in the background */}
           <div className="luxury-watermark-bg" aria-hidden="true">
             <div className="luxury-school-watermark opacity-[0.035] flex items-center justify-center">
-              <img src="/logo.png" alt="watermark" className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none" />
+              <img src="logo.png" alt="watermark" className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none" />
             </div>
           </div>
 
@@ -594,7 +594,7 @@
               {/* Central Official PAUD SETIA BHAKTI Logo Badge with 3D Ring */}
               <div className="relative w-28 h-28 rounded-full p-2 bg-gradient-to-tr from-amber-400 via-sky-400 to-blue-600 shadow-[0_15px_35px_rgba(37,99,235,0.32)] overflow-hidden flex items-center justify-center border-4 border-white bg-white group hover:scale-105 transition-transform animate-pulse-glow">
                 <img 
-                  src="/logo.png" 
+                  src="logo.png" 
                   alt="Logo PAUD Setia Bhakti" 
                   className="w-full h-full object-contain rounded-full" 
                 />
@@ -806,7 +806,7 @@
           {/* Subtle Watermark in Login */}
           <div className="luxury-watermark-bg" aria-hidden="true">
             <div className="luxury-school-watermark flex items-center justify-center">
-              <img src="/logo.png" alt="Watermark" className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none" />
+              <img src="logo.png" alt="Watermark" className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none" />
             </div>
           </div>
 
@@ -851,7 +851,7 @@
                 {/* Waving Mascot & School Badge */}
                 <div className="relative mb-4 group">
                   <div className="w-24 h-24 bg-white rounded-full p-1.5 shadow-2xl shadow-blue-950/40 border-4 border-white/80 overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105 animate-mascot-sway">
-                    <img src="/logo.png" alt="Logo PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                    <img src="logo.png" alt="Logo PAUD Setia Bhakti" className="w-full h-full object-contain" />
                   </div>
                   {/* Waving Hand Badge floating on top right of logo */}
                   <div className="absolute -top-1 -right-2 bg-white text-slate-800 p-1.5 rounded-full shadow-lg border-2 border-blue-100 flex items-center justify-center animate-bounce">
@@ -1366,7 +1366,7 @@ function ParentDashboardView({
                     {student.fotoUrl ? (
                       <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover" />
                     ) : (
-                      <img src="/logo.png" alt="PAUD Setia Bhakti" className="w-11 h-11 object-contain filter drop-shadow" />
+                      <img src="logo.png" alt="PAUD Setia Bhakti" className="w-11 h-11 object-contain filter drop-shadow" />
                     )}
                   </div>
                   <div className="min-w-0">
@@ -4685,7 +4685,7 @@ function ParentDashboardView({
             {/* KOP SURAT SEKOLAH */}
             <div className="flex flex-col sm:flex-row items-center justify-center gap-5 border-b-2 border-slate-900 pb-5 text-center sm:text-left">
               <div className="w-20 h-20 shrink-0 flex items-center justify-center p-1.5 bg-white border-2 border-slate-200 rounded-2xl shadow-sm">
-                <img src="/logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-wider">{settings?.schoolName || 'PAUD SETIA BHAKTI'}</h1>
@@ -6194,7 +6194,7 @@ function ParentDashboardView({
             <div className="pt-8 pb-4 px-6 text-center space-y-2">
               <div className="w-16 h-16 mx-auto relative flex items-center justify-center mb-1">
                 <div className="w-16 h-16 rounded-2xl bg-white border-2 border-blue-200 shadow-md p-2 flex items-center justify-center relative">
-                  <img src="/logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                  <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
                   <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-md text-white">
                     <Icon name="check" size={16} className="text-white stroke-[3]" />
                   </div>
@@ -7800,7 +7800,7 @@ function ParentDashboardView({
 
             <div className="w-20 h-20 bg-blue-50/80 rounded-full p-2 mb-4 border-2 border-blue-100 flex items-center justify-center relative shadow-inner">
               <div className="w-16 h-16 rounded-full border-4 border-blue-600 border-t-transparent animate-spin absolute inset-0 m-auto"></div>
-              <img src="/logo.png" alt="PAUD Setia Bhakti" className="w-10 h-10 object-contain relative z-10 animate-pulse" />
+              <img src="logo.png" alt="PAUD Setia Bhakti" className="w-10 h-10 object-contain relative z-10 animate-pulse" />
             </div>
 
             <h3 className="text-lg font-black text-slate-800 tracking-tight">Menyinkronkan Data...</h3>
@@ -7892,7 +7892,7 @@ function ParentDashboardView({
                 {/* Brand / School Header */}
                 <div className="p-6 sm:p-7 pb-6 flex items-center gap-4">
                   <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center font-bold text-white shadow-lg border border-white/30 shrink-0 p-1.5 overflow-hidden">
-                    <img src="/logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain filter drop-shadow" />
+                    <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain filter drop-shadow" />
                   </div>
                   <div className="min-w-0">
                     <h1 className="font-black text-base lg:text-lg leading-tight text-white tracking-tight truncate">{settings.schoolName}</h1>

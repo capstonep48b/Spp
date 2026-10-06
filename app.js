@@ -507,7 +507,7 @@ function SchoolWatermarkBg() {
   }), /*#__PURE__*/React.createElement("div", {
     className: "luxury-school-watermark flex items-center justify-center"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "Watermark PAUD Setia Bhakti",
     className: "w-full h-full object-contain filter contrast-125 select-none pointer-events-none drop-shadow-sm"
   })));
@@ -558,7 +558,7 @@ function LoadingBarScreen({
   }, /*#__PURE__*/React.createElement("div", {
     className: "luxury-school-watermark opacity-[0.035] flex items-center justify-center"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "watermark",
     className: "w-full h-full object-contain filter contrast-125 select-none pointer-events-none"
   }))), /*#__PURE__*/React.createElement("div", {
@@ -586,7 +586,7 @@ function LoadingBarScreen({
   })), /*#__PURE__*/React.createElement("div", {
     className: "relative w-28 h-28 rounded-full p-2 bg-gradient-to-tr from-amber-400 via-sky-400 to-blue-600 shadow-[0_15px_35px_rgba(37,99,235,0.32)] overflow-hidden flex items-center justify-center border-4 border-white bg-white group hover:scale-105 transition-transform animate-pulse-glow"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "Logo PAUD Setia Bhakti",
     className: "w-full h-full object-contain rounded-full"
   }))), /*#__PURE__*/React.createElement("div", {
@@ -796,7 +796,7 @@ function LoginView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "luxury-school-watermark flex items-center justify-center"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "Watermark",
     className: "w-full h-full object-contain filter contrast-125 select-none pointer-events-none"
   }))), /*#__PURE__*/React.createElement("div", {
@@ -850,7 +850,7 @@ function LoginView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "w-24 h-24 bg-white rounded-full p-1.5 shadow-2xl shadow-blue-950/40 border-4 border-white/80 overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105 animate-mascot-sway"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "Logo PAUD Setia Bhakti",
     className: "w-full h-full object-contain"
   })), /*#__PURE__*/React.createElement("div", {
@@ -1298,7 +1298,7 @@ function ParentDashboardView({
     alt: student.name,
     className: "w-full h-full object-cover"
   }) : /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "PAUD Setia Bhakti",
     className: "w-11 h-11 object-contain filter drop-shadow"
   })), /*#__PURE__*/React.createElement("div", {
@@ -4439,7 +4439,7 @@ function LaporanView({
   }, /*#__PURE__*/React.createElement("div", {
     className: "w-20 h-20 shrink-0 flex items-center justify-center p-1.5 bg-white border-2 border-slate-200 rounded-2xl shadow-sm"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "PAUD Setia Bhakti",
     className: "w-full h-full object-contain"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h1", {
@@ -5856,7 +5856,7 @@ function KuitansiModal({
   }, /*#__PURE__*/React.createElement("div", {
     className: "w-16 h-16 rounded-2xl bg-white border-2 border-blue-200 shadow-md p-2 flex items-center justify-center relative"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "PAUD Setia Bhakti",
     className: "w-full h-full object-contain"
   }), /*#__PURE__*/React.createElement("div", {
@@ -7436,7 +7436,7 @@ function App() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "w-16 h-16 rounded-full border-4 border-blue-600 border-t-transparent animate-spin absolute inset-0 m-auto"
   }), /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "PAUD Setia Bhakti",
     className: "w-10 h-10 object-contain relative z-10 animate-pulse"
   })), /*#__PURE__*/React.createElement("h3", {
@@ -7509,7 +7509,7 @@ function App() {
   }, /*#__PURE__*/React.createElement("div", {
     className: "w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center font-bold text-white shadow-lg border border-white/30 shrink-0 p-1.5 overflow-hidden"
   }, /*#__PURE__*/React.createElement("img", {
-    src: "/logo.png",
+    src: "logo.png",
     alt: "PAUD Setia Bhakti",
     className: "w-full h-full object-contain filter drop-shadow"
   })), /*#__PURE__*/React.createElement("div", {

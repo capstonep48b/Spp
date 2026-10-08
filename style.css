@@ -435,7 +435,7 @@ body {
     left: auto;
     width: 20px;
     height: 21px;
-    background: radial-gradient(circle at 0 0, transparent 19.5px, #ffffff 20px);
+    background: radial-gradient(circle at 100% 0, transparent 19.5px, #ffffff 20px);
     pointer-events: none;
     z-index: 25;
   }
@@ -448,7 +448,7 @@ body {
     left: auto;
     width: 20px;
     height: 21px;
-    background: radial-gradient(circle at 0 100%, transparent 19.5px, #ffffff 20px);
+    background: radial-gradient(circle at 100% 100%, transparent 19.5px, #ffffff 20px);
     pointer-events: none;
     z-index: 25;
   }

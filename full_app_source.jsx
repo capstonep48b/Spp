@@ -1250,11 +1250,24 @@ function ParentDashboardView({
       }, [studentTrx]);
 
       const studentClassHistoryList = useMemo(() => {
-        const list = Array.isArray(student?.classHistory) ? [...student.classHistory] : [];
-        if (student?.kelas && !list.includes(student.kelas)) {
-          list.unshift(student.kelas);
+        const rawList = Array.isArray(student?.classHistory) ? student.classHistory : [];
+        const extracted = [];
+
+        if (student?.kelas) {
+          extracted.push(student.kelas);
         }
-        return list;
+
+        rawList.forEach(item => {
+          if (typeof item === 'string' && item.trim()) {
+            extracted.push(item.trim());
+          } else if (item && typeof item === 'object') {
+            if (item.toClass && typeof item.toClass === 'string') extracted.push(item.toClass.trim());
+            if (item.fromClass && typeof item.fromClass === 'string') extracted.push(item.fromClass.trim());
+            if (item.kelas && typeof item.kelas === 'string') extracted.push(item.kelas.trim());
+          }
+        });
+
+        return [...new Set(extracted.filter(Boolean))];
       }, [student]);
 
       const filteredPaidBills = useMemo(() => {

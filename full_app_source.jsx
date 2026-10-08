@@ -1153,6 +1153,7 @@ function ParentDashboardView({
 
       const [activeTab, setActiveTab] = useState('dashboard');
       const [sppSubFilter, setSppSubFilter] = useState('all');
+      const [isSppExpanded, setIsSppExpanded] = useState(true);
       const [complaintTitle, setComplaintTitle] = useState('');
       const [complaintContent, setComplaintContent] = useState('');
       const [showParentBell, setShowParentBell] = useState(false);
@@ -1432,7 +1433,14 @@ function ParentDashboardView({
                   {/* 2. Tagihan SPP (Accordion with Sub-items) */}
                   <div className="w-full">
                     <button
-                      onClick={() => setActiveTab('spp')}
+                      onClick={() => {
+                        if (activeTab !== 'spp') {
+                          setActiveTab('spp');
+                          setIsSppExpanded(true);
+                        } else {
+                          setIsSppExpanded(!isSppExpanded);
+                        }
+                      }}
                       className={`w-full py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
                         activeTab === 'spp'
                           ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
@@ -1451,12 +1459,12 @@ function ParentDashboardView({
                             {unpaidBills.length}
                           </span>
                         )}
-                        <Icon name="chevron-down" size={16} className={`transition-transform duration-200 ${activeTab === 'spp' ? 'rotate-180' : ''}`} />
+                        <Icon name="chevron-down" size={16} className={`transition-transform duration-200 ${activeTab === 'spp' && isSppExpanded ? 'rotate-180' : ''}`} />
                       </div>
                     </button>
 
                     {/* Sub-menu items for SPP under Tagihan SPP */}
-                    {activeTab === 'spp' && (
+                    {activeTab === 'spp' && isSppExpanded && (
                       <div className="mt-1.5 ml-4 md:ml-6 pl-3 border-l-2 border-white/20 space-y-1 py-1">
                         {[
                           { id: 'all', label: 'Semua Ringkasan', icon: 'layers' },
@@ -7607,6 +7615,12 @@ function ParentDashboardView({
       mySessionTokenRef.current = mySessionToken;
 
       const [currentView, setCurrentView] = useState('dashboard');
+      const [adminExpandedGroup, setAdminExpandedGroup] = useState(() => {
+        if (['transaksi', 'tunggakan', 'laporan'].includes('dashboard')) return 'keuangan';
+        if (['siswa', 'catatan'].includes('dashboard')) return 'kesiswaan';
+        if (['pengumuman', 'pengaduan'].includes('dashboard')) return 'komunikasi';
+        return 'dashboard';
+      });
       const [isRefreshing, setIsRefreshing] = useState(false);
       const [envConfig, setEnvConfig] = useState({});
       
@@ -8414,42 +8428,129 @@ function ParentDashboardView({
                   </div>
                 </div>
 
-                {/* 5 Grouped Main Categories on the left */}
-                <nav className="pl-4 pr-0 py-4 space-y-2.5 sm:space-y-3 font-extrabold text-sm sm:text-base relative">
+                {/* 5 Grouped Main Categories on the left with vertical accordions */}
+                <nav className="pl-4 pr-0 py-4 space-y-2.5 font-extrabold text-sm sm:text-base relative">
                   {[
                     { id: 'dashboard', label: 'Dashboard', icon: 'home', defaultView: 'dashboard', views: ['dashboard'] },
-                    { id: 'keuangan', label: 'Keuangan SPP', icon: 'credit-card', defaultView: 'transaksi', views: ['transaksi', 'tunggakan', 'laporan'] },
-                    { id: 'kesiswaan', label: 'Kesiswaan', icon: 'users', defaultView: 'siswa', views: ['siswa', 'catatan'], badge: students.length },
-                    { id: 'komunikasi', label: 'Komunikasi', icon: 'message-square', defaultView: 'pengumuman', views: ['pengumuman', 'pengaduan'], badge: (announcements.length + complaints.length) || null },
+                    { 
+                      id: 'keuangan', 
+                      label: 'Keuangan SPP', 
+                      icon: 'credit-card', 
+                      defaultView: 'transaksi', 
+                      views: ['transaksi', 'tunggakan', 'laporan'],
+                      subItems: [
+                        { id: 'transaksi', label: 'Catat Bayar Manual', icon: 'plus-circle' },
+                        { id: 'tunggakan', label: 'Follow-Up Tunggakan', icon: 'phone-call' },
+                        { id: 'laporan', label: 'Cetak Laporan PDF', icon: 'printer' }
+                      ]
+                    },
+                    { 
+                      id: 'kesiswaan', 
+                      label: 'Kesiswaan', 
+                      icon: 'users', 
+                      defaultView: 'siswa', 
+                      views: ['siswa', 'catatan'], 
+                      badge: students.length,
+                      subItems: [
+                        { id: 'siswa', label: 'Data Murid', icon: 'user-check', badge: students.length },
+                        { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text', badge: notes.length }
+                      ]
+                    },
+                    { 
+                      id: 'komunikasi', 
+                      label: 'Komunikasi', 
+                      icon: 'message-square', 
+                      defaultView: 'pengumuman', 
+                      views: ['pengumuman', 'pengaduan'], 
+                      badge: (announcements.length + complaints.length) || null,
+                      subItems: [
+                        { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper', badge: announcements.length },
+                        { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: complaints.length }
+                      ]
+                    },
                     { id: 'pengaturan', label: 'Pengaturan', icon: 'settings', defaultView: 'pengaturan', views: ['pengaturan'] }
                   ].map(group => {
                     const isGroupActive = group.views.includes(currentView);
+                    const isExpanded = adminExpandedGroup === group.id;
+
                     return (
-                      <button
-                        key={group.id}
-                        onClick={() => {
-                          if (!group.views.includes(currentView)) {
-                            setCurrentView(group.defaultView);
-                          }
-                        }}
-                        className={`w-full py-4 px-5 sm:px-6 flex items-center justify-between transition-all text-sm sm:text-[15px] ${
-                          isGroupActive
-                            ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-l-2xl rounded-r-none mr-0 shadow-sm'
-                            : 'w-[calc(100%-16px)] mr-4 rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3.5 truncate">
-                          <Icon name={group.icon} size={22} />
-                          <span className="truncate">{group.label}</span>
-                        </div>
-                        {group.badge ? (
-                          <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
-                            isGroupActive ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
-                          }`}>
-                            {group.badge}
-                          </span>
-                        ) : null}
-                      </button>
+                      <div key={group.id} className="w-full">
+                        <button
+                          onClick={() => {
+                            if (group.subItems) {
+                              if (isExpanded) {
+                                setAdminExpandedGroup(null);
+                              } else {
+                                setAdminExpandedGroup(group.id);
+                                if (!isGroupActive) {
+                                  setCurrentView(group.defaultView);
+                                }
+                              }
+                            } else {
+                              setAdminExpandedGroup(group.id);
+                              setCurrentView(group.defaultView);
+                            }
+                          }}
+                          className={`w-full py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                            isGroupActive
+                              ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-l-2xl rounded-r-none mr-0 shadow-sm'
+                              : 'w-[calc(100%-16px)] mr-4 rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 truncate">
+                            <Icon name={group.icon} size={20} />
+                            <span className="truncate">{group.label}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {group.badge ? (
+                              <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                                isGroupActive ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                              }`}>
+                                {group.badge}
+                              </span>
+                            ) : null}
+
+                            {group.subItems && (
+                              <Icon 
+                                name="chevron-down" 
+                                size={16} 
+                                className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
+                              />
+                            )}
+                          </div>
+                        </button>
+
+                        {/* Vertical Sub-Items List when Expanded */}
+                        {group.subItems && isExpanded && (
+                          <div className="mt-1.5 ml-4 md:ml-6 pl-3 border-l-2 border-white/20 space-y-1 py-1">
+                            {group.subItems.map(sub => (
+                              <button
+                                key={sub.id}
+                                onClick={() => {
+                                  setCurrentView(sub.id);
+                                  setAdminExpandedGroup(group.id);
+                                }}
+                                className={`w-[calc(100%-12px)] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
+                                  currentView === sub.id
+                                    ? 'bg-white/20 text-white font-black border border-white/30 shadow-sm'
+                                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <Icon name={sub.icon} size={14} />
+                                  <span className="truncate">{sub.label}</span>
+                                </div>
+                                {sub.badge !== undefined && sub.badge !== null && sub.badge > 0 && (
+                                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-white/20 text-white">
+                                    {sub.badge}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </nav>
@@ -8525,89 +8626,6 @@ function ParentDashboardView({
                     </button>
                   </div>
                 </div>
-
-                {/* HORIZONTAL SUB-PILL BAR ("di bikin sub per pilihan biar ga banyak yang disebelah kirinya") */}
-                {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && (
-                  <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                    <button
-                      onClick={() => setCurrentView('transaksi')}
-                      className={`sub-pill-btn ${currentView === 'transaksi' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`}
-                    >
-                      <Icon name="plus-circle" size={16} />
-                      <span>Catat Bayar Manual</span>
-                    </button>
-                    <button
-                      onClick={() => setCurrentView('tunggakan')}
-                      className={`sub-pill-btn ${currentView === 'tunggakan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`}
-                    >
-                      <Icon name="phone-call" size={16} />
-                      <span>Belum Bayar & Follow Up</span>
-                    </button>
-                    <button
-                      onClick={() => setCurrentView('laporan')}
-                      className={`sub-pill-btn ${currentView === 'laporan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`}
-                    >
-                      <Icon name="printer" size={16} />
-                      <span>Cetak Laporan PDF</span>
-                    </button>
-                  </div>
-                )}
-
-                {['siswa', 'catatan'].includes(currentView) && (
-                  <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                    <button
-                      onClick={() => setCurrentView('siswa')}
-                      className={`sub-pill-btn ${currentView === 'siswa' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`}
-                    >
-                      <Icon name="users" size={16} />
-                      <span>Data Murid</span>
-                      <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'siswa' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`}>
-                        {students.length}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setCurrentView('catatan')}
-                      className={`sub-pill-btn ${currentView === 'catatan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`}
-                    >
-                      <Icon name="award" size={16} />
-                      <span>Catatan Siswa TU</span>
-                      {notes.length > 0 && (
-                        <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'catatan' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`}>
-                          {notes.length}
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {['pengumuman', 'pengaduan'].includes(currentView) && (
-                  <div className="flex flex-wrap items-center gap-2.5 pt-1">
-                    <button
-                      onClick={() => setCurrentView('pengumuman')}
-                      className={`sub-pill-btn ${currentView === 'pengumuman' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`}
-                    >
-                      <Icon name="newspaper" size={16} />
-                      <span>Berita & Pengumuman</span>
-                      {announcements.length > 0 && (
-                        <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'pengumuman' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`}>
-                          {announcements.length}
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setCurrentView('pengaduan')}
-                      className={`sub-pill-btn ${currentView === 'pengaduan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`}
-                    >
-                      <Icon name="message-square" size={16} />
-                      <span>Pengaduan & Aspirasi</span>
-                      {complaints.length > 0 && (
-                        <span className={`ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'pengaduan' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`}>
-                          {complaints.length}
-                        </span>
-                      )}
-                    </button>
-                  </div>
-                )}
               </header>
 
               <div key={currentView} className="p-6 md:p-10 space-y-8 flex-1 animate-tab-switch">

@@ -1090,6 +1090,7 @@ function ParentDashboardView({
   }
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sppSubFilter, setSppSubFilter] = useState('all');
+  const [isSppExpanded, setIsSppExpanded] = useState(true);
   const [complaintTitle, setComplaintTitle] = useState('');
   const [complaintContent, setComplaintContent] = useState('');
   const [showParentBell, setShowParentBell] = useState(false);
@@ -1351,7 +1352,14 @@ function ParentDashboardView({
   }, "Dashboard Utama"))), /*#__PURE__*/React.createElement("div", {
     className: "w-full"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setActiveTab('spp'),
+    onClick: () => {
+      if (activeTab !== 'spp') {
+        setActiveTab('spp');
+        setIsSppExpanded(true);
+      } else {
+        setIsSppExpanded(!isSppExpanded);
+      }
+    },
     className: `w-full py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${activeTab === 'spp' ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm' : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'}`
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-3 truncate"
@@ -1367,8 +1375,8 @@ function ParentDashboardView({
   }, unpaidBills.length), /*#__PURE__*/React.createElement(Icon, {
     name: "chevron-down",
     size: 16,
-    className: `transition-transform duration-200 ${activeTab === 'spp' ? 'rotate-180' : ''}`
-  }))), activeTab === 'spp' && /*#__PURE__*/React.createElement("div", {
+    className: `transition-transform duration-200 ${activeTab === 'spp' && isSppExpanded ? 'rotate-180' : ''}`
+  }))), activeTab === 'spp' && isSppExpanded && /*#__PURE__*/React.createElement("div", {
     className: "mt-1.5 ml-4 md:ml-6 pl-3 border-l-2 border-white/20 space-y-1 py-1"
   }, [{
     id: 'all',
@@ -7108,6 +7116,12 @@ function App() {
   const mySessionTokenRef = useRef(mySessionToken);
   mySessionTokenRef.current = mySessionToken;
   const [currentView, setCurrentView] = useState('dashboard');
+  const [adminExpandedGroup, setAdminExpandedGroup] = useState(() => {
+    if (['transaksi', 'tunggakan', 'laporan'].includes('dashboard')) return 'keuangan';
+    if (['siswa', 'catatan'].includes('dashboard')) return 'kesiswaan';
+    if (['pengumuman', 'pengaduan'].includes('dashboard')) return 'komunikasi';
+    return 'dashboard';
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [envConfig, setEnvConfig] = useState({});
   const [settings, setSettings] = useState(() => {
@@ -7932,7 +7946,7 @@ function App() {
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-black text-blue-100 uppercase tracking-wider"
   }, "Admin Panel")))), /*#__PURE__*/React.createElement("nav", {
-    className: "pl-4 pr-0 py-4 space-y-2.5 sm:space-y-3 font-extrabold text-sm sm:text-base relative"
+    className: "pl-4 pr-0 py-4 space-y-2.5 font-extrabold text-sm sm:text-base relative"
   }, [{
     id: 'dashboard',
     label: 'Dashboard',
@@ -7944,21 +7958,56 @@ function App() {
     label: 'Keuangan SPP',
     icon: 'credit-card',
     defaultView: 'transaksi',
-    views: ['transaksi', 'tunggakan', 'laporan']
+    views: ['transaksi', 'tunggakan', 'laporan'],
+    subItems: [{
+      id: 'transaksi',
+      label: 'Catat Bayar Manual',
+      icon: 'plus-circle'
+    }, {
+      id: 'tunggakan',
+      label: 'Follow-Up Tunggakan',
+      icon: 'phone-call'
+    }, {
+      id: 'laporan',
+      label: 'Cetak Laporan PDF',
+      icon: 'printer'
+    }]
   }, {
     id: 'kesiswaan',
     label: 'Kesiswaan',
     icon: 'users',
     defaultView: 'siswa',
     views: ['siswa', 'catatan'],
-    badge: students.length
+    badge: students.length,
+    subItems: [{
+      id: 'siswa',
+      label: 'Data Murid',
+      icon: 'user-check',
+      badge: students.length
+    }, {
+      id: 'catatan',
+      label: 'Catatan Siswa TU',
+      icon: 'file-text',
+      badge: notes.length
+    }]
   }, {
     id: 'komunikasi',
     label: 'Komunikasi',
     icon: 'message-square',
     defaultView: 'pengumuman',
     views: ['pengumuman', 'pengaduan'],
-    badge: announcements.length + complaints.length || null
+    badge: announcements.length + complaints.length || null,
+    subItems: [{
+      id: 'pengumuman',
+      label: 'Pengumuman Sekolah',
+      icon: 'newspaper',
+      badge: announcements.length
+    }, {
+      id: 'pengaduan',
+      label: 'Pengaduan Wali',
+      icon: 'message-circle',
+      badge: complaints.length
+    }]
   }, {
     id: 'pengaturan',
     label: 'Pengaturan',
@@ -7967,24 +8016,61 @@ function App() {
     views: ['pengaturan']
   }].map(group => {
     const isGroupActive = group.views.includes(currentView);
-    return /*#__PURE__*/React.createElement("button", {
+    const isExpanded = adminExpandedGroup === group.id;
+    return /*#__PURE__*/React.createElement("div", {
       key: group.id,
+      className: "w-full"
+    }, /*#__PURE__*/React.createElement("button", {
       onClick: () => {
-        if (!group.views.includes(currentView)) {
+        if (group.subItems) {
+          if (isExpanded) {
+            setAdminExpandedGroup(null);
+          } else {
+            setAdminExpandedGroup(group.id);
+            if (!isGroupActive) {
+              setCurrentView(group.defaultView);
+            }
+          }
+        } else {
+          setAdminExpandedGroup(group.id);
           setCurrentView(group.defaultView);
         }
       },
-      className: `w-full py-4 px-5 sm:px-6 flex items-center justify-between transition-all text-sm sm:text-[15px] ${isGroupActive ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-l-2xl rounded-r-none mr-0 shadow-sm' : 'w-[calc(100%-16px)] mr-4 rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'}`
+      className: `w-full py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${isGroupActive ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-l-2xl rounded-r-none mr-0 shadow-sm' : 'w-[calc(100%-16px)] mr-4 rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'}`
     }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-3.5 truncate"
+      className: "flex items-center gap-3 truncate"
     }, /*#__PURE__*/React.createElement(Icon, {
       name: group.icon,
-      size: 22
+      size: 20
     }), /*#__PURE__*/React.createElement("span", {
       className: "truncate"
-    }, group.label)), group.badge ? /*#__PURE__*/React.createElement("span", {
-      className: `px-2.5 py-1 rounded-full text-xs font-black ${isGroupActive ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'}`
-    }, group.badge) : null);
+    }, group.label)), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-1.5"
+    }, group.badge ? /*#__PURE__*/React.createElement("span", {
+      className: `px-2 py-0.5 rounded-full text-[11px] font-black ${isGroupActive ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'}`
+    }, group.badge) : null, group.subItems && /*#__PURE__*/React.createElement(Icon, {
+      name: "chevron-down",
+      size: 16,
+      className: `transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`
+    }))), group.subItems && isExpanded && /*#__PURE__*/React.createElement("div", {
+      className: "mt-1.5 ml-4 md:ml-6 pl-3 border-l-2 border-white/20 space-y-1 py-1"
+    }, group.subItems.map(sub => /*#__PURE__*/React.createElement("button", {
+      key: sub.id,
+      onClick: () => {
+        setCurrentView(sub.id);
+        setAdminExpandedGroup(group.id);
+      },
+      className: `w-[calc(100%-12px)] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${currentView === sub.id ? 'bg-white/20 text-white font-black border border-white/30 shadow-sm' : 'text-white/80 hover:text-white hover:bg-white/10'}`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 truncate"
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: sub.icon,
+      size: 14
+    }), /*#__PURE__*/React.createElement("span", {
+      className: "truncate"
+    }, sub.label)), sub.badge !== undefined && sub.badge !== null && sub.badge > 0 && /*#__PURE__*/React.createElement("span", {
+      className: "px-1.5 py-0.2 rounded-full text-[10px] font-black bg-white/20 text-white"
+    }, sub.badge)))));
   }))), /*#__PURE__*/React.createElement("div", {
     className: "p-4 m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-white"
   }, /*#__PURE__*/React.createElement("div", {
@@ -8032,63 +8118,7 @@ function App() {
     size: 17
   }), /*#__PURE__*/React.createElement("span", {
     className: "hidden sm:inline"
-  }, "Keluar")))), ['transaksi', 'tunggakan', 'laporan'].includes(currentView) && /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap items-center gap-2.5 pt-1"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentView('transaksi'),
-    className: `sub-pill-btn ${currentView === 'transaksi' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "plus-circle",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Catat Bayar Manual")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentView('tunggakan'),
-    className: `sub-pill-btn ${currentView === 'tunggakan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "phone-call",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Belum Bayar & Follow Up")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentView('laporan'),
-    className: `sub-pill-btn ${currentView === 'laporan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "printer",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Cetak Laporan PDF"))), ['siswa', 'catatan'].includes(currentView) && /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap items-center gap-2.5 pt-1"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentView('siswa'),
-    className: `sub-pill-btn ${currentView === 'siswa' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "users",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Data Murid"), /*#__PURE__*/React.createElement("span", {
-    className: `ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'siswa' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`
-  }, students.length)), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentView('catatan'),
-    className: `sub-pill-btn ${currentView === 'catatan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "award",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Catatan Siswa TU"), notes.length > 0 && /*#__PURE__*/React.createElement("span", {
-    className: `ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'catatan' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`
-  }, notes.length))), ['pengumuman', 'pengaduan'].includes(currentView) && /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap items-center gap-2.5 pt-1"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentView('pengumuman'),
-    className: `sub-pill-btn ${currentView === 'pengumuman' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "newspaper",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Berita & Pengumuman"), announcements.length > 0 && /*#__PURE__*/React.createElement("span", {
-    className: `ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'pengumuman' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`
-  }, announcements.length)), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentView('pengaduan'),
-    className: `sub-pill-btn ${currentView === 'pengaduan' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "message-square",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Pengaduan & Aspirasi"), complaints.length > 0 && /*#__PURE__*/React.createElement("span", {
-    className: `ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${currentView === 'pengaduan' ? 'bg-white text-blue-700' : 'bg-slate-200 text-slate-800'}`
-  }, complaints.length)))), /*#__PURE__*/React.createElement("div", {
+  }, "Keluar"))))), /*#__PURE__*/React.createElement("div", {
     key: currentView,
     className: "p-6 md:p-10 space-y-8 flex-1 animate-tab-switch"
   }, currentView === 'dashboard' && /*#__PURE__*/React.createElement(DashboardView, {

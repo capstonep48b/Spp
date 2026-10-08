@@ -5562,6 +5562,14 @@ function ParentDashboardView({
       const [newClassName, setNewClassName] = useState('');
       const [newClassTarif, setNewClassTarif] = useState(400000);
 
+      // State untuk Form Tambah Preset Periode Manual
+      const [newPresetName, setNewPresetName] = useState('');
+      const [newPresetStartMonth, setNewPresetStartMonth] = useState('Juli');
+      const [newPresetStartYear, setNewPresetStartYear] = useState(2026);
+      const [newPresetEndMonth, setNewPresetEndMonth] = useState('Juni');
+      const [newPresetEndYear, setNewPresetEndYear] = useState(2027);
+      const [newPresetSemester, setNewPresetSemester] = useState('Semua');
+
       useEffect(() => {
         setFormData({ ...settings });
         setNewAdminPassword('');
@@ -5594,6 +5602,65 @@ function ParentDashboardView({
         setFormData(updated);
       };
 
+      // Tambah Preset Periode Baru secara Manual
+      const handleAddPresetManual = () => {
+        const sM = newPresetStartMonth || 'Juli';
+        const sY = Number(newPresetStartYear) || 2026;
+        const eM = newPresetEndMonth || 'Juni';
+        const eY = Number(newPresetEndYear) || 2027;
+        const sem = newPresetSemester || 'Semua';
+        const semTag = (sem && sem !== 'Semua') ? ` (${sem})` : '';
+        const name = newPresetName.trim() || `Periode ${sM} ${sY} - ${eM} ${eY}${semTag}`;
+
+        const newPeriod = {
+          id: Date.now().toString(),
+          name: name,
+          startMonth: sM,
+          startYear: sY,
+          endMonth: eM,
+          endYear: eY,
+          semester: sem,
+          isActive: false
+        };
+
+        const existingPeriods = formData.academicPeriods || [];
+        const updatedPeriods = [...existingPeriods, newPeriod];
+
+        const updatedFormData = {
+          ...formData,
+          academicPeriods: updatedPeriods
+        };
+
+        setFormData(updatedFormData);
+        onSaveSettings(updatedFormData);
+        setNewPresetName('');
+      };
+
+      // Edit langsung item preset di daftar
+      const handleUpdatePresetField = (idx, field, value) => {
+        const updatedPeriods = [...(formData.academicPeriods || [])];
+        const val = (field === 'startYear' || field === 'endYear') ? (Number(value) || 0) : value;
+        updatedPeriods[idx] = {
+          ...updatedPeriods[idx],
+          [field]: val
+        };
+
+        let updatedFormData = { ...formData, academicPeriods: updatedPeriods };
+        if (updatedPeriods[idx].isActive) {
+          updatedFormData = {
+            ...updatedFormData,
+            activePeriodName: updatedPeriods[idx].name,
+            startMonth: updatedPeriods[idx].startMonth,
+            startYear: updatedPeriods[idx].startYear,
+            endMonth: updatedPeriods[idx].endMonth,
+            endYear: updatedPeriods[idx].endYear,
+            semester: updatedPeriods[idx].semester
+          };
+        }
+
+        setFormData(updatedFormData);
+      };
+
       const handleSaveCurrentAsPreset = () => {
         const sM = formData.startMonth || 'Juli';
         const sY = parseInt(formData.startYear) || 2025;
@@ -5618,7 +5685,6 @@ function ParentDashboardView({
           ? formData.academicPeriods
           : [];
 
-        // Hapus duplikat rentang yang sama persis jika ada
         const filtered = existingPeriods.filter(p => !(p.startMonth === sM && String(p.startYear) === String(sY) && p.endMonth === eM && String(p.endYear) === String(eY) && (p.semester || 'Semua') === sem));
         const updatedPeriods = [newPeriod, ...filtered.map(p => ({ ...p, isActive: false }))];
 
@@ -5963,17 +6029,24 @@ function ParentDashboardView({
               </div>
 
               {/* Kelola Daftar / Pilihan Periode Tambahan */}
-              <div className="pt-3 border-t border-emerald-100/80 space-y-3">
+              <div className="pt-4 border-t border-emerald-100/80 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-extrabold text-xs uppercase tracking-wider text-emerald-900">
-                    Daftar Pilihan Preset Periode Ajaran
-                  </h4>
-                  <span className="text-[11px] text-slate-500 font-medium">
+                  <div>
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                      <Icon name="list" size={14} className="text-emerald-700" />
+                      Daftar Pilihan Preset Periode Ajaran (Bisa Diisi & Disimpan ke Database)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Kelola daftar preset periode tersimpan. Anda dapat mengedit nama & rentang periode langsung di bawah ini.
+                    </p>
+                  </div>
+                  <span className="text-[11px] text-emerald-800 font-bold bg-emerald-100 px-2.5 py-1 rounded-full">
                     {(formData.academicPeriods || []).length} Preset Tersimpan
                   </span>
                 </div>
 
-                <div className="space-y-2">
+                {/* List Preset Tersimpan dengan Editable Form Controls */}
+                <div className="space-y-3">
                   {(formData.academicPeriods && formData.academicPeriods.length > 0) ? (
                     formData.academicPeriods.map((p, idx) => {
                       const isSelected = p.isActive || (
@@ -5985,66 +6058,188 @@ function ParentDashboardView({
                       );
 
                       return (
-                        <div key={p.id || idx} className={`p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${isSelected ? 'bg-emerald-100/70 border-emerald-300' : 'bg-white border-slate-200'}`}>
-                          <div className="flex items-center gap-3">
-                            <span className={`w-6 h-6 rounded-lg font-black text-xs flex items-center justify-center ${isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                              {idx + 1}
-                            </span>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-black text-slate-800">{p.name}</p>
-                                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-blue-100 text-blue-800">
-                                  {p.semester || 'Semua Semester'}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-slate-500 mt-0.5">
-                                {p.startMonth} {p.startYear} s/d {p.endMonth} {p.endYear}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {isSelected ? (
-                              <span className="px-3 py-1 bg-emerald-600 text-white font-black text-[10px] rounded-lg flex items-center gap-1 shadow-sm">
-                                <Icon name="check" size={12} /> Sedang Digunakan
+                        <div key={p.id || idx} className={`p-3.5 rounded-2xl border transition-all ${isSelected ? 'bg-emerald-100/80 border-emerald-400 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-[240px]">
+                              <span className={`w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center shrink-0 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                {idx + 1}
                               </span>
-                            ) : (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
+                                <div className="sm:col-span-2">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Nama Preset Periode</label>
+                                  <input
+                                    type="text"
+                                    value={p.name || ''}
+                                    onChange={(e) => handleUpdatePresetField(idx, 'name', e.target.value)}
+                                    placeholder="Nama Preset Periode"
+                                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white text-xs"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Mulai (Bulan & Thn)</label>
+                                  <div className="flex gap-1">
+                                    <select
+                                      value={p.startMonth || 'Juli'}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'startMonth', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    >
+                                      {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <input
+                                      type="number"
+                                      value={p.startYear || 2025}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'startYear', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Akhir & Semester</label>
+                                  <div className="flex gap-1">
+                                    <select
+                                      value={p.endMonth || 'Juni'}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'endMonth', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    >
+                                      {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <input
+                                      type="number"
+                                      value={p.endYear || 2026}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'endYear', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 justify-end pt-1 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                              <select
+                                value={p.semester || 'Semua'}
+                                onChange={(e) => handleUpdatePresetField(idx, 'semester', e.target.value)}
+                                className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-900 font-bold rounded-xl text-xs"
+                              >
+                                <option value="Semua">Semua Sem</option>
+                                <option value="Semester 1">Semester 1</option>
+                                <option value="Semester 2">Semester 2</option>
+                              </select>
+
+                              {isSelected ? (
+                                <span className="px-3 py-1.5 bg-emerald-600 text-white font-black text-[10px] rounded-xl flex items-center gap-1 shadow-xs">
+                                  <Icon name="check" size={12} /> Aktif
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApplyPreset(p)}
+                                  className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-300 rounded-xl text-[10px] transition-colors shadow-2xs"
+                                >
+                                  Terapkan
+                                </button>
+                              )}
+
                               <button
                                 type="button"
-                                onClick={() => handleApplyPreset(p)}
-                                className="px-3 py-1 bg-white hover:bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-300 rounded-lg text-[10px] transition-colors shadow-2xs"
+                                onClick={() => handleDeletePreset(idx, p.name)}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors"
+                                title="Hapus Preset"
                               >
-                                Gunakan Periode Ini
+                                <Icon name="trash-2" size={15} />
                               </button>
-                            )}
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeletePreset(idx, p.name)}
-                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
-                              title="Hapus Preset"
-                            >
-                              <Icon name="trash-2" size={14} />
-                            </button>
+                            </div>
                           </div>
                         </div>
                       );
                     })
                   ) : (
                     <div className="p-4 bg-white rounded-xl border border-dashed border-emerald-200 text-center text-slate-400 text-xs">
-                      Belum ada preset tersimpan. Klik tombol <strong>"Simpan & Terapkan Rentang Ini"</strong> di atas untuk membuat preset baru.
+                      Belum ada preset tersimpan di database. Gunakan form di bawah untuk menambah preset baru.
                     </div>
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={handleSaveCurrentAsPreset}
-                    className="py-2 px-3.5 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold rounded-xl text-xs transition-colors flex items-center gap-1.5"
-                  >
-                    <Icon name="plus" size={14} /> Simpan Rentang Saat Ini Sebagai Preset Baru
-                  </button>
+                {/* Form Manual Tambah Preset Baru */}
+                <div className="p-4 bg-white rounded-2xl border border-emerald-200 space-y-3">
+                  <h5 className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                    <Icon name="plus-circle" size={15} className="text-emerald-600" />
+                    Tambah Preset Periode Baru Manual
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                    <div className="lg:col-span-2">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Nama Preset Periode</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Periode 2026/2027"
+                        value={newPresetName}
+                        onChange={(e) => setNewPresetName(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Bulan Mulai</label>
+                      <select
+                        value={newPresetStartMonth}
+                        onChange={(e) => setNewPresetStartMonth(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      >
+                        {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Tahun Mulai</label>
+                      <input
+                        type="number"
+                        value={newPresetStartYear}
+                        onChange={(e) => setNewPresetStartYear(parseInt(e.target.value) || 2026)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Bulan Akhir</label>
+                      <select
+                        value={newPresetEndMonth}
+                        onChange={(e) => setNewPresetEndMonth(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      >
+                        {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Tahun Akhir</label>
+                      <input
+                        type="number"
+                        value={newPresetEndYear}
+                        onChange={(e) => setNewPresetEndYear(parseInt(e.target.value) || 2027)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase">Semester:</label>
+                      <select
+                        value={newPresetSemester}
+                        onChange={(e) => setNewPresetSemester(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      >
+                        <option value="Semua">Semua Semester</option>
+                        <option value="Semester 1">Semester 1 (Ganjil)</option>
+                        <option value="Semester 2">Semester 2 (Genap)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddPresetManual}
+                      className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Icon name="plus" size={14} /> + Tambah Preset Periode Baru
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

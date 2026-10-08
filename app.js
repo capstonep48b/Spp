@@ -2073,141 +2073,27 @@ function ParentDashboardView({
     className: "text-slate-500 font-bold"
   }, "Belum ada catatan dari Tata Usaha untuk ", student.name, ".")) : /*#__PURE__*/React.createElement("div", {
     className: "space-y-4"
-  }, myNotes.map(note => {
-    const isLocked = Boolean(note.comments && note.comments.length > 0);
-    const isExpanded = Boolean(expandedNotes[note.id]);
-    if (isLocked) {
-      return /*#__PURE__*/React.createElement("div", {
-        key: note.id,
-        className: "bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "p-5 sm:p-6 bg-amber-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "space-y-1"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "flex flex-wrap items-center gap-2"
-      }, /*#__PURE__*/React.createElement("span", {
-        className: "inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase"
-      }, /*#__PURE__*/React.createElement(Icon, {
-        name: "bookmark",
-        size: 11
-      }), " ", note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("span", {
-        className: "px-2.5 py-0.5 bg-amber-200/80 text-amber-900 text-[10px] font-black rounded-lg uppercase flex items-center gap-1"
-      }, /*#__PURE__*/React.createElement(Icon, {
-        name: "lock",
-        size: 11
-      }), " Terkunci (Telah Ditanggapi)")), /*#__PURE__*/React.createElement("h4", {
-        className: "font-black text-slate-800 text-base sm:text-lg"
-      }, note.title || 'Catatan Tata Usaha (TU)'), /*#__PURE__*/React.createElement("p", {
-        className: "text-xs text-slate-500 font-bold"
-      }, /*#__PURE__*/React.createElement(Icon, {
-        name: "calendar",
-        size: 12,
-        className: "inline mr-1"
-      }), note.date)), /*#__PURE__*/React.createElement("button", {
-        type: "button",
-        onClick: () => toggleNote(note.id),
-        className: "px-4 py-2 bg-white hover:bg-amber-100/60 border border-amber-300 text-amber-900 font-extrabold text-xs rounded-xl transition-all shadow-2xs flex items-center gap-1.5 shrink-0"
-      }, /*#__PURE__*/React.createElement(Icon, {
-        name: isExpanded ? "chevron-up" : "chevron-down",
-        size: 16
-      }), /*#__PURE__*/React.createElement("span", null, isExpanded ? "Sembunyikan Catatan" : "Lihat Catatan & Tanggapan"))), isExpanded && /*#__PURE__*/React.createElement("div", {
-        className: "border-t border-slate-100 animate-in fade-in duration-200"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white"
-      }, note.content), /*#__PURE__*/React.createElement("div", {
-        className: "bg-slate-50 p-6 border-t border-slate-200 space-y-4"
-      }, /*#__PURE__*/React.createElement("h5", {
-        className: "font-black text-xs text-slate-500 uppercase flex items-center gap-2"
-      }, /*#__PURE__*/React.createElement(Icon, {
-        name: "message-circle",
-        size: 14
-      }), " Tanggapan Wali Murid"), /*#__PURE__*/React.createElement("div", {
-        className: "space-y-3"
-      }, note.comments.map((cm, i) => /*#__PURE__*/React.createElement("div", {
-        key: i,
-        className: "bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0"
-      }, "W"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
-        className: "text-xs font-black text-slate-800 mb-0.5"
-      }, cm.sender), /*#__PURE__*/React.createElement("p", {
-        className: "text-xs text-slate-600 font-medium"
-      }, cm.text))))), /*#__PURE__*/React.createElement("div", {
-        className: "p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "flex items-center gap-2.5"
-      }, /*#__PURE__*/React.createElement("div", {
-        className: "w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0"
-      }, /*#__PURE__*/React.createElement(Icon, {
-        name: "lock",
-        size: 14
-      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
-        className: "text-xs font-black text-amber-900"
-      }, "Catatan Telah Ditanggapi (Terkunci)"), /*#__PURE__*/React.createElement("p", {
-        className: "text-[11px] font-medium text-amber-700"
-      }, "Tanggapan Anda telah terkirim ke pihak TU. Sesi tanggapan ini telah terkunci dan tersimpan di riwayat."))), /*#__PURE__*/React.createElement("span", {
-        className: "px-2.5 py-1 bg-amber-200/80 text-amber-900 text-[10px] font-black rounded-lg uppercase tracking-wide shrink-0 flex items-center gap-1"
-      }, /*#__PURE__*/React.createElement(Icon, {
-        name: "check",
-        size: 11
-      }), " Terkunci")))));
-    }
-
-    // Note belum ditanggapi (masih terbuka untuk diketik balasan)
-    return /*#__PURE__*/React.createElement("div", {
-      key: note.id,
-      className: "bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "p-6 border-b border-slate-100 bg-amber-50/30 flex items-start justify-between gap-4"
-    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-      className: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase mb-2"
-    }, /*#__PURE__*/React.createElement(Icon, {
-      name: "bookmark",
-      size: 12
-    }), " ", note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("h4", {
-      className: "font-black text-slate-800 text-lg"
-    }, note.title || 'Catatan Tata Usaha (TU)'), /*#__PURE__*/React.createElement("p", {
-      className: "text-xs text-slate-500 font-bold mt-1"
-    }, /*#__PURE__*/React.createElement(Icon, {
-      name: "calendar",
-      size: 12,
-      className: "inline mr-1"
-    }), note.date))), /*#__PURE__*/React.createElement("div", {
-      className: "p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white"
-    }, note.content), /*#__PURE__*/React.createElement("div", {
-      className: "bg-slate-50 p-6 border-t border-slate-200"
-    }, /*#__PURE__*/React.createElement("h5", {
-      className: "font-black text-xs text-slate-500 uppercase mb-4 flex items-center gap-2"
-    }, /*#__PURE__*/React.createElement(Icon, {
-      name: "message-circle",
-      size: 14
-    }), " Tanggapan Wali Murid"), /*#__PURE__*/React.createElement("div", {
-      className: "flex gap-2"
-    }, /*#__PURE__*/React.createElement("input", {
-      type: "text",
-      value: commentText[note.id] || '',
-      onChange: e => setCommentText({
-        ...commentText,
-        [note.id]: e.target.value
-      }),
-      placeholder: "Ketik tanggapan Anda...",
-      className: "flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
-    }), /*#__PURE__*/React.createElement("button", {
-      onClick: () => {
-        if (!commentText[note.id]?.trim()) return;
-        onAddCommentNote(note.id, {
-          sender: student.wali || 'Wali Murid',
-          text: commentText[note.id].trim()
-        });
-        setCommentText({
-          ...commentText,
-          [note.id]: ''
-        });
-      },
-      className: "px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black text-xs rounded-xl transition-all shadow-sm"
-    }, "Kirim"))));
-  }))), activeTab === 'pengaduan' && /*#__PURE__*/React.createElement("section", {
+  }, myNotes.map(note => /*#__PURE__*/React.createElement("div", {
+    key: note.id,
+    className: "bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "p-6 border-b border-slate-100 bg-amber-50/30 flex items-start justify-between gap-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase mb-2"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "bookmark",
+    size: 12
+  }), " ", note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("h4", {
+    className: "font-black text-slate-800 text-lg"
+  }, note.title || 'Catatan Tata Usaha (TU)'), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-500 font-bold mt-1"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "calendar",
+    size: 12,
+    className: "inline mr-1"
+  }), note.date))), /*#__PURE__*/React.createElement("div", {
+    className: "p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white"
+  }, note.content))))), activeTab === 'pengaduan' && /*#__PURE__*/React.createElement("section", {
     className: "space-y-6 animate-in fade-in duration-300"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 rounded-3xl p-6 sm:p-8 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-teal-900/20"

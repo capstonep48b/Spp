@@ -2211,120 +2211,22 @@ function ParentDashboardView({
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {myNotes.map((note) => {
-                      const isLocked = Boolean(note.comments && note.comments.length > 0);
-                      const isExpanded = Boolean(expandedNotes[note.id]);
-
-                      if (isLocked) {
-                        return (
-                          <div key={note.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all">
-                            <div className="p-5 sm:p-6 bg-amber-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                              <div className="space-y-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase">
-                                    <Icon name="bookmark" size={11} /> {note.category || 'Catatan TU'}
-                                  </span>
-                                  <span className="px-2.5 py-0.5 bg-amber-200/80 text-amber-900 text-[10px] font-black rounded-lg uppercase flex items-center gap-1">
-                                    <Icon name="lock" size={11} /> Terkunci (Telah Ditanggapi)
-                                  </span>
-                                </div>
-                                <h4 className="font-black text-slate-800 text-base sm:text-lg">{note.title || 'Catatan Tata Usaha (TU)'}</h4>
-                                <p className="text-xs text-slate-500 font-bold"><Icon name="calendar" size={12} className="inline mr-1"/>{note.date}</p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => toggleNote(note.id)}
-                                className="px-4 py-2 bg-white hover:bg-amber-100/60 border border-amber-300 text-amber-900 font-extrabold text-xs rounded-xl transition-all shadow-2xs flex items-center gap-1.5 shrink-0"
-                              >
-                                <Icon name={isExpanded ? "chevron-up" : "chevron-down"} size={16} />
-                                <span>{isExpanded ? "Sembunyikan Catatan" : "Lihat Catatan & Tanggapan"}</span>
-                              </button>
+                    {myNotes.map((note) => (
+                      <div key={note.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 bg-amber-50/30 flex items-start justify-between gap-4">
+                          <div>
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase mb-2">
+                              <Icon name="bookmark" size={12} /> {note.category || 'Catatan TU'}
                             </div>
-
-                            {isExpanded && (
-                              <div className="border-t border-slate-100 animate-in fade-in duration-200">
-                                <div className="p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white">
-                                  {note.content}
-                                </div>
-                                <div className="bg-slate-50 p-6 border-t border-slate-200 space-y-4">
-                                  <h5 className="font-black text-xs text-slate-500 uppercase flex items-center gap-2">
-                                    <Icon name="message-circle" size={14}/> Tanggapan Wali Murid
-                                  </h5>
-                                  <div className="space-y-3">
-                                    {note.comments.map((cm, i) => (
-                                      <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0">W</div>
-                                        <div>
-                                          <p className="text-xs font-black text-slate-800 mb-0.5">{cm.sender}</p>
-                                          <p className="text-xs text-slate-600 font-medium">{cm.text}</p>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-
-                                  <div className="p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3">
-                                    <div className="flex items-center gap-2.5">
-                                      <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
-                                        <Icon name="lock" size={14} />
-                                      </div>
-                                      <div>
-                                        <p className="text-xs font-black text-amber-900">Catatan Telah Ditanggapi (Terkunci)</p>
-                                        <p className="text-[11px] font-medium text-amber-700">Tanggapan Anda telah terkirim ke pihak TU. Sesi tanggapan ini telah terkunci dan tersimpan di riwayat.</p>
-                                      </div>
-                                    </div>
-                                    <span className="px-2.5 py-1 bg-amber-200/80 text-amber-900 text-[10px] font-black rounded-lg uppercase tracking-wide shrink-0 flex items-center gap-1">
-                                      <Icon name="check" size={11} /> Terkunci
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-
-                      // Note belum ditanggapi (masih terbuka untuk diketik balasan)
-                      return (
-                        <div key={note.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-                          <div className="p-6 border-b border-slate-100 bg-amber-50/30 flex items-start justify-between gap-4">
-                            <div>
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase mb-2">
-                                <Icon name="bookmark" size={12} /> {note.category || 'Catatan TU'}
-                              </div>
-                              <h4 className="font-black text-slate-800 text-lg">{note.title || 'Catatan Tata Usaha (TU)'}</h4>
-                              <p className="text-xs text-slate-500 font-bold mt-1"><Icon name="calendar" size={12} className="inline mr-1"/>{note.date}</p>
-                            </div>
-                          </div>
-                          <div className="p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white">
-                            {note.content}
-                          </div>
-                          
-                          {/* Comments Section */}
-                          <div className="bg-slate-50 p-6 border-t border-slate-200">
-                             <h5 className="font-black text-xs text-slate-500 uppercase mb-4 flex items-center gap-2"><Icon name="message-circle" size={14}/> Tanggapan Wali Murid</h5>
-                             <div className="flex gap-2">
-                                <input 
-                                  type="text" 
-                                  value={commentText[note.id] || ''}
-                                  onChange={(e) => setCommentText({...commentText, [note.id]: e.target.value})}
-                                  placeholder="Ketik tanggapan Anda..."
-                                  className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
-                                />
-                                <button
-                                  onClick={() => {
-                                    if(!commentText[note.id]?.trim()) return;
-                                    onAddCommentNote(note.id, { sender: student.wali || 'Wali Murid', text: commentText[note.id].trim() });
-                                    setCommentText({...commentText, [note.id]: ''});
-                                  }}
-                                  className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black text-xs rounded-xl transition-all shadow-sm"
-                                >
-                                  Kirim
-                                </button>
-                             </div>
+                            <h4 className="font-black text-slate-800 text-lg">{note.title || 'Catatan Tata Usaha (TU)'}</h4>
+                            <p className="text-xs text-slate-500 font-bold mt-1"><Icon name="calendar" size={12} className="inline mr-1"/>{note.date}</p>
                           </div>
                         </div>
-                      );
-                    })}
+                        <div className="p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white">
+                          {note.content}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </section>

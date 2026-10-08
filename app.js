@@ -5152,7 +5152,6 @@ function TransaksiView({
 // ==========================================
 // 7. MANAJEMEN PENGADUAN
 // ==========================================
-
 function AdminPengaduanView({
   complaints,
   onReplyComplaint,
@@ -5177,133 +5176,171 @@ function AdminPengaduanView({
   const expiredComplaints = complaints.filter(c => nowMs > (c.expiresAtMs || c.createdAtMs + 3600000)).sort((a, b) => b.createdAtMs - a.createdAtMs);
   const activeChat = complaints.find(c => c.id === activeChatId);
   return /*#__PURE__*/React.createElement("div", {
-    className: "h-[calc(100vh-6rem)] animate-in fade-in duration-300 flex gap-4"
+    className: "h-[calc(100vh-6rem)] animate-in fade-in duration-300 flex flex-col md:flex-row gap-4"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-1/3 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden shrink-0"
+    className: `w-full md:w-80 lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-sm flex-col overflow-hidden shrink-0 ${activeChatId ? 'hidden md:flex' : 'flex'}`
   }, /*#__PURE__*/React.createElement("div", {
-    className: "p-5 border-b border-slate-100 bg-slate-50/80"
-  }, /*#__PURE__*/React.createElement("h2", {
-    className: "text-lg font-black text-slate-800 flex items-center gap-2"
+    className: "p-4 sm:p-5 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    className: "text-base sm:text-lg font-black text-slate-800 flex items-center gap-2"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "message-square",
     size: 20,
     className: "text-emerald-600"
   }), " Pesan Pengaduan"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] text-slate-500 font-medium mt-1"
-  }, "Sesi chat aktif dalam 1 Jam.")), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 overflow-y-auto"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-3"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2"
-  }, "Live Chat (", activeComplaints.length, ")"), activeComplaints.length === 0 && /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-400 italic"
-  }, "Tidak ada chat aktif."), /*#__PURE__*/React.createElement("div", {
+    className: "text-[11px] text-slate-500 font-medium mt-0.5"
+  }, "Sesi live chat aktif selama 1 jam.")), /*#__PURE__*/React.createElement("span", {
+    className: "px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800"
+  }, activeComplaints.length, " Live")), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 overflow-y-auto p-3 space-y-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-2"
+  }, "Live Chat (", activeComplaints.length, ")"), activeComplaints.length === 0 && /*#__PURE__*/React.createElement("div", {
+    className: "p-4 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-slate-400 font-bold italic"
+  }, "Tidak ada chat aktif saat ini.")), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2"
-  }, activeComplaints.map(c => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    onClick: () => setActiveChatId(c.id),
-    className: `p-3 rounded-2xl cursor-pointer transition-all border ${activeChatId === c.id ? 'bg-emerald-50 border-emerald-300 shadow-sm' : 'bg-white border-slate-100 hover:bg-slate-50'}`
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-between items-start mb-1"
-  }, /*#__PURE__*/React.createElement("h4", {
-    className: "font-black text-slate-800 text-sm truncate max-w-[150px]"
-  }, c.studentName), /*#__PURE__*/React.createElement("span", {
-    className: "w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"
-  })), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 font-bold truncate"
-  }, c.title), /*#__PURE__*/React.createElement("p", {
-    className: "text-[10px] text-slate-400 mt-1 font-medium"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "clock",
-    size: 10,
-    className: "inline mr-0.5"
-  }), " Sisa ", Math.max(0, Math.floor((c.expiresAtMs - nowMs) / 60000)), " mnt"))))), /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-3 border-t border-slate-100"
+  }, activeComplaints.map(c => {
+    const isSelected = activeChatId === c.id;
+    const remainingMinutes = Math.max(0, Math.floor((c.expiresAtMs - nowMs) / 60000));
+    const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      onClick: () => setActiveChatId(c.id),
+      className: `p-3.5 rounded-2xl cursor-pointer transition-all border ${isSelected ? 'bg-emerald-50 border-emerald-300 shadow-sm ring-2 ring-emerald-400/20' : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200'}`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-between mb-1"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 truncate"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0"
+    }, c.studentName ? c.studentName.charAt(0).toUpperCase() : 'W'), /*#__PURE__*/React.createElement("h4", {
+      className: "font-black text-slate-800 text-sm truncate"
+    }, c.studentName)), /*#__PURE__*/React.createElement("span", {
+      className: "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"
+    })), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs font-black text-slate-700 truncate pl-10"
+    }, c.title), lastMsg && /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-slate-500 truncate pl-10 mt-0.5 font-medium"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-bold text-slate-600"
+    }, lastMsg.sender === 'Admin TU' ? 'Anda: ' : ''), lastMsg.text), /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center justify-between mt-2 pl-10 text-[10px] text-slate-400 font-bold"
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "flex items-center gap-1 text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-full"
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: "clock",
+      size: 10
+    }), " Sisa ", remainingMinutes, " mnt"), /*#__PURE__*/React.createElement("span", null, c.date)));
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "pt-2 border-t border-slate-100"
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2"
+    className: "text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-2"
   }, "Riwayat Expired (", expiredComplaints.length, ")"), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2"
-  }, expiredComplaints.map(c => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    onClick: () => setActiveChatId(c.id),
-    className: `p-3 rounded-2xl cursor-pointer transition-all border ${activeChatId === c.id ? 'bg-slate-100 border-slate-300 shadow-sm' : 'bg-white border-slate-100 hover:bg-slate-50'} opacity-75`
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-between items-start mb-1"
-  }, /*#__PURE__*/React.createElement("h4", {
-    className: "font-black text-slate-800 text-sm truncate max-w-[150px]"
-  }, c.studentName), /*#__PURE__*/React.createElement(Icon, {
-    name: "lock",
-    size: 12,
-    className: "text-slate-400"
-  })), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 font-bold truncate"
-  }, c.title))))))), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex flex-col overflow-hidden"
+  }, expiredComplaints.map(c => {
+    const isSelected = activeChatId === c.id;
+    return /*#__PURE__*/React.createElement("div", {
+      key: c.id,
+      onClick: () => setActiveChatId(c.id),
+      className: `p-3 rounded-2xl cursor-pointer transition-all border ${isSelected ? 'bg-slate-100 border-slate-300 shadow-sm' : 'bg-white border-slate-100 hover:bg-slate-50'} opacity-80`
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-between items-center mb-1"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center gap-2 truncate"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs shrink-0"
+    }, c.studentName ? c.studentName.charAt(0).toUpperCase() : 'W'), /*#__PURE__*/React.createElement("h4", {
+      className: "font-bold text-slate-800 text-xs truncate"
+    }, c.studentName)), /*#__PURE__*/React.createElement(Icon, {
+      name: "lock",
+      size: 12,
+      className: "text-slate-400 shrink-0"
+    })), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-slate-600 font-medium truncate pl-9"
+    }, c.title));
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: `w-full flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex-col overflow-hidden ${!activeChatId ? 'hidden md:flex' : 'flex'}`
   }, !activeChat ? /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 flex flex-col items-center justify-center text-center p-8"
+    className: "flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50/50"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-20 h-20 bg-slate-100 text-slate-300 rounded-full flex items-center justify-center mb-4"
+    className: "w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4 border border-emerald-100 shadow-inner"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "message-circle",
     size: 40
   })), /*#__PURE__*/React.createElement("h3", {
-    className: "text-xl font-black text-slate-700"
-  }, "Pilih Percakapan"), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-slate-500 mt-2 font-medium"
-  }, "Pilih pesan di samping kiri untuk membalas pengaduan wali murid.")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: `p-5 sm:p-6 border-b flex items-center justify-between shrink-0 ${nowMs <= activeChat.expiresAtMs ? 'bg-emerald-50/50 border-emerald-100' : 'bg-slate-100 border-slate-200'}`
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-    className: "font-black text-slate-800 text-lg"
+    className: "text-xl font-black text-slate-800"
+  }, "Pilih Percakapan Chat"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-500 mt-2 font-medium max-w-sm"
+  }, "Pilih pesan pengaduan di panel sebelah kiri untuk membalas obrolan wali murid secara real-time.")) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: `p-4 sm:p-5 border-b flex items-center justify-between shrink-0 ${nowMs <= activeChat.expiresAtMs ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-100 border-slate-200'}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 min-w-0"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setActiveChatId(null),
+    className: "md:hidden p-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl transition-colors shrink-0 border border-slate-200 flex items-center justify-center shadow-sm",
+    title: "Kembali ke Daftar Chat"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "arrow-left",
+    size: 18
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "font-black text-slate-900 text-base sm:text-lg truncate"
   }, activeChat.title), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 font-bold mt-1"
-  }, "Siswa: ", activeChat.studentName, " • Wali: ", activeChat.waliName || 'Wali Murid')), nowMs <= activeChat.expiresAtMs ? /*#__PURE__*/React.createElement("div", {
-    className: "bg-rose-100 text-rose-700 px-3 py-1.5 rounded-lg text-xs font-black border border-rose-200 shadow-sm flex items-center gap-1.5"
+    className: "text-xs text-slate-600 font-bold truncate mt-0.5"
+  }, "Siswa: ", /*#__PURE__*/React.createElement("span", {
+    className: "text-emerald-700"
+  }, activeChat.studentName), " • Wali: ", activeChat.waliName || 'Wali Murid'))), /*#__PURE__*/React.createElement("div", {
+    className: "shrink-0 ml-2"
+  }, nowMs <= activeChat.expiresAtMs ? /*#__PURE__*/React.createElement("div", {
+    className: "bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "w-2 h-2 rounded-full bg-rose-500 animate-pulse"
+    className: "w-2 h-2 rounded-full bg-white animate-pulse"
   }), "LIVE CHAT") : /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-black border border-slate-300 flex items-center gap-1.5"
+    className: "bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-black border border-slate-300 flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "lock",
     size: 14
-  }), " EXPIRED")), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 p-5 sm:p-6 overflow-y-auto bg-slate-50/50 space-y-4"
+  }), " EXPIRED"))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 p-4 sm:p-6 overflow-y-auto bg-[#f0f4f8] space-y-4"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "text-center my-4"
+    className: "text-center my-3"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "bg-slate-200 text-slate-500 text-[10px] font-black uppercase px-3 py-1 rounded-full"
+    className: "bg-white/80 backdrop-blur-sm text-slate-500 text-[10px] font-black uppercase px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm"
   }, "Sesi Obrolan Dibuka: ", activeChat.date)), activeChat.messages && activeChat.messages.map((msg, i) => {
     const isAdmin = msg.sender === 'Admin TU';
     return /*#__PURE__*/React.createElement("div", {
       key: i,
       className: `flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`
     }, /*#__PURE__*/React.createElement("div", {
-      className: `max-w-[85%] sm:max-w-[70%] p-4 rounded-2xl shadow-sm ${isAdmin ? 'bg-emerald-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 rounded-tl-sm text-slate-800'}`
+      className: `max-w-[88%] sm:max-w-[75%] p-3.5 sm:p-4 rounded-2xl shadow-sm ${isAdmin ? 'bg-emerald-600 text-white rounded-tr-xs' : 'bg-white border border-slate-200/90 rounded-tl-xs text-slate-800'}`
     }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-2 mb-1.5 opacity-80"
+      className: "flex items-center gap-1.5 mb-1 opacity-80"
     }, /*#__PURE__*/React.createElement(Icon, {
       name: isAdmin ? 'shield-check' : 'user',
       size: 12
     }), /*#__PURE__*/React.createElement("span", {
-      className: "text-[10px] font-black uppercase"
+      className: "text-[10px] font-black uppercase tracking-wider"
     }, msg.sender)), /*#__PURE__*/React.createElement("p", {
-      className: "text-sm font-medium leading-relaxed"
+      className: "text-xs sm:text-sm font-semibold leading-relaxed whitespace-pre-wrap"
     }, msg.text), msg.imageUrl && /*#__PURE__*/React.createElement("div", {
-      className: "mt-2"
+      className: "mt-2.5"
     }, /*#__PURE__*/React.createElement("img", {
       src: msg.imageUrl,
       alt: "Lampiran",
-      className: "max-w-full h-auto rounded-lg shadow-sm border border-slate-200 cursor-pointer",
+      className: "max-w-full max-h-64 object-cover rounded-xl shadow-md border border-slate-200 cursor-pointer hover:opacity-95 transition-opacity",
       onClick: () => setPreviewImage(msg.imageUrl)
     }))), /*#__PURE__*/React.createElement("span", {
-      className: "text-[10px] text-slate-400 font-bold mt-1.5"
+      className: "text-[10px] text-slate-400 font-bold mt-1 px-1"
     }, msg.time || '-'));
   }), /*#__PURE__*/React.createElement("div", {
     ref: chatEndRef
   })), /*#__PURE__*/React.createElement("div", {
-    className: "p-4 sm:p-5 bg-white border-t border-slate-100 shrink-0"
+    className: "p-3.5 sm:p-4 bg-white border-t border-slate-200 shrink-0"
   }, nowMs <= activeChat.expiresAtMs ? /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-3"
+    className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement("input", {
     type: "file",
     id: `admin_file_${activeChat.id}`,
@@ -5321,8 +5358,10 @@ function AdminPengaduanView({
       }
     }
   }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: () => document.getElementById(`admin_file_${activeChat.id}`).click(),
-    className: "px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl shadow-sm transition-colors flex items-center justify-center"
+    className: "p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center shrink-0",
+    title: "Kirim Lampiran Gambar"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "paperclip",
     size: 18
@@ -5331,7 +5370,7 @@ function AdminPengaduanView({
     value: replyText,
     onChange: e => setReplyText(e.target.value),
     placeholder: "Ketik balasan Anda...",
-    className: "flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500",
+    className: "flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500",
     onKeyDown: e => {
       if (e.key === 'Enter' && replyText.trim()) {
         onReplyComplaint(activeChat.id, replyText.trim(), 'Admin TU');
@@ -5339,25 +5378,25 @@ function AdminPengaduanView({
       }
     }
   }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
     onClick: () => {
       if (replyText.trim()) {
         onReplyComplaint(activeChat.id, replyText.trim(), 'Admin TU');
         setReplyText('');
       }
     },
-    className: "px-6 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 font-black"
+    className: "px-4 sm:px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 font-black shrink-0 text-xs sm:text-sm"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "send",
     size: 18
   }), " ", /*#__PURE__*/React.createElement("span", {
     className: "hidden sm:inline"
   }, "Kirim"))) : /*#__PURE__*/React.createElement("div", {
-    className: "w-full py-3 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-500 text-xs font-bold"
+    className: "w-full py-3 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-500 text-xs font-bold flex items-center justify-center gap-2"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "lock",
-    size: 14,
-    className: "inline mr-1"
-  }), " Waktu Sesi Habis. Obrolan ditutup.")))));
+    size: 14
+  }), " Sesi live chat 1 jam telah berakhir (Expired)")))));
 }
 
 // ==========================================

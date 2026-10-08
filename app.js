@@ -1143,6 +1143,46 @@ function ParentDashboardView({
   const myNotes = useMemo(() => {
     return notes.filter(n => n.studentId === student.id || n.studentName === student.name).sort((a, b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now()));
   }, [notes, student]);
+
+  // Auto-mark notifications as read when opening specific tabs or notifications
+  useEffect(() => {
+    if (activeTab === 'pengaduan' && myComplaints.length > 0) {
+      const updated = {
+        ...readComplaintMsgs
+      };
+      let changed = false;
+      myComplaints.forEach(c => {
+        if (c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length) {
+          updated[c.id] = c.messages.length;
+          changed = true;
+        }
+      });
+      if (changed) {
+        setReadComplaintMsgs(updated);
+        try {
+          localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updated));
+        } catch (e) {}
+      }
+    } else if (activeTab === 'evaluasi' && myNotes.length > 0) {
+      const unreadIds = myNotes.filter(n => !readNotes.includes(n.id)).map(n => n.id);
+      if (unreadIds.length > 0) {
+        const next = [...readNotes, ...unreadIds];
+        setReadNotes(next);
+        try {
+          localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(next));
+        } catch (e) {}
+      }
+    } else if (activeTab === 'berita' && announcements.length > 0) {
+      const unreadIds = announcements.filter(a => !readAnnouncements.includes(a.id)).map(a => a.id);
+      if (unreadIds.length > 0) {
+        const next = [...readAnnouncements, ...unreadIds];
+        setReadAnnouncements(next);
+        try {
+          localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next));
+        } catch (e) {}
+      }
+    }
+  }, [activeTab, myComplaints, myNotes, announcements]);
   const monthlyBills = useMemo(() => {
     const periodStartYear = parseInt(settings?.startYear) || 2026;
     const bills = getMonthsList(settings).map(monthName => {
@@ -2032,90 +2072,142 @@ function ParentDashboardView({
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-slate-500 font-bold"
   }, "Belum ada catatan dari Tata Usaha untuk ", student.name, ".")) : /*#__PURE__*/React.createElement("div", {
-    className: "space-y-6"
-  }, myNotes.map(note => /*#__PURE__*/React.createElement("div", {
-    key: note.id,
-    className: "bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "p-6 border-b border-slate-100 bg-amber-50/30 flex items-start justify-between gap-4"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase mb-2"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "bookmark",
-    size: 12
-  }), " ", note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("h4", {
-    className: "font-black text-slate-800 text-lg"
-  }, note.title || 'Catatan Tata Usaha (TU)'), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 font-bold mt-1"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "calendar",
-    size: 12,
-    className: "inline mr-1"
-  }), note.date))), /*#__PURE__*/React.createElement("div", {
-    className: "p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white"
-  }, note.content), /*#__PURE__*/React.createElement("div", {
-    className: "bg-slate-50 p-6 border-t border-slate-200"
-  }, /*#__PURE__*/React.createElement("h5", {
-    className: "font-black text-xs text-slate-500 uppercase mb-4 flex items-center gap-2"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "message-circle",
-    size: 14
-  }), " Tanggapan Wali Murid"), note.comments && note.comments.length > 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "space-y-3 mb-4"
-  }, note.comments.map((cm, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    className: "bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0"
-  }, "W"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-black text-slate-800 mb-0.5"
-  }, cm.sender), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-600 font-medium"
-  }, cm.text))))) : /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-400 font-bold mb-4 italic"
-  }, "Belum ada tanggapan."), note.comments && note.comments.length > 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2.5"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "lock",
-    size: 14
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
-    className: "text-xs font-black text-amber-900"
-  }, "Catatan Telah Ditanggapi (Terkunci)"), /*#__PURE__*/React.createElement("p", {
-    className: "text-[11px] font-medium text-amber-700"
-  }, "Tanggapan Anda telah terkirim ke pihak TU. Sesi tanggapan ini telah terkunci dan tersimpan di riwayat."))), /*#__PURE__*/React.createElement("span", {
-    className: "px-2.5 py-1 bg-amber-200/80 text-amber-900 text-[10px] font-black rounded-lg uppercase tracking-wide shrink-0 flex items-center gap-1"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "check",
-    size: 11
-  }), " Terkunci")) : /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: commentText[note.id] || '',
-    onChange: e => setCommentText({
-      ...commentText,
-      [note.id]: e.target.value
-    }),
-    placeholder: "Ketik tanggapan Anda...",
-    className: "flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if (!commentText[note.id]?.trim()) return;
-      onAddCommentNote(note.id, {
-        sender: student.wali || 'Wali Murid',
-        text: commentText[note.id].trim()
-      });
-      setCommentText({
+    className: "space-y-4"
+  }, myNotes.map(note => {
+    const isLocked = Boolean(note.comments && note.comments.length > 0);
+    const isExpanded = Boolean(expandedNotes[note.id]);
+    if (isLocked) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: note.id,
+        className: "bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden transition-all"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "p-5 sm:p-6 bg-amber-50/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "space-y-1"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "flex flex-wrap items-center gap-2"
+      }, /*#__PURE__*/React.createElement("span", {
+        className: "inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase"
+      }, /*#__PURE__*/React.createElement(Icon, {
+        name: "bookmark",
+        size: 11
+      }), " ", note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("span", {
+        className: "px-2.5 py-0.5 bg-amber-200/80 text-amber-900 text-[10px] font-black rounded-lg uppercase flex items-center gap-1"
+      }, /*#__PURE__*/React.createElement(Icon, {
+        name: "lock",
+        size: 11
+      }), " Terkunci (Telah Ditanggapi)")), /*#__PURE__*/React.createElement("h4", {
+        className: "font-black text-slate-800 text-base sm:text-lg"
+      }, note.title || 'Catatan Tata Usaha (TU)'), /*#__PURE__*/React.createElement("p", {
+        className: "text-xs text-slate-500 font-bold"
+      }, /*#__PURE__*/React.createElement(Icon, {
+        name: "calendar",
+        size: 12,
+        className: "inline mr-1"
+      }), note.date)), /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: () => toggleNote(note.id),
+        className: "px-4 py-2 bg-white hover:bg-amber-100/60 border border-amber-300 text-amber-900 font-extrabold text-xs rounded-xl transition-all shadow-2xs flex items-center gap-1.5 shrink-0"
+      }, /*#__PURE__*/React.createElement(Icon, {
+        name: isExpanded ? "chevron-up" : "chevron-down",
+        size: 16
+      }), /*#__PURE__*/React.createElement("span", null, isExpanded ? "Sembunyikan Catatan" : "Lihat Catatan & Tanggapan"))), isExpanded && /*#__PURE__*/React.createElement("div", {
+        className: "border-t border-slate-100 animate-in fade-in duration-200"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white"
+      }, note.content), /*#__PURE__*/React.createElement("div", {
+        className: "bg-slate-50 p-6 border-t border-slate-200 space-y-4"
+      }, /*#__PURE__*/React.createElement("h5", {
+        className: "font-black text-xs text-slate-500 uppercase flex items-center gap-2"
+      }, /*#__PURE__*/React.createElement(Icon, {
+        name: "message-circle",
+        size: 14
+      }), " Tanggapan Wali Murid"), /*#__PURE__*/React.createElement("div", {
+        className: "space-y-3"
+      }, note.comments.map((cm, i) => /*#__PURE__*/React.createElement("div", {
+        key: i,
+        className: "bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex items-start gap-3"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0"
+      }, "W"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+        className: "text-xs font-black text-slate-800 mb-0.5"
+      }, cm.sender), /*#__PURE__*/React.createElement("p", {
+        className: "text-xs text-slate-600 font-medium"
+      }, cm.text))))), /*#__PURE__*/React.createElement("div", {
+        className: "p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-2xl flex items-center justify-between gap-3"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "flex items-center gap-2.5"
+      }, /*#__PURE__*/React.createElement("div", {
+        className: "w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0"
+      }, /*#__PURE__*/React.createElement(Icon, {
+        name: "lock",
+        size: 14
+      })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+        className: "text-xs font-black text-amber-900"
+      }, "Catatan Telah Ditanggapi (Terkunci)"), /*#__PURE__*/React.createElement("p", {
+        className: "text-[11px] font-medium text-amber-700"
+      }, "Tanggapan Anda telah terkirim ke pihak TU. Sesi tanggapan ini telah terkunci dan tersimpan di riwayat."))), /*#__PURE__*/React.createElement("span", {
+        className: "px-2.5 py-1 bg-amber-200/80 text-amber-900 text-[10px] font-black rounded-lg uppercase tracking-wide shrink-0 flex items-center gap-1"
+      }, /*#__PURE__*/React.createElement(Icon, {
+        name: "check",
+        size: 11
+      }), " Terkunci")))));
+    }
+
+    // Note belum ditanggapi (masih terbuka untuk diketik balasan)
+    return /*#__PURE__*/React.createElement("div", {
+      key: note.id,
+      className: "bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "p-6 border-b border-slate-100 bg-amber-50/30 flex items-start justify-between gap-4"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      className: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase mb-2"
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: "bookmark",
+      size: 12
+    }), " ", note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("h4", {
+      className: "font-black text-slate-800 text-lg"
+    }, note.title || 'Catatan Tata Usaha (TU)'), /*#__PURE__*/React.createElement("p", {
+      className: "text-xs text-slate-500 font-bold mt-1"
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: "calendar",
+      size: 12,
+      className: "inline mr-1"
+    }), note.date))), /*#__PURE__*/React.createElement("div", {
+      className: "p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white"
+    }, note.content), /*#__PURE__*/React.createElement("div", {
+      className: "bg-slate-50 p-6 border-t border-slate-200"
+    }, /*#__PURE__*/React.createElement("h5", {
+      className: "font-black text-xs text-slate-500 uppercase mb-4 flex items-center gap-2"
+    }, /*#__PURE__*/React.createElement(Icon, {
+      name: "message-circle",
+      size: 14
+    }), " Tanggapan Wali Murid"), /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-2"
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "text",
+      value: commentText[note.id] || '',
+      onChange: e => setCommentText({
         ...commentText,
-        [note.id]: ''
-      });
-    },
-    className: "px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black text-xs rounded-xl transition-all shadow-sm"
-  }, "Kirim"))))))), activeTab === 'pengaduan' && /*#__PURE__*/React.createElement("section", {
+        [note.id]: e.target.value
+      }),
+      placeholder: "Ketik tanggapan Anda...",
+      className: "flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-amber-500"
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: () => {
+        if (!commentText[note.id]?.trim()) return;
+        onAddCommentNote(note.id, {
+          sender: student.wali || 'Wali Murid',
+          text: commentText[note.id].trim()
+        });
+        setCommentText({
+          ...commentText,
+          [note.id]: ''
+        });
+      },
+      className: "px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black text-xs rounded-xl transition-all shadow-sm"
+    }, "Kirim"))));
+  }))), activeTab === 'pengaduan' && /*#__PURE__*/React.createElement("section", {
     className: "space-y-6 animate-in fade-in duration-300"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 rounded-3xl p-6 sm:p-8 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-teal-900/20"
@@ -2431,7 +2523,14 @@ function DashboardView({
   }, "Refresh Data")), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setShowBellDropdown(!showBellDropdown),
+    onClick: () => {
+      const next = !showBellDropdown;
+      setShowBellDropdown(next);
+      if (next) {
+        complaints.forEach(c => onMarkReadNotification && onMarkReadNotification('complaint', c.id));
+        transactions.forEach(t => onMarkReadNotification && onMarkReadNotification('transaction', t.id));
+      }
+    },
     className: "p-3 bg-white/15 hover:bg-white/25 rounded-2xl text-white relative transition-colors border border-white/20"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "bell",
@@ -7019,12 +7118,54 @@ function App() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [envConfig, setEnvConfig] = useState({});
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-  const [students, setStudents] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [announcements, setAnnouncements] = useState([]);
-  const [complaints, setComplaints] = useState([]);
-  const [notes, setNotes] = useState([]);
+  const [settings, setSettings] = useState(() => {
+    try {
+      const c = localStorage.getItem('spp_cached_settings');
+      return c ? JSON.parse(c) : DEFAULT_SETTINGS;
+    } catch (e) {
+      return DEFAULT_SETTINGS;
+    }
+  });
+  const [students, setStudents] = useState(() => {
+    try {
+      const c = localStorage.getItem('spp_cached_students');
+      return c ? JSON.parse(c) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [transactions, setTransactions] = useState(() => {
+    try {
+      const c = localStorage.getItem('spp_cached_transactions');
+      return c ? JSON.parse(c) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [announcements, setAnnouncements] = useState(() => {
+    try {
+      const c = localStorage.getItem('spp_cached_announcements');
+      return c ? JSON.parse(c) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [complaints, setComplaints] = useState(() => {
+    try {
+      const c = localStorage.getItem('spp_cached_complaints');
+      return c ? JSON.parse(c) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [notes, setNotes] = useState(() => {
+    try {
+      const c = localStorage.getItem('spp_cached_notes');
+      return c ? JSON.parse(c) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [selectedKuitansi, setSelectedKuitansi] = useState(null);
   const [activeMidtransBill, setActiveMidtransBill] = useState(null);
   const [toast, setToast] = useState(null);
@@ -7154,6 +7295,9 @@ function App() {
         if (stData) {
           const mappedStudents = stData.map(mapStudentFromDb);
           setStudents(mappedStudents);
+          try {
+            localStorage.setItem('spp_cached_students', JSON.stringify(mappedStudents));
+          } catch (e) {}
 
           // Cek validitas sesi siswa aktif di perangkat ini
           const activeUser = currentUserRef.current;
@@ -7169,25 +7313,52 @@ function App() {
         const {
           data: trData
         } = await supabase.from('transactions').select('*');
-        if (trData) setTransactions(trData.map(mapTransactionFromDb));
+        if (trData) {
+          const mappedTr = trData.map(mapTransactionFromDb);
+          setTransactions(mappedTr);
+          try {
+            localStorage.setItem('spp_cached_transactions', JSON.stringify(mappedTr));
+          } catch (e) {}
+        }
         const {
           data: anData
         } = await supabase.from('announcements').select('*');
-        if (anData) setAnnouncements(anData.map(mapAnnouncementFromDb));
+        if (anData) {
+          const mappedAn = anData.map(mapAnnouncementFromDb);
+          setAnnouncements(mappedAn);
+          try {
+            localStorage.setItem('spp_cached_announcements', JSON.stringify(mappedAn));
+          } catch (e) {}
+        }
         const {
           data: cpData
         } = await supabase.from('complaints').select('*');
-        if (cpData) setComplaints(cpData.map(mapComplaintFromDb));
+        if (cpData) {
+          const mappedCp = cpData.map(mapComplaintFromDb);
+          setComplaints(mappedCp);
+          try {
+            localStorage.setItem('spp_cached_complaints', JSON.stringify(mappedCp));
+          } catch (e) {}
+        }
         const {
           data: ntData
         } = await supabase.from('student_notes').select('*');
-        if (ntData) setNotes(ntData.map(mapNoteFromDb));
+        if (ntData) {
+          const mappedNt = ntData.map(mapNoteFromDb);
+          setNotes(mappedNt);
+          try {
+            localStorage.setItem('spp_cached_notes', JSON.stringify(mappedNt));
+          } catch (e) {}
+        }
         const {
           data: stgData
         } = await supabase.from('settings').select('*').limit(1);
         if (stgData && stgData.length > 0) {
           const mappedSettings = mapSettingsFromDb(stgData[0]);
           setSettings(mappedSettings);
+          try {
+            localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings));
+          } catch (e) {}
         }
       }
     } catch (e) {

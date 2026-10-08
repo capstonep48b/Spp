@@ -1086,9 +1086,7 @@ function ParentDashboardView({
   }
   const [activeTab, setActiveTab] = useState('spp');
   const [sppSubFilter, setSppSubFilter] = useState('all');
-  const [complaintTitle, setComplaintTitle] = useState('');
-  const [complaintContent, setComplaintContent] = useState('');
-  const [commentText, setCommentText] = useState({});
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [showParentBell, setShowParentBell] = useState(false);
   const [readAnnouncements, setReadAnnouncements] = useState(() => {
     try {
@@ -1097,95 +1095,13 @@ function ParentDashboardView({
       return [];
     }
   });
-  const [readNotes, setReadNotes] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('read_notes_' + (student ? student.id : 'guest'))) || [];
-    } catch (e) {
-      return [];
-    }
-  });
-  const [readComplaintMsgs, setReadComplaintMsgs] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('read_complaint_msgs_' + (student ? student.id : 'guest'))) || {};
-    } catch (e) {
-      return {};
-    }
-  });
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
-  const [replyText, setReplyText] = useState({});
-  const [nowMs, setNowMs] = useState(Date.now());
-  const [expandedNotes, setExpandedNotes] = useState({});
-  const toggleNote = id => setExpandedNotes(prev => ({
-    ...prev,
-    [id]: !prev[id]
-  }));
-
-  // Settings State
-  const [newPassword, setNewPassword] = useState('');
-  const [newPhone, setNewPhone] = useState(student.telepon || '');
-  useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), 5000);
-    return () => clearInterval(timer);
-  }, []);
   const studentTrx = useMemo(() => {
     return transactions.filter(t => t.studentId && t.studentId === student.id || t.studentName && t.studentName.toLowerCase().trim() === student.name.toLowerCase().trim());
   }, [transactions, student]);
-  const myComplaints = useMemo(() => {
-    return complaints.filter(c => c.studentId === student.id || c.studentName === student.name);
-  }, [complaints, student]);
-  const activeComplaint = useMemo(() => {
-    return myComplaints.find(c => nowMs <= (c.expiresAtMs || c.createdAtMs + 3600000));
-  }, [myComplaints, nowMs]);
-  const expiredComplaints = useMemo(() => {
-    return myComplaints.filter(c => nowMs > (c.expiresAtMs || c.createdAtMs + 3600000)).sort((a, b) => b.createdAtMs - a.createdAtMs);
-  }, [myComplaints, nowMs]);
-  const myNotes = useMemo(() => {
-    return notes.filter(n => n.studentId === student.id || n.studentName === student.name).sort((a, b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now()));
-  }, [notes, student]);
-
-  // Auto-mark notifications as read when opening specific tabs or notifications
-  useEffect(() => {
-    if (activeTab === 'pengaduan' && myComplaints.length > 0) {
-      const updated = {
-        ...readComplaintMsgs
-      };
-      let changed = false;
-      myComplaints.forEach(c => {
-        if (c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length) {
-          updated[c.id] = c.messages.length;
-          changed = true;
-        }
-      });
-      if (changed) {
-        setReadComplaintMsgs(updated);
-        try {
-          localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updated));
-        } catch (e) {}
-      }
-    } else if (activeTab === 'evaluasi' && myNotes.length > 0) {
-      const unreadIds = myNotes.filter(n => !readNotes.includes(n.id)).map(n => n.id);
-      if (unreadIds.length > 0) {
-        const next = [...readNotes, ...unreadIds];
-        setReadNotes(next);
-        try {
-          localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(next));
-        } catch (e) {}
-      }
-    } else if (activeTab === 'berita' && announcements.length > 0) {
-      const unreadIds = announcements.filter(a => !readAnnouncements.includes(a.id)).map(a => a.id);
-      if (unreadIds.length > 0) {
-        const next = [...readAnnouncements, ...unreadIds];
-        setReadAnnouncements(next);
-        try {
-          localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next));
-        } catch (e) {}
-      }
-    }
-  }, [activeTab, myComplaints, myNotes, announcements]);
   const monthlyBills = useMemo(() => {
-    const periodStartYear = parseInt(settings?.startYear) || 2026;
-    const bills = getMonthsList(settings).map(monthName => {
+    return getMonthsList(settings).map(monthName => {
       const paidTrx = studentTrx.find(t => t.status === 'Lunas' && (t.month === monthName || t.month.toLowerCase().trim() === monthName.toLowerCase().trim() || monthName.startsWith(t.month)));
       const isDue = isMonthDueOrElapsed(monthName, new Date(), settings?.dueDateDay || 10);
       return {
@@ -1200,25 +1116,15 @@ function ParentDashboardView({
         isDue: isDue
       };
     });
-    return bills;
   }, [studentTrx, student, settings]);
-
-  // Tunggakan HANYA bulan yang sudah berjalan s/d saat ini dan belum dibayar
   const unpaidBills = monthlyBills.filter(b => b.status !== 'Lunas' && b.isDue);
-  // Bulan mendatang dalam periode ajaran (belum jatuh tempo)
   const upcomingBills = monthlyBills.filter(b => b.status !== 'Lunas' && !b.isDue);
   const paidBills = monthlyBills.filter(b => b.status === 'Lunas');
   const totalDueDebt = unpaidBills.reduce((acc, b) => acc + (b.amount || 0), 0);
-
-  // Seluruh transaksi lunas (mencakup kelas saat ini & kelas sebelumnya)
   const allPaidTransactions = useMemo(() => {
     return studentTrx.filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses').sort((a, b) => (b.id || 0) - (a.id || 0));
   }, [studentTrx]);
-
-  // State filter kelas untuk riwayat pembayaran
   const [historyClassFilter, setHistoryClassFilter] = useState('all');
-
-  // Daftar kelas yang pernah diikuti siswa (kelas saat ini + kelas dari transaksi masa lalu + classHistory)
   const studentClassHistoryList = useMemo(() => {
     const clsSet = new Set();
     if (student?.kelas) clsSet.add(student.kelas);
@@ -1231,46 +1137,24 @@ function ParentDashboardView({
     });
     return Array.from(clsSet);
   }, [student, allPaidTransactions]);
-
-  // Filter riwayat berdasarkan pilihan kelas
   const filteredPaidBills = useMemo(() => {
     if (historyClassFilter === 'all') return allPaidTransactions;
     return allPaidTransactions.filter(t => (t.kelas || student?.kelas) === historyClassFilter);
   }, [allPaidTransactions, historyClassFilter, student?.kelas]);
   const unreadAnnCount = announcements.filter(a => !readAnnouncements.includes(a.id)).length;
-  const unreadNotesCount = myNotes.filter(n => !readNotes.includes(n.id)).length;
-  const unreadComplaintMsgsCount = myComplaints.filter(c => c.messages && c.messages.length > (readComplaintMsgs[c.id] || 0) && c.messages[c.messages.length - 1].sender === 'Admin TU').length;
-  const totalParentUnread = unreadAnnCount + unreadNotesCount + unreadComplaintMsgsCount;
-  const handleSubmitComplaint = e => {
-    e.preventDefault();
-    if (!complaintTitle || !complaintContent) return;
-    const now = Date.now();
-    onAddComplaint({
-      studentId: student.id,
-      studentName: student.name,
-      waliName: student.wali || 'Wali Siswa',
-      title: complaintTitle,
-      content: complaintContent,
-      adminReply: '',
-      status: 'Belum Ditangani',
-      isRead: false,
-      date: new Date().toLocaleDateString('id-ID'),
-      createdAtMs: now,
-      expiresAtMs: now + 3600000
-    });
-    setComplaintTitle('');
-    setComplaintContent('');
-  };
-  const handleSaveSettings = e => {
-    e.preventDefault();
-    const updateObj = {};
-    if (newPassword.trim()) updateObj.password = newPassword.trim();
-    if (newPhone.trim()) updateObj.telepon = newPhone.trim();
-    if (Object.keys(updateObj).length > 0) {
-      onUpdateParentSettings(student.id, updateObj);
-      setNewPassword('');
+  const totalParentUnread = unreadAnnCount;
+  useEffect(() => {
+    if (activeTab === 'berita' && announcements.length > 0) {
+      const unreadIds = announcements.filter(a => !readAnnouncements.includes(a.id)).map(a => a.id);
+      if (unreadIds.length > 0) {
+        const next = [...readAnnouncements, ...unreadIds];
+        setReadAnnouncements(next);
+        try {
+          localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next));
+        } catch (e) {}
+      }
     }
-  };
+  }, [activeTab, announcements]);
   const getWaLink = numStr => {
     if (!numStr) return '#';
     let clean = numStr.replace(/[^0-9]/g, '');
@@ -1323,13 +1207,13 @@ function ParentDashboardView({
   }, /*#__PURE__*/React.createElement("aside", {
     className: "w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "p-6 sm:p-7 pb-6 flex items-center gap-4"
+    className: "p-5 sm:p-7 pb-4 sm:pb-6 flex items-center gap-3.5 sm:gap-4"
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => student.fotoUrl && setPreviewImage({
       url: student.fotoUrl,
       title: `Foto Profil - ${student.name}`
     }),
-    className: "w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/30 overflow-hidden shrink-0 shadow-lg cursor-pointer hover:scale-105 transition-transform"
+    className: "w-12 h-12 sm:w-14 sm:h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/30 overflow-hidden shrink-0 shadow-lg cursor-pointer hover:scale-105 transition-transform"
   }, student.fotoUrl ? /*#__PURE__*/React.createElement("img", {
     src: student.fotoUrl,
     alt: student.name,
@@ -1337,9 +1221,9 @@ function ParentDashboardView({
   }) : /*#__PURE__*/React.createElement("img", {
     src: "logo.png",
     alt: "PAUD Setia Bhakti",
-    className: "w-11 h-11 object-contain filter drop-shadow"
+    className: "w-10 h-10 sm:w-11 sm:h-11 object-contain filter drop-shadow"
   })), /*#__PURE__*/React.createElement("div", {
-    className: "min-w-0"
+    className: "min-w-0 flex-1"
   }, /*#__PURE__*/React.createElement("h1", {
     className: "font-black text-base lg:text-lg leading-tight text-white tracking-tight truncate"
   }, settings.schoolName), /*#__PURE__*/React.createElement("div", {
@@ -1349,7 +1233,7 @@ function ParentDashboardView({
   }), /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-black text-blue-100 uppercase tracking-wider"
   }, "Wali Murid")))), /*#__PURE__*/React.createElement("nav", {
-    className: "pl-4 pr-0 py-4 space-y-2.5 sm:space-y-3 font-extrabold text-sm sm:text-base relative"
+    className: "px-3 sm:pl-4 sm:pr-0 py-2 sm:py-4 flex md:flex-col gap-2 sm:gap-3 font-extrabold text-sm sm:text-base relative overflow-x-auto"
   }, [{
     id: 'spp',
     icon: 'credit-card',
@@ -1361,38 +1245,24 @@ function ParentDashboardView({
     icon: 'newspaper',
     label: 'Pengumuman',
     count: unreadAnnCount > 0 ? unreadAnnCount : null
-  }, {
-    id: 'evaluasi',
-    icon: 'award',
-    label: 'Catatan TU',
-    count: unreadNotesCount > 0 ? unreadNotesCount : null
-  }, {
-    id: 'pengaduan',
-    icon: 'message-square',
-    label: 'Pengaduan',
-    count: unreadComplaintMsgsCount > 0 ? unreadComplaintMsgsCount : null
-  }, {
-    id: 'pengaturan',
-    icon: 'settings',
-    label: 'Pengaturan'
   }].map(tab => {
     const isActive = activeTab === tab.id;
     return /*#__PURE__*/React.createElement("button", {
       key: tab.id,
       onClick: () => setActiveTab(tab.id),
-      className: `w-full py-4 px-5 sm:px-6 flex items-center justify-between transition-all text-sm sm:text-[15px] ${isActive ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-l-2xl rounded-r-none mr-0 shadow-sm' : 'w-[calc(100%-16px)] mr-4 rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'}`
+      className: `py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${isActive ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm' : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'}`
     }, /*#__PURE__*/React.createElement("div", {
-      className: "flex items-center gap-3.5 truncate"
+      className: "flex items-center gap-3 truncate"
     }, /*#__PURE__*/React.createElement(Icon, {
       name: tab.icon,
-      size: 22
+      size: 20
     }), /*#__PURE__*/React.createElement("span", {
       className: "truncate"
     }, tab.label)), tab.count ? /*#__PURE__*/React.createElement("span", {
-      className: `px-2.5 py-1 rounded-full text-xs font-black ${isActive ? tab.isBadgeDanger ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700' : tab.isBadgeDanger ? 'bg-rose-500 text-white' : 'bg-white/20 text-white'}`
+      className: `ml-2 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[11px] sm:text-xs font-black ${isActive ? tab.isBadgeDanger ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700' : tab.isBadgeDanger ? 'bg-rose-500 text-white' : 'bg-white/20 text-white'}`
     }, tab.count) : null);
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "p-4 m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-white"
+    className: "p-3.5 sm:p-4 m-3 sm:m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-white hidden md:block"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1406,14 +1276,14 @@ function ParentDashboardView({
   }, "Kelas ", student.kelas, " • NIS ", student.nis))))), /*#__PURE__*/React.createElement("main", {
     className: "flex-1 bg-white flex flex-col min-w-0 min-h-0 overflow-y-auto"
   }, /*#__PURE__*/React.createElement("header", {
-    className: "px-6 md:px-10 pt-7 pb-5 border-b border-slate-100 flex flex-col gap-4 bg-white/95 backdrop-blur-md sticky top-0 z-10"
+    className: "px-4 sm:px-6 md:px-10 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-slate-100 flex flex-col gap-4 bg-white/95 backdrop-blur-md sticky top-0 z-10"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex flex-col sm:flex-row sm:items-center justify-between gap-4"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("h2", {
-    className: "text-2xl sm:text-3xl font-black text-slate-900 tracking-tight"
-  }, activeTab === 'spp' && 'Status Pembayaran SPP', activeTab === 'berita' && 'Berita & Pengumuman Sekolah', activeTab === 'evaluasi' && 'Catatan Siswa dari TU / Guru', activeTab === 'pengaduan' && 'Layanan Pengaduan & Aspirasi', activeTab === 'pengaturan' && 'Pengaturan Akun Wali Murid'), activeTab === 'spp' && (unpaidBills.length > 0 ? /*#__PURE__*/React.createElement("span", {
+    className: "text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight"
+  }, activeTab === 'spp' && 'Status Pembayaran SPP', activeTab === 'berita' && 'Berita & Pengumuman Sekolah'), activeTab === 'spp' && (unpaidBills.length > 0 ? /*#__PURE__*/React.createElement("span", {
     className: "hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "alert-circle",
@@ -1426,24 +1296,24 @@ function ParentDashboardView({
     size: 14,
     className: "text-emerald-600"
   }), /*#__PURE__*/React.createElement("span", null, "Status Lunas / Aman")))), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm sm:text-base text-slate-500 font-medium mt-1"
-  }, activeTab === 'spp' && 'Informasi tarif, tagihan jatuh tempo, dan riwayat pembayaran resmi', activeTab === 'berita' && 'Informasi kegiatan, edaran libur, dan agenda sekolah terkini', activeTab === 'evaluasi' && 'Catatan perkembangan, pembinaan, dan apresiasi dari sekolah', activeTab === 'pengaduan' && 'Sampaikan aspirasi dan konsultasi langsung dengan pihak TU', activeTab === 'pengaturan' && 'Perbarui nomor WhatsApp dan kata sandi akun')), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2.5 sm:gap-3 shrink-0"
+    className: "text-xs sm:text-sm md:text-base text-slate-500 font-medium mt-1"
+  }, activeTab === 'spp' && 'Informasi tarif, tagihan jatuh tempo, dan riwayat pembayaran resmi', activeTab === 'berita' && 'Informasi kegiatan, edaran libur, dan agenda sekolah terkini')), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2 sm:gap-3 shrink-0"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => onRefresh(true),
     title: "Sinkronisasi Data",
-    className: "px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
+    className: "px-3.5 py-2 sm:px-4 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "refresh-cw",
     size: 17,
     className: isRefreshing ? 'animate-spin text-blue-600' : ''
   }), /*#__PURE__*/React.createElement("span", {
-    className: "hidden md:inline"
+    className: "hidden sm:inline"
   }, "Sinkronisasi")), /*#__PURE__*/React.createElement("div", {
     className: "relative"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowParentBell(!showParentBell),
-    className: "p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 relative transition-colors",
+    className: "p-2 sm:p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 relative transition-colors",
     title: "Notifikasi"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "bell",
@@ -1451,7 +1321,7 @@ function ParentDashboardView({
   }), totalParentUnread > 0 && /*#__PURE__*/React.createElement("span", {
     className: "absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center animate-pulse"
   }, totalParentUnread)), showParentBell && /*#__PURE__*/React.createElement("div", {
-    className: "absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2"
+    className: "absolute right-0 mt-3 w-72 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between border-b border-slate-100 pb-2"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1466,20 +1336,9 @@ function ParentDashboardView({
     type: "button",
     onClick: () => {
       const newAnnIds = [...new Set([...readAnnouncements, ...announcements.map(a => a.id)])];
-      const newNoteIds = [...new Set([...readNotes, ...myNotes.map(n => n.id)])];
-      const newComplaintMsgs = {
-        ...readComplaintMsgs
-      };
-      myComplaints.forEach(c => {
-        if (c.messages) newComplaintMsgs[c.id] = c.messages.length;
-      });
       setReadAnnouncements(newAnnIds);
-      setReadNotes(newNoteIds);
-      setReadComplaintMsgs(newComplaintMsgs);
       try {
         localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(newAnnIds));
-        localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(newNoteIds));
-        localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(newComplaintMsgs));
       } catch (e) {}
     },
     className: "text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
@@ -1488,9 +1347,9 @@ function ParentDashboardView({
     className: "text-slate-400 hover:text-slate-600 text-xs font-bold"
   }, "Tutup"))), /*#__PURE__*/React.createElement("div", {
     className: "space-y-2 max-h-72 overflow-y-auto text-xs"
-  }, announcements.length === 0 && myNotes.length === 0 && /*#__PURE__*/React.createElement("p", {
+  }, announcements.length === 0 && /*#__PURE__*/React.createElement("p", {
     className: "text-slate-400 text-center py-4 font-medium"
-  }, "Tidak ada notifikasi saat ini."), announcements.slice(0, 6).map(ann => {
+  }, "Tidak ada notifikasi pengumuman saat ini."), announcements.slice(0, 6).map(ann => {
     const isUnread = !readAnnouncements.includes(ann.id);
     return /*#__PURE__*/React.createElement("div", {
       key: ann.id,
@@ -1517,77 +1376,100 @@ function ParentDashboardView({
     }, "Dibaca")), /*#__PURE__*/React.createElement("p", {
       className: "text-[10px] text-slate-500 font-normal line-clamp-1"
     }, ann.content || 'Klik untuk membuka pengumuman sekolah'));
-  }), myNotes.slice(0, 6).map(n => {
-    const isUnread = !readNotes.includes(n.id);
-    return /*#__PURE__*/React.createElement("div", {
-      key: n.id,
-      onClick: () => {
-        if (isUnread) {
-          const next = [...readNotes, n.id];
-          setReadNotes(next);
-          try {
-            localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(next));
-          } catch (e) {}
-        }
-        setShowParentBell(false);
-        setActiveTab('evaluasi');
-      },
-      className: `p-3 rounded-xl border cursor-pointer transition-all hover:scale-[0.99] ${isUnread ? 'bg-emerald-50/80 border-emerald-200 font-extrabold text-emerald-950 shadow-sm' : 'bg-slate-50/80 border-slate-200 text-slate-600'}`
-    }, /*#__PURE__*/React.createElement("div", {
-      className: "flex justify-between items-center mb-1"
-    }, /*#__PURE__*/React.createElement("span", {
-      className: "font-extrabold text-[12px] truncate"
-    }, "Catatan TU: ", n.title || n.category), isUnread ? /*#__PURE__*/React.createElement("span", {
-      className: "px-1.5 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-black shrink-0"
-    }, "Baru") : /*#__PURE__*/React.createElement("span", {
-      className: "text-[10px] text-slate-400 font-semibold shrink-0"
-    }, "Dibaca")), /*#__PURE__*/React.createElement("p", {
-      className: "text-[10px] text-slate-500 font-normal line-clamp-1"
-    }, n.content || 'Klik untuk melihat catatan dari Tata Usaha'));
   })))), /*#__PURE__*/React.createElement("button", {
     onClick: onLogout,
     title: "Keluar",
-    className: "px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-sm font-bold border border-rose-200 transition-colors flex items-center gap-2"
+    className: "px-3.5 py-2 sm:px-4 sm:py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs sm:text-sm font-bold border border-rose-200 transition-colors flex items-center gap-2"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "log-out",
     size: 17
   }), /*#__PURE__*/React.createElement("span", {
     className: "hidden sm:inline"
   }, "Keluar")))), activeTab === 'spp' && /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap items-center gap-2.5 pt-1.5"
+    className: "relative pt-1.5 self-start"
   }, /*#__PURE__*/React.createElement("button", {
-    onClick: () => setSppSubFilter('all'),
-    className: `sub-pill-btn ${sppSubFilter === 'all' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
+    onClick: () => setIsFilterDropdownOpen(!isFilterDropdownOpen),
+    className: "px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-2.5 border border-slate-200/80 shadow-sm"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "filter",
+    size: 16,
+    className: "text-blue-600"
+  }), /*#__PURE__*/React.createElement("span", null, sppSubFilter === 'all' && 'Semua Ringkasan', sppSubFilter === 'unpaid' && `Tagihan Menunggak (${unpaidBills.length})`, sppSubFilter === 'upcoming' && `Belum Jatuh Tempo (${upcomingBills.length})`, sppSubFilter === 'paid' && `Riwayat Lunas (${paidBills.length})`), /*#__PURE__*/React.createElement(Icon, {
+    name: "chevron-down",
+    size: 16,
+    className: `text-blue-600 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`
+  })), isFilterDropdownOpen && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-30",
+    onClick: () => setIsFilterDropdownOpen(false)
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-40 space-y-1 animate-in fade-in zoom-in-95 duration-150"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "px-3 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider"
+  }, "Pilih Tampilan Tagihan"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setSppSubFilter('all');
+      setIsFilterDropdownOpen(false);
+    },
+    className: `w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${sppSubFilter === 'all' ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2.5"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "layers",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Semua Ringkasan")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setSppSubFilter('unpaid'),
-    className: `sub-pill-btn ${sppSubFilter === 'unpaid' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
+    size: 16,
+    className: sppSubFilter === 'all' ? 'text-blue-600' : 'text-slate-400'
+  }), /*#__PURE__*/React.createElement("span", null, "Semua Ringkasan")), sppSubFilter === 'all' && /*#__PURE__*/React.createElement(Icon, {
+    name: "check",
+    size: 14,
+    className: "text-blue-600"
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setSppSubFilter('unpaid');
+      setIsFilterDropdownOpen(false);
+    },
+    className: `w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${sppSubFilter === 'unpaid' ? 'bg-rose-50 text-rose-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2.5"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "alert-circle",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Tagihan Menunggak"), unpaidBills.length > 0 && /*#__PURE__*/React.createElement("span", {
-    className: `ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${sppSubFilter === 'unpaid' ? 'bg-white text-rose-600' : 'bg-rose-500 text-white'}`
-  }, unpaidBills.length)), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setSppSubFilter('upcoming'),
-    className: `sub-pill-btn ${sppSubFilter === 'upcoming' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
+    size: 16,
+    className: sppSubFilter === 'unpaid' ? 'text-rose-600' : 'text-slate-400'
+  }), /*#__PURE__*/React.createElement("span", null, "Tagihan Menunggak")), unpaidBills.length > 0 ? /*#__PURE__*/React.createElement("span", {
+    className: "px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-500 text-white"
+  }, unpaidBills.length) : sppSubFilter === 'unpaid' && /*#__PURE__*/React.createElement(Icon, {
+    name: "check",
+    size: 14,
+    className: "text-rose-600"
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setSppSubFilter('upcoming');
+      setIsFilterDropdownOpen(false);
+    },
+    className: `w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${sppSubFilter === 'upcoming' ? 'bg-sky-50 text-sky-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2.5"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "calendar",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Belum Jatuh Tempo"), /*#__PURE__*/React.createElement("span", {
-    className: `ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${sppSubFilter === 'upcoming' ? 'bg-white text-sky-800' : 'bg-sky-200 text-sky-800'}`
+    size: 16,
+    className: sppSubFilter === 'upcoming' ? 'text-sky-600' : 'text-slate-400'
+  }), /*#__PURE__*/React.createElement("span", null, "Belum Jatuh Tempo")), /*#__PURE__*/React.createElement("span", {
+    className: "px-2 py-0.5 rounded-full text-[11px] font-black bg-sky-100 text-sky-800"
   }, upcomingBills.length)), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setSppSubFilter('paid'),
-    className: `sub-pill-btn ${sppSubFilter === 'paid' ? 'sub-pill-btn-active' : 'sub-pill-btn-inactive'}`
+    onClick: () => {
+      setSppSubFilter('paid');
+      setIsFilterDropdownOpen(false);
+    },
+    className: `w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${sppSubFilter === 'paid' ? 'bg-emerald-50 text-emerald-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2.5"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "check-circle-2",
-    size: 16
-  }), /*#__PURE__*/React.createElement("span", null, "Riwayat Lunas"), /*#__PURE__*/React.createElement("span", {
-    className: `ml-1.5 px-2 py-0.5 rounded-full text-xs font-black ${sppSubFilter === 'paid' ? 'bg-white text-emerald-800' : 'bg-emerald-200 text-emerald-800'}`
-  }, paidBills.length)))), /*#__PURE__*/React.createElement("div", {
+    size: 16,
+    className: sppSubFilter === 'paid' ? 'text-emerald-600' : 'text-slate-400'
+  }), /*#__PURE__*/React.createElement("span", null, "Riwayat Lunas")), /*#__PURE__*/React.createElement("span", {
+    className: "px-2 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800"
+  }, paidBills.length)))))), /*#__PURE__*/React.createElement("div", {
     key: activeTab,
-    className: "p-6 md:p-10 space-y-7 flex-1 animate-tab-switch"
+    className: "p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-7 flex-1 animate-tab-switch"
   }, /*#__PURE__*/React.createElement(GreetingMascotBanner, {
     name: student.name || 'Wali Murid',
     role: "Wali Murid",
@@ -1607,95 +1489,57 @@ function ParentDashboardView({
     className: "h-5 w-36 bg-slate-200 rounded-full"
   }), /*#__PURE__*/React.createElement("div", {
     className: "h-8 w-64 bg-slate-200 rounded-xl"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap gap-2"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "h-6 w-24 bg-slate-200 rounded-lg"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "h-6 w-32 bg-slate-200 rounded-lg"
-  })))), /*#__PURE__*/React.createElement("div", {
-    className: "h-20 w-48 bg-slate-200 rounded-2xl"
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
-  }, [1, 2, 3, 4].map(i => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    className: "p-6 rounded-3xl bg-white border border-slate-200 space-y-3 shadow-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-between items-center"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 rounded-2xl bg-slate-200"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "h-5 w-20 bg-slate-200 rounded-full"
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "h-4 w-28 bg-slate-200 rounded"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "h-8 w-36 bg-slate-200 rounded-xl"
-  })))), /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl border border-slate-200 p-6 space-y-4 shadow-sm"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 rounded-2xl bg-slate-200"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "h-6 w-56 bg-slate-200 rounded-lg"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "h-4 w-72 bg-slate-100 rounded"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-3 pt-4"
-  }, [1, 2, 3].map(i => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    className: "h-16 bg-slate-100 rounded-2xl w-full"
   }))))) : /*#__PURE__*/React.createElement("div", {
     key: sppSubFilter,
-    className: "space-y-7 animate-modern-fade"
+    className: "space-y-6 sm:space-y-7 animate-modern-fade"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "glass-panel-modern rounded-[32px] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden"
+    className: "glass-panel-modern rounded-2xl sm:rounded-[32px] p-5 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {
     className: "absolute top-0 right-0 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl -z-10 -translate-y-1/2 translate-x-1/3"
   }), /*#__PURE__*/React.createElement("div", {
     className: "absolute bottom-0 left-0 w-64 h-64 bg-cyan-400/10 rounded-full blur-3xl -z-10 translate-y-1/3 -translate-x-1/4"
   }), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-6 w-full md:w-auto"
+    className: "flex items-center gap-4 sm:gap-6 w-full md:w-auto"
   }, /*#__PURE__*/React.createElement("div", {
     onClick: () => student.fotoUrl && setPreviewImage({
       url: student.fotoUrl,
       title: `Foto Profil - ${student.name}`
     }),
-    className: "w-24 h-24 rounded-3xl bg-gradient-to-tr from-blue-600 via-sky-500 to-cyan-400 border-4 border-white shadow-xl flex items-center justify-center text-white font-black text-4xl overflow-hidden shrink-0 cursor-pointer hover:scale-105 transition-transform relative z-10"
+    className: "w-20 h-20 sm:w-24 sm:h-24 rounded-2xl sm:rounded-3xl bg-gradient-to-tr from-blue-600 via-sky-500 to-cyan-400 border-4 border-white shadow-xl flex items-center justify-center text-white font-black text-3xl sm:text-4xl overflow-hidden shrink-0 cursor-pointer hover:scale-105 transition-transform relative z-10"
   }, student.fotoUrl ? /*#__PURE__*/React.createElement("img", {
     src: student.fotoUrl,
     alt: student.name,
     className: "w-full h-full object-cover"
-  }) : /*#__PURE__*/React.createElement("span", null, student.name ? student.name.charAt(0).toUpperCase() : 'S')), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "inline-flex items-center gap-2 px-3.5 py-1.5 bg-blue-50/90 text-blue-700 rounded-full text-xs font-black tracking-wider uppercase mb-2 shadow-sm border border-blue-200"
+  }) : /*#__PURE__*/React.createElement("span", null, student.name ? student.name.charAt(0).toUpperCase() : 'S')), /*#__PURE__*/React.createElement("div", {
+    className: "min-w-0 flex-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "inline-flex items-center gap-2 px-3 py-1 bg-blue-50/90 text-blue-700 rounded-full text-[11px] sm:text-xs font-black tracking-wider uppercase mb-1.5 shadow-sm border border-blue-200"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"
+    className: "w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
   }), "AKTIF • KELAS ", student.kelas), /*#__PURE__*/React.createElement("h2", {
-    className: "text-2xl sm:text-3xl font-black text-slate-900 tracking-tight"
+    className: "text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight truncate"
   }, student.name), /*#__PURE__*/React.createElement("div", {
-    className: "flex flex-wrap items-center gap-3 mt-2.5 text-sm font-bold text-slate-500"
+    className: "flex flex-wrap items-center gap-2.5 mt-2 text-xs sm:text-sm font-bold text-slate-500"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm"
+    className: "bg-white/80 px-2.5 py-1 rounded-xl border border-slate-200 shadow-sm"
   }, "NIS: ", /*#__PURE__*/React.createElement("span", {
     className: "text-slate-800 font-extrabold"
   }, student.nis)), /*#__PURE__*/React.createElement("span", {
-    className: "bg-white/80 px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm"
+    className: "bg-white/80 px-2.5 py-1 rounded-xl border border-slate-200 shadow-sm"
   }, "Wali: ", /*#__PURE__*/React.createElement("span", {
     className: "text-slate-800 font-extrabold"
   }, student.wali || '-')), /*#__PURE__*/React.createElement("a", {
     href: getWaLink(student.telepon),
     target: "_blank",
     rel: "noopener noreferrer",
-    className: "bg-teal-50 text-teal-700 px-3 py-1.5 rounded-xl border border-teal-200 hover:bg-teal-100 transition-colors flex items-center gap-2 shadow-sm font-extrabold"
+    className: "bg-teal-50 text-teal-700 px-2.5 py-1 rounded-xl border border-teal-200 hover:bg-teal-100 transition-colors flex items-center gap-1.5 shadow-sm font-extrabold"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "phone",
-    size: 14
+    size: 13
   }), " ", formatPhoneDisplay(student.telepon))))), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-6 bg-white/80 backdrop-blur-md p-6 rounded-2xl border border-slate-200/80 w-full md:w-auto shadow-sm"
+    className: "flex items-center gap-4 bg-white/80 backdrop-blur-md p-4 sm:p-6 rounded-2xl border border-slate-200/80 w-full md:w-auto shadow-sm"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "text-right"
+    className: "text-right w-full md:w-auto"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-xs font-black text-slate-400 uppercase tracking-wider mb-1"
   }, "Tarif SPP Resmi"), /*#__PURE__*/React.createElement("p", {
@@ -1703,229 +1547,229 @@ function ParentDashboardView({
   }, formatRupiah(student.tarif)), student.keringanan_note && /*#__PURE__*/React.createElement("span", {
     className: "inline-block mt-1 px-2.5 py-1 bg-amber-100 text-amber-900 text-xs font-black rounded-lg border border-amber-200"
   }, "Keringanan: ", student.keringanan_note)), /*#__PURE__*/React.createElement("div", {
-    className: "h-12 w-px bg-slate-200"
+    className: "h-10 w-px bg-slate-200 hidden sm:block"
   }), /*#__PURE__*/React.createElement("div", {
-    className: "text-left"
+    className: "text-left hidden sm:block"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-xs font-black text-slate-400 uppercase tracking-wider mb-1"
   }, "Tahun Ajaran"), /*#__PURE__*/React.createElement("p", {
-    className: "text-base font-black text-slate-800 bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-sm"
+    className: "text-sm font-black text-slate-800 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm"
   }, settings.academicYear)))), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5"
+    className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5"
   }, /*#__PURE__*/React.createElement("div", {
-    className: `p-6 rounded-3xl border transition-all stagger-card-1 modern-hover-card ${unpaidBills.length > 0 ? 'bg-rose-50/90 border-rose-200 shadow-sm card-glow-rose' : 'bg-emerald-50/90 border-emerald-200 shadow-sm card-glow-emerald'}`
+    className: `p-5 sm:p-6 rounded-2xl sm:rounded-3xl border transition-all ${unpaidBills.length > 0 ? 'bg-rose-50/90 border-rose-200 shadow-sm' : 'bg-emerald-50/90 border-emerald-200 shadow-sm'}`
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3.5"
+    className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: `w-12 h-12 rounded-2xl flex items-center justify-center ${unpaidBills.length > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`
+    className: `w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center ${unpaidBills.length > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`
   }, /*#__PURE__*/React.createElement(Icon, {
     name: unpaidBills.length > 0 ? 'alert-circle' : 'shield-check',
-    size: 24
+    size: 22
   })), /*#__PURE__*/React.createElement("span", {
-    className: `px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${unpaidBills.length > 0 ? 'bg-rose-200 text-rose-800' : 'bg-emerald-200 text-emerald-800'}`
+    className: `px-2.5 py-1 rounded-full text-[11px] font-black uppercase tracking-wider ${unpaidBills.length > 0 ? 'bg-rose-200 text-rose-800' : 'bg-emerald-200 text-emerald-800'}`
   }, unpaidBills.length > 0 ? `${unpaidBills.length} Bulan` : 'Lunas / Aman')), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-wider"
+    className: "text-xs font-extrabold text-slate-500 uppercase tracking-wider"
   }, "Tunggakan s/d Bulan Ini"), /*#__PURE__*/React.createElement("h4", {
-    className: `text-2xl sm:text-3xl font-black mt-1 ${unpaidBills.length > 0 ? 'text-rose-700' : 'text-emerald-700'}`
+    className: `text-xl sm:text-2xl md:text-3xl font-black mt-1 ${unpaidBills.length > 0 ? 'text-rose-700' : 'text-emerald-700'}`
   }, formatRupiah(totalDueDebt)), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs sm:text-sm font-medium text-slate-500 mt-1.5"
-  }, unpaidBills.length > 0 ? 'Wajib segera dilunasi' : 'Semua tagihan s/d bulan ini aman')), /*#__PURE__*/React.createElement("div", {
-    className: "p-6 rounded-3xl bg-sky-50/80 border border-sky-200 shadow-sm card-glow-cyan transition-all stagger-card-2 modern-hover-card"
+    className: "text-xs font-medium text-slate-500 mt-1"
+  }, unpaidBills.length > 0 ? 'Wajib segera dilunasi' : 'Semua tagihan aman')), /*#__PURE__*/React.createElement("div", {
+    className: "p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-sky-50/80 border border-sky-200 shadow-sm transition-all"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3.5"
+    className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 rounded-2xl bg-sky-500 text-white flex items-center justify-center"
+    className: "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-sky-500 text-white flex items-center justify-center"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "calendar",
-    size: 24
+    size: 22
   })), /*#__PURE__*/React.createElement("span", {
-    className: "px-3 py-1 rounded-full bg-sky-200 text-sky-800 text-xs font-black uppercase tracking-wider"
+    className: "px-2.5 py-1 rounded-full bg-sky-200 text-sky-800 text-[11px] font-black uppercase tracking-wider"
   }, upcomingBills.length, " Bulan")), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-wider"
+    className: "text-xs font-extrabold text-slate-500 uppercase tracking-wider"
   }, "Bulan Mendatang"), /*#__PURE__*/React.createElement("h4", {
-    className: "text-2xl sm:text-3xl font-black text-sky-900 mt-1"
+    className: "text-xl sm:text-2xl md:text-3xl font-black text-sky-900 mt-1"
   }, "Belum Jatuh Tempo"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs sm:text-sm font-medium text-slate-500 mt-1.5"
-  }, "Tidak dihitung nunggak • Opsi bayar awal")), /*#__PURE__*/React.createElement("div", {
-    className: "p-6 rounded-3xl bg-indigo-50/80 border border-indigo-200 shadow-sm card-glow-purple transition-all stagger-card-3 modern-hover-card"
+    className: "text-xs font-medium text-slate-500 mt-1"
+  }, "Opsi bayar lebih awal")), /*#__PURE__*/React.createElement("div", {
+    className: "p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-indigo-50/80 border border-indigo-200 shadow-sm transition-all"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3.5"
+    className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center"
+    className: "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "check-circle-2",
-    size: 24
+    size: 22
   })), /*#__PURE__*/React.createElement("span", {
-    className: "px-3 py-1 rounded-full bg-indigo-200 text-indigo-800 text-xs font-black uppercase tracking-wider"
+    className: "px-2.5 py-1 rounded-full bg-indigo-200 text-indigo-800 text-[11px] font-black uppercase tracking-wider"
   }, monthlyBills.length > 0 ? Math.round(paidBills.length / monthlyBills.length * 100) : 0, "% Lunas")), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-wider"
+    className: "text-xs font-extrabold text-slate-500 uppercase tracking-wider"
   }, "Status Pembayaran"), /*#__PURE__*/React.createElement("h4", {
-    className: "text-2xl sm:text-3xl font-black text-indigo-950 mt-1"
+    className: "text-xl sm:text-2xl md:text-3xl font-black text-indigo-950 mt-1"
   }, paidBills.length, " ", /*#__PURE__*/React.createElement("span", {
-    className: "text-base font-bold text-slate-500"
+    className: "text-sm font-bold text-slate-500"
   }, "/ ", monthlyBills.length, " Bulan")), /*#__PURE__*/React.createElement("div", {
-    className: "w-full bg-indigo-200/60 rounded-full h-2 mt-2.5 overflow-hidden"
+    className: "w-full bg-indigo-200/60 rounded-full h-2 mt-2 overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {
     className: "bg-indigo-600 h-full rounded-full transition-all duration-500",
     style: {
       width: `${monthlyBills.length > 0 ? paidBills.length / monthlyBills.length * 100 : 0}%`
     }
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "p-6 rounded-3xl bg-amber-50/80 border border-amber-200 shadow-sm card-glow-amber transition-all stagger-card-4 modern-hover-card"
+    className: "p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-amber-50/80 border border-amber-200 shadow-sm transition-all"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-3.5"
+    className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center"
+    className: "w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "badge-percent",
-    size: 24
+    size: 22
   })), /*#__PURE__*/React.createElement("span", {
-    className: "px-3 py-1 rounded-full bg-amber-200 text-amber-900 text-xs font-black uppercase tracking-wider"
+    className: "px-2.5 py-1 rounded-full bg-amber-200 text-amber-900 text-[11px] font-black uppercase tracking-wider"
   }, "Kelas ", student.kelas)), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs sm:text-sm font-extrabold text-slate-500 uppercase tracking-wider"
-  }, "Tarif Resmi SPP"), /*#__PURE__*/React.createElement("h4", {
-    className: "text-2xl sm:text-3xl font-black text-amber-950 mt-1"
+    className: "text-xs font-extrabold text-slate-500 uppercase tracking-wider"
+  }, "Tarif SPP"), /*#__PURE__*/React.createElement("h4", {
+    className: "text-xl sm:text-2xl md:text-3xl font-black text-amber-950 mt-1"
   }, formatRupiah(student.tarif), /*#__PURE__*/React.createElement("span", {
-    className: "text-sm font-bold text-slate-500"
+    className: "text-xs font-bold text-slate-500"
   }, "/bln")), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs sm:text-sm font-medium text-slate-500 mt-1.5 truncate"
-  }, student.keringanan_note ? `Keringanan: ${student.keringanan_note}` : `Periode ${settings.academicYear || 'Aktif'}`))), (sppSubFilter === 'all' || sppSubFilter === 'unpaid') && /*#__PURE__*/React.createElement("section", {
-    className: `bg-white rounded-3xl border shadow-sm overflow-hidden relative transition-all ${unpaidBills.length > 0 ? 'border-rose-100' : 'border-emerald-100'}`
+    className: "text-xs font-medium text-slate-500 mt-1 truncate"
+  }, "Periode ", settings.academicYear || 'Aktif'))), (sppSubFilter === 'all' || sppSubFilter === 'unpaid') && /*#__PURE__*/React.createElement("section", {
+    className: `bg-white rounded-2xl sm:rounded-3xl border shadow-sm overflow-hidden relative transition-all ${unpaidBills.length > 0 ? 'border-rose-100' : 'border-emerald-100'}`
   }, /*#__PURE__*/React.createElement("div", {
     className: `absolute top-0 left-0 w-1.5 h-full ${unpaidBills.length > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`
   }), /*#__PURE__*/React.createElement("div", {
-    className: `p-6 md:p-7 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${unpaidBills.length > 0 ? 'bg-rose-50/30' : 'bg-emerald-50/30'}`
+    className: `p-5 sm:p-7 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${unpaidBills.length > 0 ? 'bg-rose-50/30' : 'bg-emerald-50/30'}`
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3.5"
+    className: "flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: `w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${unpaidBills.length > 0 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`
+    className: `w-10 h-10 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center shrink-0 ${unpaidBills.length > 0 ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`
   }, /*#__PURE__*/React.createElement(Icon, {
     name: unpaidBills.length > 0 ? "alert-circle" : "shield-check",
-    size: 24
+    size: 22
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-    className: "font-black text-slate-800 text-xl sm:text-2xl"
-  }, unpaidBills.length > 0 ? 'Tagihan Menunggak (s/d Bulan Berjalan)' : 'Status Tagihan s/d Bulan Ini'), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-slate-500 font-medium mt-0.5"
-  }, unpaidBills.length > 0 ? 'Bulan SPP yang telah berjalan / jatuh tempo dan perlu segera dilunasi.' : 'Semua tagihan SPP s/d bulan berjalan dalam status aman & lunas.'))), unpaidBills.length > 0 ? /*#__PURE__*/React.createElement("span", {
-    className: "px-4 py-1.5 bg-rose-500 text-white rounded-full text-sm font-black shadow-sm shrink-0"
+    className: "font-black text-slate-800 text-lg sm:text-2xl"
+  }, unpaidBills.length > 0 ? 'Tagihan Menunggak' : 'Status Tagihan Bulan Ini'), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs sm:text-sm text-slate-500 font-medium mt-0.5"
+  }, unpaidBills.length > 0 ? 'Bulan SPP yang telah jatuh tempo dan perlu dilunasi.' : 'Semua tagihan SPP s/d bulan berjalan lunas.'))), unpaidBills.length > 0 ? /*#__PURE__*/React.createElement("span", {
+    className: "px-3 py-1 sm:px-4 sm:py-1.5 bg-rose-500 text-white rounded-full text-xs sm:text-sm font-black shadow-sm shrink-0"
   }, "Total: ", formatRupiah(totalDueDebt)) : /*#__PURE__*/React.createElement("span", {
-    className: "px-4 py-1.5 bg-emerald-500 text-white rounded-full text-sm font-black shadow-sm shrink-0 flex items-center gap-1.5"
+    className: "px-3 py-1 sm:px-4 sm:py-1.5 bg-emerald-500 text-white rounded-full text-xs sm:text-sm font-black shadow-sm shrink-0 flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "check-circle",
-    size: 16
+    size: 15
   }), " Status Aman & Lunas")), /*#__PURE__*/React.createElement("div", {
-    className: "overflow-x-auto p-3"
+    className: "overflow-x-auto p-2 sm:p-3"
   }, unpaidBills.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "p-10 text-center flex flex-col items-center justify-center"
+    className: "p-8 sm:p-10 text-center flex flex-col items-center justify-center"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3"
+    className: "w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "shield-check",
-    size: 36
+    size: 32
   })), /*#__PURE__*/React.createElement("p", {
-    className: "font-black text-slate-800 text-xl"
-  }, "Alhamdulillah, Tidak Ada Tunggakan"), /*#__PURE__*/React.createElement("p", {
-    className: "text-base text-slate-500 font-medium mt-1"
+    className: "font-black text-slate-800 text-lg sm:text-xl"
+  }, "Tidak Ada Tunggakan"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs sm:text-base text-slate-500 font-medium mt-1"
   }, "Semua tagihan SPP ananda s/d bulan berjalan dalam status aman & lunas.")) : /*#__PURE__*/React.createElement("table", {
     className: "w-full text-left"
   }, /*#__PURE__*/React.createElement("tbody", {
     className: "divide-y divide-slate-100"
   }, unpaidBills.map((bill, idx) => /*#__PURE__*/React.createElement("tr", {
     key: idx,
-    className: "hover:bg-slate-50 transition-colors group"
+    className: "hover:bg-slate-50 transition-colors"
   }, /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6"
+    className: "py-4 px-4 sm:px-6"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "font-black text-slate-800 text-lg sm:text-xl"
+    className: "font-black text-slate-800 text-base sm:text-xl"
   }, bill.month), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-1.5 text-xs font-black text-rose-600 uppercase mt-1"
+    className: "flex items-center gap-1.5 text-[11px] font-black text-rose-600 uppercase mt-0.5"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "alert-triangle",
-    size: 13,
+    size: 12,
     className: "text-rose-500"
   }), /*#__PURE__*/React.createElement("span", null, "Jatuh Tempo • SPP ", student.kelas))), /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6 text-right"
+    className: "py-4 px-4 sm:px-6 text-right"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "font-black text-rose-600 text-xl sm:text-2xl"
+    className: "font-black text-rose-600 text-lg sm:text-2xl"
   }, formatRupiah(bill.amount))), /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6 text-right w-52"
+    className: "py-4 px-4 sm:px-6 text-right w-40 sm:w-52"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => onPayMidtrans(bill),
-    className: "w-full py-3.5 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-xl text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 group-hover:scale-105"
+    className: "w-full py-2.5 sm:py-3.5 px-3 sm:px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-xl text-xs sm:text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "credit-card",
-    size: 18
+    size: 16
   }), " Bayar Online")))))))), (sppSubFilter === 'all' || sppSubFilter === 'upcoming') && upcomingBills.length > 0 && /*#__PURE__*/React.createElement("details", {
-    className: "group bg-white rounded-3xl border border-sky-100 shadow-sm overflow-hidden",
+    className: "group bg-white rounded-2xl sm:rounded-3xl border border-sky-100 shadow-sm overflow-hidden",
     open: sppSubFilter === 'upcoming'
   }, /*#__PURE__*/React.createElement("summary", {
-    className: "p-6 md:p-7 cursor-pointer flex items-center justify-between select-none bg-sky-50/30 hover:bg-sky-50/60 transition-colors"
+    className: "p-5 sm:p-7 cursor-pointer flex items-center justify-between select-none bg-sky-50/30 hover:bg-sky-50/60 transition-colors"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3.5"
+    className: "flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center shrink-0"
+    className: "w-10 h-10 sm:w-12 sm:h-12 bg-sky-100 text-sky-600 rounded-2xl flex items-center justify-center shrink-0"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "calendar",
-    size: 24
+    size: 22
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-    className: "font-black text-slate-800 text-xl sm:text-2xl"
+    className: "font-black text-slate-800 text-lg sm:text-2xl"
   }, "Bulan Mendatang (Belum Jatuh Tempo)"), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-slate-500 font-medium mt-0.5"
-  }, upcomingBills.length, " bulan tersisa di periode ajaran ini. Tidak dihitung nunggak & Anda dapat membayar lebih awal."))), /*#__PURE__*/React.createElement("div", {
-    className: "w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-open:rotate-180 transition-transform"
+    className: "text-xs sm:text-sm text-slate-500 font-medium mt-0.5"
+  }, upcomingBills.length, " bulan tersisa di periode ajaran ini."))), /*#__PURE__*/React.createElement("div", {
+    className: "w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-open:rotate-180 transition-transform shrink-0"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "chevron-down",
-    size: 18
+    size: 16
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 p-3 overflow-x-auto"
+    className: "border-t border-slate-100 p-2 sm:p-3 overflow-x-auto"
   }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-left"
   }, /*#__PURE__*/React.createElement("tbody", {
     className: "divide-y divide-slate-100"
   }, upcomingBills.map((bill, idx) => /*#__PURE__*/React.createElement("tr", {
     key: idx,
-    className: "hover:bg-slate-50 transition-colors group"
+    className: "hover:bg-slate-50 transition-colors"
   }, /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6"
+    className: "py-4 px-4 sm:px-6"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "font-black text-slate-800 text-lg sm:text-xl"
+    className: "font-black text-slate-800 text-base sm:text-xl"
   }, bill.month), /*#__PURE__*/React.createElement("div", {
-    className: "text-xs font-bold text-sky-600 uppercase mt-1"
+    className: "text-[11px] font-bold text-sky-600 uppercase mt-0.5"
   }, "Belum Jatuh Tempo • SPP ", student.kelas)), /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6 text-right"
+    className: "py-4 px-4 sm:px-6 text-right"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "font-black text-slate-700 text-xl sm:text-2xl"
+    className: "font-black text-slate-700 text-lg sm:text-2xl"
   }, formatRupiah(bill.amount))), /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6 text-right w-52"
+    className: "py-4 px-4 sm:px-6 text-right w-40 sm:w-52"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => onPayMidtrans(bill),
-    className: "w-full py-3.5 px-5 bg-slate-800 hover:bg-slate-900 text-white font-black rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 group-hover:scale-105"
+    className: "w-full py-2.5 sm:py-3.5 px-3 sm:px-5 bg-slate-800 hover:bg-slate-900 text-white font-black rounded-xl text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "credit-card",
-    size: 18
+    size: 16
   }), " Bayar di Awal")))))))), (sppSubFilter === 'all' || sppSubFilter === 'paid') && /*#__PURE__*/React.createElement("details", {
-    className: "group bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden",
+    className: "group bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm overflow-hidden",
     open: sppSubFilter === 'paid' || unpaidBills.length === 0
   }, /*#__PURE__*/React.createElement("summary", {
-    className: "p-6 md:p-7 cursor-pointer flex items-center justify-between select-none bg-slate-50/50 hover:bg-slate-50 transition-colors"
+    className: "p-5 sm:p-7 cursor-pointer flex items-center justify-between select-none bg-slate-50/50 hover:bg-slate-50 transition-colors"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3.5"
+    className: "flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0"
+    className: "w-10 h-10 sm:w-12 sm:h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "history",
-    size: 24
+    size: 22
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-    className: "font-black text-slate-800 text-xl sm:text-2xl"
-  }, "Riwayat SPP Lunas & Kelas Sebelumnya"), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-slate-500 font-medium mt-0.5"
-  }, allPaidTransactions.length, " transaksi resmi tersimpan lengkap dengan kuitansi."))), /*#__PURE__*/React.createElement("div", {
-    className: "w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-open:rotate-180 transition-transform"
+    className: "font-black text-slate-800 text-lg sm:text-2xl"
+  }, "Riwayat SPP Lunas"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs sm:text-sm text-slate-500 font-medium mt-0.5"
+  }, allPaidTransactions.length, " transaksi resmi tersimpan."))), /*#__PURE__*/React.createElement("div", {
+    className: "w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-open:rotate-180 transition-transform shrink-0"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "chevron-down",
-    size: 18
+    size: 16
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "px-6 py-3.5 bg-slate-50 border-t border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs"
+    className: "px-4 sm:px-6 py-3 bg-slate-50 border-t border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2"
   }, /*#__PURE__*/React.createElement(Icon, {
@@ -1934,7 +1778,7 @@ function ParentDashboardView({
     className: "text-slate-500"
   }), /*#__PURE__*/React.createElement("span", {
     className: "font-extrabold text-slate-600 uppercase tracking-wider"
-  }, "Filter Riwayat Kelas:")), /*#__PURE__*/React.createElement("div", {
+  }, "Filter Kelas:")), /*#__PURE__*/React.createElement("div", {
     className: "flex flex-wrap items-center gap-2"
   }, /*#__PURE__*/React.createElement("button", {
     type: "button",
@@ -1954,9 +1798,9 @@ function ParentDashboardView({
       className: `px-1.5 py-0.2 rounded text-[10px] font-black ${historyClassFilter === cls ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'}`
     }, count));
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "p-3 overflow-x-auto"
+    className: "p-2 sm:p-3 overflow-x-auto"
   }, filteredPaidBills.length === 0 ? /*#__PURE__*/React.createElement("p", {
-    className: "text-center p-8 text-base text-slate-500 font-bold"
+    className: "text-center p-8 text-sm sm:text-base text-slate-500 font-bold"
   }, historyClassFilter === 'all' ? 'Belum ada riwayat pembayaran lunas.' : `Belum ada riwayat pembayaran pada kelas ${historyClassFilter}.`) : /*#__PURE__*/React.createElement("table", {
     className: "w-full text-left"
   }, /*#__PURE__*/React.createElement("tbody", {
@@ -1965,52 +1809,50 @@ function ParentDashboardView({
     key: trx.id || idx,
     className: "hover:bg-slate-50 transition-colors"
   }, /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6"
+    className: "py-4 px-4 sm:px-6"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "font-black text-slate-800 text-lg sm:text-xl"
+    className: "font-black text-slate-800 text-base sm:text-xl"
   }, trx.month), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 mt-1"
+    className: "flex items-center gap-2 mt-0.5"
   }, /*#__PURE__*/React.createElement("span", {
     className: "text-xs font-bold text-slate-400 uppercase"
   }, "Tgl: ", trx.date), /*#__PURE__*/React.createElement("span", {
-    className: "px-2 py-0.5 rounded-md text-[11px] font-black bg-blue-50 text-blue-800 border border-blue-200"
+    className: "px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-800 border border-blue-200"
   }, "Kelas: ", trx.kelas || student?.kelas))), /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6"
+    className: "py-4 px-4 sm:px-6"
   }, /*#__PURE__*/React.createElement("span", {
-    className: "inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-xl font-black text-xs"
+    className: "inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-xl font-black text-xs"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "check-circle-2",
-    size: 14
-  }), " LUNAS"), /*#__PURE__*/React.createElement("div", {
-    className: "text-[11px] font-semibold text-slate-400 mt-1"
-  }, trx.metode || 'Tunai (di TU)')), /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6 font-black text-emerald-700 text-right text-lg sm:text-xl"
+    size: 13
+  }), " LUNAS")), /*#__PURE__*/React.createElement("td", {
+    className: "py-4 px-4 sm:px-6 font-black text-emerald-700 text-right text-base sm:text-xl"
   }, formatRupiah(trx.amount || trx.nominal)), /*#__PURE__*/React.createElement("td", {
-    className: "py-5 px-6 text-right w-48"
+    className: "py-4 px-4 sm:px-6 text-right w-36 sm:w-48"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => onShowKuitansi(trx),
-    className: "w-full py-3 px-4 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold rounded-xl text-sm transition-colors flex items-center justify-center gap-2 border border-blue-200 shadow-sm hover:scale-[1.02]"
+    className: "w-full py-2.5 px-3 sm:px-4 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 border border-blue-200 shadow-sm"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "receipt",
-    size: 16
-  }), " Lihat Kuitansi")))))))))), activeTab === 'berita' && /*#__PURE__*/React.createElement("section", {
+    size: 15
+  }), " Kuitansi")))))))))), activeTab === 'berita' && /*#__PURE__*/React.createElement("section", {
     className: "space-y-4 animate-in fade-in duration-300"
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-xl font-black text-slate-800 flex items-center gap-2 mb-6"
+    className: "text-lg sm:text-xl font-black text-slate-800 flex items-center gap-2 mb-4"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-10 h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"
+    className: "w-9 h-9 sm:w-10 sm:h-10 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "newspaper",
-    size: 20
+    size: 18
   })), "Berita & Pengumuman Sekolah"), announcements.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "bg-white p-8 rounded-3xl border border-slate-200 text-center shadow-sm"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-slate-500 font-bold"
   }, "Belum ada pengumuman saat ini.")) : /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+    className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6"
   }, announcements.map(ann => /*#__PURE__*/React.createElement("div", {
     key: ann.id,
-    className: "bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all overflow-hidden flex flex-col h-full group"
+    className: "bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all overflow-hidden flex flex-col h-full group"
   }, ann.imageUrl ? /*#__PURE__*/React.createElement("div", {
     className: "w-full h-44 bg-slate-100 relative cursor-pointer overflow-hidden shrink-0",
     onClick: () => setPreviewImage({
@@ -2021,27 +1863,20 @@ function ParentDashboardView({
     src: ann.imageUrl,
     alt: ann.title,
     className: "w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-  }), /*#__PURE__*/React.createElement("div", {
-    className: "absolute inset-0 bg-slate-900/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white/95 px-3 py-1.5 rounded-full text-slate-800 text-xs font-black shadow-lg flex items-center gap-1.5"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "zoom-in",
-    size: 14
-  }), /*#__PURE__*/React.createElement("span", null, "Lihat Foto")))) : /*#__PURE__*/React.createElement("div", {
-    className: "w-full h-44 bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-500 p-5 flex flex-col justify-between text-white shrink-0 relative overflow-hidden"
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "w-full h-36 bg-gradient-to-br from-blue-600 via-indigo-600 to-sky-500 p-5 flex flex-col justify-between text-white shrink-0 relative overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between"
   }, /*#__PURE__*/React.createElement("span", {
     className: "px-2.5 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-wider"
   }, "Berita Resmi"), /*#__PURE__*/React.createElement(Icon, {
     name: "newspaper",
-    size: 22,
+    size: 20,
     className: "text-blue-100"
   })), /*#__PURE__*/React.createElement("h4", {
     className: "font-black text-sm text-white line-clamp-2 leading-snug drop-shadow-sm"
   }, ann.title)), /*#__PURE__*/React.createElement("div", {
-    className: "p-6 flex-1 flex flex-col justify-between"
+    className: "p-5 flex-1 flex flex-col justify-between"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-1.5 text-[11px] font-bold text-blue-600 uppercase mb-2"
   }, /*#__PURE__*/React.createElement(Icon, {
@@ -2058,291 +1893,7 @@ function ParentDashboardView({
   }, /*#__PURE__*/React.createElement("span", null, "Baca Selengkapnya"), /*#__PURE__*/React.createElement(Icon, {
     name: "arrow-right",
     size: 14
-  }))))))), activeTab === 'evaluasi' && /*#__PURE__*/React.createElement("section", {
-    className: "space-y-6 animate-in fade-in duration-300"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "text-xl font-black text-slate-800 flex items-center gap-2 mb-6"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "award",
-    size: 20
-  })), "Catatan Tata Usaha (TU) untuk Siswa"), myNotes.length === 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "bg-white p-8 rounded-3xl border border-slate-200 text-center shadow-sm"
-  }, /*#__PURE__*/React.createElement("p", {
-    className: "text-slate-500 font-bold"
-  }, "Belum ada catatan dari Tata Usaha untuk ", student.name, ".")) : /*#__PURE__*/React.createElement("div", {
-    className: "space-y-4"
-  }, myNotes.map(note => /*#__PURE__*/React.createElement("div", {
-    key: note.id,
-    className: "bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "p-6 border-b border-slate-100 bg-amber-50/30 flex items-start justify-between gap-4"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg text-[10px] font-black uppercase mb-2"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "bookmark",
-    size: 12
-  }), " ", note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("h4", {
-    className: "font-black text-slate-800 text-lg"
-  }, note.title || 'Catatan Tata Usaha (TU)'), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 font-bold mt-1"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "calendar",
-    size: 12,
-    className: "inline mr-1"
-  }), note.date))), /*#__PURE__*/React.createElement("div", {
-    className: "p-6 text-sm text-slate-700 leading-relaxed font-medium whitespace-pre-wrap bg-white"
-  }, note.content))))), activeTab === 'pengaduan' && /*#__PURE__*/React.createElement("section", {
-    className: "space-y-6 animate-in fade-in duration-300"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 rounded-3xl p-6 sm:p-8 text-white flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-teal-900/20"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
-    className: "text-2xl font-black flex items-center gap-3"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "message-square",
-    size: 28
-  }), " Layanan Pengaduan 2 Arah"), /*#__PURE__*/React.createElement("p", {
-    className: "text-blue-100 text-sm mt-2 font-medium max-w-xl leading-relaxed"
-  }, "Kirimkan saran, kritik, atau pertanyaan. Ruang obrolan akan terbuka selama 1 jam untuk interaksi real-time dengan Admin TU. Setelah waktu habis, sesi ditutup otomatis."))), !activeComplaint ? /*#__PURE__*/React.createElement("form", {
-    onSubmit: handleSubmitComplaint,
-    className: "bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5"
-  }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-black text-lg text-slate-800 border-b border-slate-100 pb-4"
-  }, "Buat Sesi Pengaduan Baru"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    className: "block text-xs font-black text-slate-700 uppercase mb-2"
-  }, "Judul Topik / Subjek"), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    required: true,
-    value: complaintTitle,
-    onChange: e => setComplaintTitle(e.target.value),
-    placeholder: "Contoh: Pertanyaan seragam olahraga",
-    className: "w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    className: "block text-xs font-black text-slate-700 uppercase mb-2"
-  }, "Pesan Anda"), /*#__PURE__*/React.createElement("textarea", {
-    required: true,
-    value: complaintContent,
-    onChange: e => setComplaintContent(e.target.value),
-    rows: "4",
-    placeholder: "Jelaskan pertanyaan atau masukan Anda...",
-    className: "w-full px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
-  })), /*#__PURE__*/React.createElement("button", {
-    type: "submit",
-    className: "w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "send",
-    size: 18
-  }), " Kirim Pengaduan & Mulai Sesi")) : /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl border-2 border-blue-400 shadow-lg shadow-blue-500/10 overflow-hidden flex flex-col h-[600px]"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-blue-50 p-4 sm:p-6 border-b border-blue-100 flex items-center justify-between shrink-0"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-    className: "font-black text-blue-900 text-lg"
-  }, activeComplaint.title), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-blue-700 font-bold mt-1 flex items-center gap-1.5"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "clock",
-    size: 14
-  }), " Sesi Aktif: Tersisa ", Math.max(0, Math.floor((activeComplaint.expiresAtMs - nowMs) / 60000)), " Menit")), /*#__PURE__*/React.createElement("div", {
-    className: "w-3 h-3 rounded-full bg-rose-500 animate-pulse border-2 border-rose-200",
-    title: "Live Chat Aktif"
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "flex-1 p-4 sm:p-6 overflow-y-auto bg-slate-50 space-y-4"
-  }, activeComplaint.messages && activeComplaint.messages.map((msg, i) => /*#__PURE__*/React.createElement("div", {
-    key: i,
-    className: `flex flex-col ${msg.sender === 'Admin TU' ? 'items-start' : 'items-end'}`
-  }, /*#__PURE__*/React.createElement("div", {
-    className: `max-w-[85%] sm:max-w-[70%] p-4 rounded-2xl shadow-sm ${msg.sender === 'Admin TU' ? 'bg-white border border-slate-200 rounded-tl-sm' : 'bg-blue-600 text-white rounded-tr-sm'}`
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-2 mb-1.5 opacity-80"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: msg.sender === 'Admin TU' ? 'shield-check' : 'user',
-    size: 12
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] font-black uppercase"
-  }, msg.sender)), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm font-medium leading-relaxed"
-  }, msg.text), msg.imageUrl && /*#__PURE__*/React.createElement("div", {
-    className: "mt-2"
-  }, /*#__PURE__*/React.createElement("img", {
-    src: msg.imageUrl,
-    alt: "Lampiran",
-    className: "max-w-full h-auto rounded-lg shadow-sm border border-slate-200 cursor-pointer",
-    onClick: () => setPreviewImage(msg.imageUrl)
-  }))), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] text-slate-400 font-bold mt-1.5"
-  }, msg.time || '-')))), /*#__PURE__*/React.createElement("div", {
-    className: "p-4 sm:p-6 bg-white border-t border-slate-100 shrink-0"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex gap-2"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "file",
-    id: `file_${activeComplaint.id}`,
-    className: "hidden",
-    accept: "image/*",
-    onChange: e => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = ev => {
-          onReplyComplaint(activeComplaint.id, replyText[activeComplaint.id] || '(Mengirim Lampiran)', student.wali || 'Wali Murid', ev.target.result);
-          setReplyText({
-            ...replyText,
-            [activeComplaint.id]: ''
-          });
-        };
-        reader.readAsDataURL(file);
-      }
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => document.getElementById(`file_${activeComplaint.id}`).click(),
-    className: "px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl shadow-sm transition-colors flex items-center justify-center"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "paperclip",
-    size: 18
-  })), /*#__PURE__*/React.createElement("input", {
-    type: "text",
-    value: replyText[activeComplaint.id] || '',
-    onChange: e => setReplyText({
-      ...replyText,
-      [activeComplaint.id]: e.target.value
-    }),
-    placeholder: "Ketik balasan pesan...",
-    className: "flex-1 px-4 py-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-500",
-    onKeyDown: e => {
-      if (e.key === 'Enter') {
-        if (!replyText[activeComplaint.id]) return;
-        onReplyComplaint(activeComplaint.id, replyText[activeComplaint.id], student.wali || 'Wali Murid');
-        setReplyText({
-          ...replyText,
-          [activeComplaint.id]: ''
-        });
-      }
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: () => {
-      if (!replyText[activeComplaint.id]) return;
-      onReplyComplaint(activeComplaint.id, replyText[activeComplaint.id], student.wali || 'Wali Murid');
-      setReplyText({
-        ...replyText,
-        [activeComplaint.id]: ''
-      });
-    },
-    className: "px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-colors flex items-center justify-center"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "send",
-    size: 18
-  }))))), expiredComplaints.length > 0 && /*#__PURE__*/React.createElement("details", {
-    className: "group bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden"
-  }, /*#__PURE__*/React.createElement("summary", {
-    className: "p-6 cursor-pointer flex items-center justify-between select-none bg-slate-50/50 hover:bg-slate-50 transition-colors"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center gap-3"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-10 h-10 bg-slate-200 text-slate-600 rounded-xl flex items-center justify-center"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "archive",
-    size: 20
-  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
-    className: "font-black text-slate-800 text-lg"
-  }, "Riwayat Pengaduan (Selesai)"), /*#__PURE__*/React.createElement("p", {
-    className: "text-xs text-slate-500 font-medium"
-  }, expiredComplaints.length, " sesi chat yang sudah ditutup/expired."))), /*#__PURE__*/React.createElement("div", {
-    className: "w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-open:rotate-180 transition-transform"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "chevron-down",
-    size: 16
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "border-t border-slate-100 p-6 space-y-4 bg-slate-50/30"
-  }, expiredComplaints.map(c => /*#__PURE__*/React.createElement("div", {
-    key: c.id,
-    className: "bg-white p-5 rounded-2xl border border-slate-200 shadow-sm opacity-75 hover:opacity-100 transition-opacity"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-between items-start mb-3"
-  }, /*#__PURE__*/React.createElement("h4", {
-    className: "font-black text-slate-800 text-base"
-  }, c.title), /*#__PURE__*/React.createElement("span", {
-    className: "text-[10px] font-black text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 uppercase flex items-center gap-1"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "lock",
-    size: 12
-  }), " Tertutup")), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2 mb-4 max-h-40 overflow-y-auto border border-slate-100 rounded-xl p-3 bg-slate-50"
-  }, c.messages && c.messages.map((m, idx) => /*#__PURE__*/React.createElement("p", {
-    key: idx,
-    className: "text-xs font-medium text-slate-700"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "font-black text-slate-900 mr-1"
-  }, m.sender, ":"), m.text))), /*#__PURE__*/React.createElement("p", {
-    className: "text-[10px] font-bold text-slate-400 uppercase"
-  }, "Dibuat pada: ", c.date, " • Berakhir: ", new Date(c.expiresAtMs || c.createdAtMs).toLocaleString('id-ID'))))))), activeTab === 'pengaturan' && /*#__PURE__*/React.createElement("section", {
-    className: "space-y-6 animate-in fade-in duration-300"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mx-auto"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "text-center mb-8"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-16 h-16 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "settings",
-    size: 32
-  })), /*#__PURE__*/React.createElement("h3", {
-    className: "text-2xl font-black text-slate-800"
-  }, "Pengaturan Akun Wali"), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-slate-500 font-medium mt-1"
-  }, "Perbarui password login dan nomor WhatsApp yang dapat dihubungi oleh pihak sekolah.")), /*#__PURE__*/React.createElement("form", {
-    onSubmit: handleSaveSettings,
-    className: "space-y-6"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "block text-xs font-black text-slate-700 uppercase tracking-wide"
-  }, "Nomor WhatsApp Baru"), /*#__PURE__*/React.createElement("div", {
-    className: "relative"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "phone",
-    size: 18
-  })), /*#__PURE__*/React.createElement("input", {
-    id: "settings-phone",
-    name: "phone",
-    autoComplete: "tel",
-    type: "text",
-    value: newPhone,
-    onChange: e => setNewPhone(e.target.value),
-    placeholder: "Contoh: 08123456789",
-    className: "w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "block text-xs font-black text-slate-700 uppercase tracking-wide"
-  }, "Ganti Password (Opsional)"), /*#__PURE__*/React.createElement("div", {
-    className: "relative"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "lock",
-    size: 18
-  })), /*#__PURE__*/React.createElement("input", {
-    id: "settings-password",
-    name: "newPassword",
-    autoComplete: "new-password",
-    type: "password",
-    value: newPassword,
-    onChange: e => setNewPassword(e.target.value),
-    placeholder: "Kosongkan jika tidak ingin mengubah",
-    className: "w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
-  }))), /*#__PURE__*/React.createElement("div", {
-    className: "pt-4"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "submit",
-    className: "w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-sm"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "save",
-    size: 18
-  }), " Simpan Perubahan Akun")))))))));
+  })))))))))));
 }
 
 // ==========================================

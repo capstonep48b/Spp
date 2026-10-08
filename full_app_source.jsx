@@ -1151,12 +1151,31 @@ function ParentDashboardView({
       const [activeTab, setActiveTab] = useState('spp');
       const [sppSubFilter, setSppSubFilter] = useState('all');
       const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+      const [complaintTitle, setComplaintTitle] = useState('');
+      const [complaintContent, setComplaintContent] = useState('');
       const [showParentBell, setShowParentBell] = useState(false);
       const [readAnnouncements, setReadAnnouncements] = useState(() => {
         try { return JSON.parse(localStorage.getItem('read_announcements_' + (student ? student.id : 'guest'))) || []; } catch(e) { return []; }
       });
+      const [readNotes, setReadNotes] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('read_notes_' + (student ? student.id : 'guest'))) || []; } catch(e) { return []; }
+      });
+      const [readComplaintMsgs, setReadComplaintMsgs] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('read_complaint_msgs_' + (student ? student.id : 'guest'))) || {}; } catch(e) { return {}; }
+      });
       const [previewImage, setPreviewImage] = useState(null);
       const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+      const [replyText, setReplyText] = useState({});
+      const [nowMs, setNowMs] = useState(Date.now());
+
+      // Settings State
+      const [newPassword, setNewPassword] = useState('');
+      const [newPhone, setNewPhone] = useState(student.telepon || '');
+
+      useEffect(() => {
+        const timer = setInterval(() => setNowMs(Date.now()), 5000);
+        return () => clearInterval(timer);
+      }, []);
 
       const studentTrx = useMemo(() => {
         return transactions.filter(t => 
@@ -1165,72 +1184,67 @@ function ParentDashboardView({
         );
       }, [transactions, student]);
 
-      const monthlyBills = useMemo(() => {
-        return getMonthsList(settings).map((monthName) => {
-          const paidTrx = studentTrx.find(t => 
-            t.status === 'Lunas' && (
-              t.month === monthName || 
-              t.month.toLowerCase().trim() === monthName.toLowerCase().trim() ||
-              monthName.startsWith(t.month)
-            )
-          );
-          const isDue = isMonthDueOrElapsed(monthName, new Date(), settings?.dueDateDay || 10);
-          return {
-            id: monthName,
-            month: monthName,
-            amount: student.tarif || 350000,
-            status: paidTrx ? 'Lunas' : 'Belum Bayar',
-            date: paidTrx ? paidTrx.date : '-',
-            kuitansiNo: paidTrx ? paidTrx.kuitansiNo : '-',
-            method: paidTrx ? paidTrx.method : '-',
-            paidTrx: paidTrx,
-            isDue: isDue
-          };
-        });
-      }, [studentTrx, student, settings]);
+      const myComplaints = useMemo(() => {
+        return complaints.filter(c => c.studentId === student.id || c.studentName === student.name);
+      }, [complaints, student]);
+
+      const activeComplaint = useMemo(() => {
+        return myComplaints.find(c => nowMs <= (c.expiresAtMs || (c.createdAtMs + 3600000)));
+      }, [myComplaints, nowMs]);
       
-      const unpaidBills = monthlyBills.filter(b => b.status !== 'Lunas' && b.isDue);
-      const upcomingBills = monthlyBills.filter(b => b.status !== 'Lunas' && !b.isDue);
-      const paidBills = monthlyBills.filter(b => b.status === 'Lunas');
-      const totalDueDebt = unpaidBills.reduce((acc, b) => acc + (b.amount || 0), 0);
+      const expiredComplaints = useMemo(() => {
+        return myComplaints.filter(c => nowMs > (c.expiresAtMs || (c.createdAtMs + 3600000))).sort((a,b) => b.createdAtMs - a.createdAtMs);
+      }, [myComplaints, nowMs]);
 
-      const allPaidTransactions = useMemo(() => {
-        return studentTrx
-          .filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
-          .sort((a, b) => (b.id || 0) - (a.id || 0));
-      }, [studentTrx]);
+      const myNotes = useMemo(() => {
+        return notes.filter(n => n.studentId === student.id || n.studentName === student.name).sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now()));
+      }, [notes, student]);
 
-      const [historyClassFilter, setHistoryClassFilter] = useState('all');
+      const unreadNotesCount = useMemo(() => {
+        return myNotes.filter(n => !readNotes.includes(n.id)).length;
+      }, [myNotes, readNotes]);
 
-      const studentClassHistoryList = useMemo(() => {
-        const clsSet = new Set();
-        if (student?.kelas) clsSet.add(student.kelas);
-        (allPaidTransactions || []).forEach(t => { if (t.kelas) clsSet.add(t.kelas); });
-        (student?.classHistory || []).forEach(h => {
-          if (h.fromClass) clsSet.add(h.fromClass);
-          if (h.toClass) clsSet.add(h.toClass);
-        });
-        return Array.from(clsSet);
-      }, [student, allPaidTransactions]);
+      const unreadComplaintsCount = useMemo(() => {
+        return myComplaints.filter(c => c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length).length;
+      }, [myComplaints, readComplaintMsgs]);
 
-      const filteredPaidBills = useMemo(() => {
-        if (historyClassFilter === 'all') return allPaidTransactions;
-        return allPaidTransactions.filter(t => (t.kelas || student?.kelas) === historyClassFilter);
-      }, [allPaidTransactions, historyClassFilter, student?.kelas]);
+      const unreadAnnCount = useMemo(() => {
+        return announcements.filter(a => !readAnnouncements.includes(a.id)).length;
+      }, [announcements, readAnnouncements]);
 
-      const unreadAnnCount = announcements.filter(a => !readAnnouncements.includes(a.id)).length;
-      const totalParentUnread = unreadAnnCount;
+      const totalParentUnread = unreadAnnCount + unreadNotesCount + unreadComplaintsCount;
 
+      // Auto-mark notifications as read when opening specific tabs or notifications
       useEffect(() => {
-        if (activeTab === 'berita' && announcements.length > 0) {
+        if (activeTab === 'pengaduan' && myComplaints.length > 0) {
+          const updated = { ...readComplaintMsgs };
+          let changed = false;
+          myComplaints.forEach(c => {
+            if (c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length) {
+              updated[c.id] = c.messages.length;
+              changed = true;
+            }
+          });
+          if (changed) {
+            setReadComplaintMsgs(updated);
+            try { localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updated)); } catch(e) {}
+          }
+        } else if (activeTab === 'evaluasi' && myNotes.length > 0) {
+          const unreadIds = myNotes.filter(n => !readNotes.includes(n.id)).map(n => n.id);
+          if (unreadIds.length > 0) {
+            const next = [...readNotes, ...unreadIds];
+            setReadNotes(next);
+            try { localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
+          }
+        } else if (activeTab === 'berita' && announcements.length > 0) {
           const unreadIds = announcements.filter(a => !readAnnouncements.includes(a.id)).map(a => a.id);
           if (unreadIds.length > 0) {
-            const next = [...readAnnouncements, ...unreadIds];
+            const next = [...readAnnouncements, ...readAnnouncements.map(a => a.id)];
             setReadAnnouncements(next);
             try { localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
           }
         }
-      }, [activeTab, announcements]);
+      }, [activeTab, myComplaints, myNotes, announcements]);
 
       const getWaLink = (numStr) => {
         if (!numStr) return '#';
@@ -1305,11 +1319,14 @@ function ParentDashboardView({
                   </div>
                 </div>
 
-                {/* Vertical Navigation (Clean 2 Main Items) */}
+                {/* Vertical Navigation (All 5 Main Items) */}
                 <nav className="px-3 sm:pl-4 sm:pr-0 py-2 sm:py-4 flex md:flex-col gap-2 sm:gap-3 font-extrabold text-sm sm:text-base relative overflow-x-auto">
                   {[
                     { id: 'spp', icon: 'credit-card', label: 'Tagihan SPP', count: unpaidBills.length > 0 ? unpaidBills.length : null, isBadgeDanger: true },
-                    { id: 'berita', icon: 'newspaper', label: 'Pengumuman', count: unreadAnnCount > 0 ? unreadAnnCount : null }
+                    { id: 'berita', icon: 'newspaper', label: 'Pengumuman', count: unreadAnnCount > 0 ? unreadAnnCount : null },
+                    { id: 'evaluasi', icon: 'file-text', label: 'Catatan TU', count: unreadNotesCount > 0 ? unreadNotesCount : null },
+                    { id: 'pengaduan', icon: 'message-square', label: 'Pengaduan', count: unreadComplaintsCount > 0 ? unreadComplaintsCount : null },
+                    { id: 'pengaturan', icon: 'settings', label: 'Pengaturan' }
                   ].map(tab => {
                     const isActive = activeTab === tab.id;
                     return (
@@ -1365,6 +1382,9 @@ function ParentDashboardView({
                       <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
                         {activeTab === 'spp' && 'Status Pembayaran SPP'}
                         {activeTab === 'berita' && 'Berita & Pengumuman Sekolah'}
+                        {activeTab === 'evaluasi' && 'Catatan Siswa (Tata Usaha)'}
+                        {activeTab === 'pengaduan' && 'Layanan Pengaduan Wali Murid'}
+                        {activeTab === 'pengaturan' && 'Pengaturan Akun'}
                       </h2>
                       {activeTab === 'spp' && (
                         unpaidBills.length > 0 ? (
@@ -1383,6 +1403,9 @@ function ParentDashboardView({
                     <p className="text-xs sm:text-sm md:text-base text-slate-500 font-medium mt-1">
                       {activeTab === 'spp' && 'Informasi tarif, tagihan jatuh tempo, dan riwayat pembayaran resmi'}
                       {activeTab === 'berita' && 'Informasi kegiatan, edaran libur, dan agenda sekolah terkini'}
+                      {activeTab === 'evaluasi' && 'Pesan dan catatan penting perkembangan siswa dari Tata Usaha (TU)'}
+                      {activeTab === 'pengaduan' && 'Sampaikan masukan, kendala, atau pertanyaan langsung ke pihak sekolah'}
+                      {activeTab === 'pengaturan' && 'Kelola informasi nomor WhatsApp dan kata sandi akun Anda'}
                     </p>
                   </div>
 
@@ -1588,14 +1611,6 @@ function ParentDashboardView({
 
               {/* Main Content Body */}
               <div key={activeTab} className="p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-7 flex-1 animate-tab-switch">
-                {/* GREETING & WAVING MASCOT BANNER */}
-                <GreetingMascotBanner 
-                  name={student.name || 'Wali Murid'} 
-                  role="Wali Murid" 
-                  schoolName={settings.schoolName} 
-                  academicYear={settings.academicYear} 
-                />
-
                 {/* TAB 1: SPP */}
                 {activeTab === 'spp' && (
                   isRefreshing ? (
@@ -2040,6 +2055,299 @@ function ParentDashboardView({
                         ))}
                       </div>
                     )}
+                  </section>
+                )}
+
+                {/* TAB 3: CATATAN TU (EVALUASI) */}
+                {activeTab === 'evaluasi' && (
+                  <section className="space-y-6 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
+                      <div className="flex items-center gap-3 mb-6 border-b border-slate-100 pb-4">
+                        <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold">
+                          <Icon name="file-text" size={24} />
+                        </div>
+                        <div>
+                          <h3 className="text-xl font-black text-slate-800">Catatan dari Tata Usaha (TU)</h3>
+                          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">Catatan & perkembangan ananda {student.name}</p>
+                        </div>
+                      </div>
+
+                      {myNotes.length === 0 ? (
+                        <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-100">
+                          <Icon name="inbox" size={36} className="mx-auto text-slate-300 mb-2" />
+                          <p className="text-slate-500 font-bold text-sm">Belum ada catatan TU untuk ananda {student.name}.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {myNotes.map(note => (
+                            <div key={note.id} className="bg-slate-50 rounded-2xl border border-slate-200/80 p-5 sm:p-6 hover:border-indigo-200 transition-colors">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                                <span className="px-3 py-1 bg-indigo-100 text-indigo-800 font-black rounded-lg text-xs uppercase tracking-wide self-start">
+                                  {note.category || 'Catatan TU'}
+                                </span>
+                                <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                                  <Icon name="calendar" size={13} /> {note.date}
+                                </span>
+                              </div>
+                              <h4 className="font-black text-slate-800 text-base mb-2">{note.title}</h4>
+                              <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{note.content}</p>
+
+                              {/* Komentar / Balasan Wali */}
+                              <div className="mt-4 pt-4 border-t border-slate-200/60 space-y-3">
+                                <p className="text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                                  <Icon name="message-square" size={12} /> Tanggapan Wali Murid ({note.comments ? note.comments.length : 0})
+                                </p>
+                                {note.comments && note.comments.length > 0 && (
+                                  <div className="space-y-2">
+                                    {note.comments.map((c, i) => (
+                                      <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 text-xs">
+                                        <span className="font-extrabold text-indigo-700 mr-1.5">{c.sender}:</span>
+                                        <span className="text-slate-700 font-medium">{c.text}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="flex gap-2 pt-1">
+                                  <input
+                                    type="text"
+                                    value={replyText[note.id] || ''}
+                                    onChange={e => setReplyText({ ...replyText, [note.id]: e.target.value })}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter' && replyText[note.id]?.trim()) {
+                                        onAddCommentNote(note.id, { sender: 'Wali Murid', text: replyText[note.id].trim() });
+                                        setReplyText({ ...replyText, [note.id]: '' });
+                                      }
+                                    }}
+                                    placeholder="Tulis balasan untuk TU..."
+                                    className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (replyText[note.id]?.trim()) {
+                                        onAddCommentNote(note.id, { sender: 'Wali Murid', text: replyText[note.id].trim() });
+                                        setReplyText({ ...replyText, [note.id]: '' });
+                                      }
+                                    }}
+                                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5"
+                                  >
+                                    <Icon name="send" size={14} /> Kirim
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                )}
+
+                {/* TAB 4: PENGADUAN */}
+                {activeTab === 'pengaduan' && (
+                  <section className="space-y-6 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto">
+                      <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+                        <div>
+                          <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                            <Icon name="message-square" size={24} className="text-blue-600" /> Layanan Pengaduan & Masukan
+                          </h3>
+                          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">Sampaikan keluhan, pertanyaan, atau masukan kepada pihak sekolah</p>
+                        </div>
+                      </div>
+
+                      {/* Form Tambah Pengaduan */}
+                      <form
+                        onSubmit={e => {
+                          e.preventDefault();
+                          if (!complaintTitle.trim() || !complaintContent.trim()) return;
+                          onAddComplaint({
+                            studentId: student.id,
+                            studentName: student.name,
+                            waliName: student.wali || 'Wali Murid',
+                            title: complaintTitle.trim(),
+                            content: complaintContent.trim(),
+                            date: new Date().toLocaleDateString('id-ID')
+                          });
+                          setComplaintTitle('');
+                          setComplaintContent('');
+                        }}
+                        className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200/80 mb-8 space-y-4"
+                      >
+                        <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">Buat Pengaduan Baru</h4>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Subjek / Judul Pengaduan</label>
+                          <input
+                            type="text"
+                            required
+                            value={complaintTitle}
+                            onChange={e => setComplaintTitle(e.target.value)}
+                            placeholder="Contoh: Kendala Pembayaran SPP / Pertanyaan Kegiatan"
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-slate-600 mb-1">Pesan / Detail Pengaduan</label>
+                          <textarea
+                            required
+                            rows="4"
+                            value={complaintContent}
+                            onChange={e => setComplaintContent(e.target.value)}
+                            placeholder="Tuliskan pengaduan atau pertanyaan Anda secara rinci..."
+                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                          ></textarea>
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+                        >
+                          <Icon name="send" size={16} /> Kirim Pengaduan
+                        </button>
+                      </form>
+
+                      {/* Daftar Pengaduan Aktif */}
+                      <div className="space-y-4">
+                        <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">Riwayat Pengaduan Anda ({myComplaints.length})</h4>
+                        {myComplaints.length === 0 ? (
+                          <p className="text-center py-8 text-slate-400 font-medium text-xs sm:text-sm">Belum ada pengaduan yang dikirim.</p>
+                        ) : (
+                          myComplaints.map(comp => (
+                            <div key={comp.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                                <div>
+                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                                    comp.status === 'Sudah Ditangani' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {comp.status || 'Belum Ditangani'}
+                                  </span>
+                                  <h5 className="font-black text-slate-800 text-base mt-1">{comp.title}</h5>
+                                </div>
+                                <span className="text-[11px] text-slate-400 font-bold">{comp.date}</span>
+                              </div>
+
+                              {/* Chat Thread */}
+                              <div className="space-y-2 max-h-60 overflow-y-auto bg-slate-50 p-3 rounded-xl border border-slate-100">
+                                {comp.messages && comp.messages.map((m, idx) => (
+                                  <div key={idx} className={`p-2.5 rounded-xl text-xs ${
+                                    m.sender === 'Admin TU' ? 'bg-blue-50 text-blue-900 border border-blue-100' : 'bg-white text-slate-800 border border-slate-200'
+                                  }`}>
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="font-black">{m.sender}</span>
+                                      <span className="text-[10px] text-slate-400">{m.time || ''}</span>
+                                    </div>
+                                    <p className="font-medium whitespace-pre-wrap">{m.text}</p>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Reply Form */}
+                              <div className="flex gap-2 pt-1">
+                                <input
+                                  type="text"
+                                  value={replyText[comp.id] || ''}
+                                  onChange={e => setReplyText({ ...replyText, [comp.id]: e.target.value })}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter' && replyText[comp.id]?.trim()) {
+                                      onReplyComplaint(comp.id, replyText[comp.id].trim(), 'Wali Murid');
+                                      setReplyText({ ...replyText, [comp.id]: '' });
+                                    }
+                                  }}
+                                  placeholder="Tulis balasan untuk Admin TU..."
+                                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (replyText[comp.id]?.trim()) {
+                                      onReplyComplaint(comp.id, replyText[comp.id].trim(), 'Wali Murid');
+                                      setReplyText({ ...replyText, [comp.id]: '' });
+                                    }
+                                  }}
+                                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5"
+                                >
+                                  <Icon name="send" size={14} /> Balas
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {/* TAB 5: PENGATURAN */}
+                {activeTab === 'pengaturan' && (
+                  <section className="space-y-6 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mx-auto">
+                      <div className="text-center mb-8">
+                        <div className="w-16 h-16 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                          <Icon name="settings" size={32} />
+                        </div>
+                        <h3 className="text-2xl font-black text-slate-800">Pengaturan Akun Wali</h3>
+                        <p className="text-sm text-slate-500 font-medium mt-1">Perbarui password login dan nomor WhatsApp yang dapat dihubungi oleh pihak sekolah.</p>
+                      </div>
+
+                      <form
+                        onSubmit={e => {
+                          e.preventDefault();
+                          const updateObj = {};
+                          if (newPhone.trim()) updateObj.telepon = newPhone.trim();
+                          if (newPassword.trim()) updateObj.password = newPassword.trim();
+                          onUpdateParentSettings(student.id, updateObj);
+                          setNewPassword('');
+                        }}
+                        className="space-y-6"
+                      >
+                        <div className="space-y-2">
+                          <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">Nomor WhatsApp Baru</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                              <Icon name="phone" size={18} />
+                            </div>
+                            <input
+                              id="settings-phone"
+                              name="phone"
+                              autoComplete="tel"
+                              type="text"
+                              value={newPhone}
+                              onChange={e => setNewPhone(e.target.value)}
+                              placeholder="Contoh: 08123456789"
+                              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">Ganti Password (Opsional)</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                              <Icon name="lock" size={18} />
+                            </div>
+                            <input
+                              id="settings-password"
+                              name="newPassword"
+                              autoComplete="new-password"
+                              type="password"
+                              value={newPassword}
+                              onChange={e => setNewPassword(e.target.value)}
+                              placeholder="Kosongkan jika tidak ingin mengubah"
+                              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="pt-4">
+                          <button
+                            type="submit"
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-sm"
+                          >
+                            <Icon name="save" size={18} /> Simpan Perubahan Akun
+                          </button>
+                        </div>
+                      </form>
+                    </div>
                   </section>
                 )}
               </div>

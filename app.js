@@ -1087,6 +1087,8 @@ function ParentDashboardView({
   const [activeTab, setActiveTab] = useState('spp');
   const [sppSubFilter, setSppSubFilter] = useState('all');
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+  const [complaintTitle, setComplaintTitle] = useState('');
+  const [complaintContent, setComplaintContent] = useState('');
   const [showParentBell, setShowParentBell] = useState(false);
   const [readAnnouncements, setReadAnnouncements] = useState(() => {
     try {
@@ -1095,66 +1097,97 @@ function ParentDashboardView({
       return [];
     }
   });
+  const [readNotes, setReadNotes] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('read_notes_' + (student ? student.id : 'guest'))) || [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [readComplaintMsgs, setReadComplaintMsgs] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('read_complaint_msgs_' + (student ? student.id : 'guest'))) || {};
+    } catch (e) {
+      return {};
+    }
+  });
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+  const [replyText, setReplyText] = useState({});
+  const [nowMs, setNowMs] = useState(Date.now());
+
+  // Settings State
+  const [newPassword, setNewPassword] = useState('');
+  const [newPhone, setNewPhone] = useState(student.telepon || '');
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), 5000);
+    return () => clearInterval(timer);
+  }, []);
   const studentTrx = useMemo(() => {
     return transactions.filter(t => t.studentId && t.studentId === student.id || t.studentName && t.studentName.toLowerCase().trim() === student.name.toLowerCase().trim());
   }, [transactions, student]);
-  const monthlyBills = useMemo(() => {
-    return getMonthsList(settings).map(monthName => {
-      const paidTrx = studentTrx.find(t => t.status === 'Lunas' && (t.month === monthName || t.month.toLowerCase().trim() === monthName.toLowerCase().trim() || monthName.startsWith(t.month)));
-      const isDue = isMonthDueOrElapsed(monthName, new Date(), settings?.dueDateDay || 10);
-      return {
-        id: monthName,
-        month: monthName,
-        amount: student.tarif || 350000,
-        status: paidTrx ? 'Lunas' : 'Belum Bayar',
-        date: paidTrx ? paidTrx.date : '-',
-        kuitansiNo: paidTrx ? paidTrx.kuitansiNo : '-',
-        method: paidTrx ? paidTrx.method : '-',
-        paidTrx: paidTrx,
-        isDue: isDue
-      };
-    });
-  }, [studentTrx, student, settings]);
-  const unpaidBills = monthlyBills.filter(b => b.status !== 'Lunas' && b.isDue);
-  const upcomingBills = monthlyBills.filter(b => b.status !== 'Lunas' && !b.isDue);
-  const paidBills = monthlyBills.filter(b => b.status === 'Lunas');
-  const totalDueDebt = unpaidBills.reduce((acc, b) => acc + (b.amount || 0), 0);
-  const allPaidTransactions = useMemo(() => {
-    return studentTrx.filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses').sort((a, b) => (b.id || 0) - (a.id || 0));
-  }, [studentTrx]);
-  const [historyClassFilter, setHistoryClassFilter] = useState('all');
-  const studentClassHistoryList = useMemo(() => {
-    const clsSet = new Set();
-    if (student?.kelas) clsSet.add(student.kelas);
-    (allPaidTransactions || []).forEach(t => {
-      if (t.kelas) clsSet.add(t.kelas);
-    });
-    (student?.classHistory || []).forEach(h => {
-      if (h.fromClass) clsSet.add(h.fromClass);
-      if (h.toClass) clsSet.add(h.toClass);
-    });
-    return Array.from(clsSet);
-  }, [student, allPaidTransactions]);
-  const filteredPaidBills = useMemo(() => {
-    if (historyClassFilter === 'all') return allPaidTransactions;
-    return allPaidTransactions.filter(t => (t.kelas || student?.kelas) === historyClassFilter);
-  }, [allPaidTransactions, historyClassFilter, student?.kelas]);
-  const unreadAnnCount = announcements.filter(a => !readAnnouncements.includes(a.id)).length;
-  const totalParentUnread = unreadAnnCount;
+  const myComplaints = useMemo(() => {
+    return complaints.filter(c => c.studentId === student.id || c.studentName === student.name);
+  }, [complaints, student]);
+  const activeComplaint = useMemo(() => {
+    return myComplaints.find(c => nowMs <= (c.expiresAtMs || c.createdAtMs + 3600000));
+  }, [myComplaints, nowMs]);
+  const expiredComplaints = useMemo(() => {
+    return myComplaints.filter(c => nowMs > (c.expiresAtMs || c.createdAtMs + 3600000)).sort((a, b) => b.createdAtMs - a.createdAtMs);
+  }, [myComplaints, nowMs]);
+  const myNotes = useMemo(() => {
+    return notes.filter(n => n.studentId === student.id || n.studentName === student.name).sort((a, b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now()));
+  }, [notes, student]);
+  const unreadNotesCount = useMemo(() => {
+    return myNotes.filter(n => !readNotes.includes(n.id)).length;
+  }, [myNotes, readNotes]);
+  const unreadComplaintsCount = useMemo(() => {
+    return myComplaints.filter(c => c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length).length;
+  }, [myComplaints, readComplaintMsgs]);
+  const unreadAnnCount = useMemo(() => {
+    return announcements.filter(a => !readAnnouncements.includes(a.id)).length;
+  }, [announcements, readAnnouncements]);
+  const totalParentUnread = unreadAnnCount + unreadNotesCount + unreadComplaintsCount;
+
+  // Auto-mark notifications as read when opening specific tabs or notifications
   useEffect(() => {
-    if (activeTab === 'berita' && announcements.length > 0) {
+    if (activeTab === 'pengaduan' && myComplaints.length > 0) {
+      const updated = {
+        ...readComplaintMsgs
+      };
+      let changed = false;
+      myComplaints.forEach(c => {
+        if (c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length) {
+          updated[c.id] = c.messages.length;
+          changed = true;
+        }
+      });
+      if (changed) {
+        setReadComplaintMsgs(updated);
+        try {
+          localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updated));
+        } catch (e) {}
+      }
+    } else if (activeTab === 'evaluasi' && myNotes.length > 0) {
+      const unreadIds = myNotes.filter(n => !readNotes.includes(n.id)).map(n => n.id);
+      if (unreadIds.length > 0) {
+        const next = [...readNotes, ...unreadIds];
+        setReadNotes(next);
+        try {
+          localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(next));
+        } catch (e) {}
+      }
+    } else if (activeTab === 'berita' && announcements.length > 0) {
       const unreadIds = announcements.filter(a => !readAnnouncements.includes(a.id)).map(a => a.id);
       if (unreadIds.length > 0) {
-        const next = [...readAnnouncements, ...unreadIds];
+        const next = [...readAnnouncements, ...readAnnouncements.map(a => a.id)];
         setReadAnnouncements(next);
         try {
           localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next));
         } catch (e) {}
       }
     }
-  }, [activeTab, announcements]);
+  }, [activeTab, myComplaints, myNotes, announcements]);
   const getWaLink = numStr => {
     if (!numStr) return '#';
     let clean = numStr.replace(/[^0-9]/g, '');
@@ -1245,6 +1278,20 @@ function ParentDashboardView({
     icon: 'newspaper',
     label: 'Pengumuman',
     count: unreadAnnCount > 0 ? unreadAnnCount : null
+  }, {
+    id: 'evaluasi',
+    icon: 'file-text',
+    label: 'Catatan TU',
+    count: unreadNotesCount > 0 ? unreadNotesCount : null
+  }, {
+    id: 'pengaduan',
+    icon: 'message-square',
+    label: 'Pengaduan',
+    count: unreadComplaintsCount > 0 ? unreadComplaintsCount : null
+  }, {
+    id: 'pengaturan',
+    icon: 'settings',
+    label: 'Pengaturan'
   }].map(tab => {
     const isActive = activeTab === tab.id;
     return /*#__PURE__*/React.createElement("button", {
@@ -1283,7 +1330,7 @@ function ParentDashboardView({
     className: "flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("h2", {
     className: "text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight"
-  }, activeTab === 'spp' && 'Status Pembayaran SPP', activeTab === 'berita' && 'Berita & Pengumuman Sekolah'), activeTab === 'spp' && (unpaidBills.length > 0 ? /*#__PURE__*/React.createElement("span", {
+  }, activeTab === 'spp' && 'Status Pembayaran SPP', activeTab === 'berita' && 'Berita & Pengumuman Sekolah', activeTab === 'evaluasi' && 'Catatan Siswa (Tata Usaha)', activeTab === 'pengaduan' && 'Layanan Pengaduan Wali Murid', activeTab === 'pengaturan' && 'Pengaturan Akun'), activeTab === 'spp' && (unpaidBills.length > 0 ? /*#__PURE__*/React.createElement("span", {
     className: "hidden sm:inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200"
   }, /*#__PURE__*/React.createElement(Icon, {
     name: "alert-circle",
@@ -1297,7 +1344,7 @@ function ParentDashboardView({
     className: "text-emerald-600"
   }), /*#__PURE__*/React.createElement("span", null, "Status Lunas / Aman")))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs sm:text-sm md:text-base text-slate-500 font-medium mt-1"
-  }, activeTab === 'spp' && 'Informasi tarif, tagihan jatuh tempo, dan riwayat pembayaran resmi', activeTab === 'berita' && 'Informasi kegiatan, edaran libur, dan agenda sekolah terkini')), /*#__PURE__*/React.createElement("div", {
+  }, activeTab === 'spp' && 'Informasi tarif, tagihan jatuh tempo, dan riwayat pembayaran resmi', activeTab === 'berita' && 'Informasi kegiatan, edaran libur, dan agenda sekolah terkini', activeTab === 'evaluasi' && 'Pesan dan catatan penting perkembangan siswa dari Tata Usaha (TU)', activeTab === 'pengaduan' && 'Sampaikan masukan, kendala, atau pertanyaan langsung ke pihak sekolah', activeTab === 'pengaturan' && 'Kelola informasi nomor WhatsApp dan kata sandi akun Anda')), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center gap-2 sm:gap-3 shrink-0"
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => onRefresh(true),
@@ -1470,12 +1517,7 @@ function ParentDashboardView({
   }, paidBills.length)))))), /*#__PURE__*/React.createElement("div", {
     key: activeTab,
     className: "p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-7 flex-1 animate-tab-switch"
-  }, /*#__PURE__*/React.createElement(GreetingMascotBanner, {
-    name: student.name || 'Wali Murid',
-    role: "Wali Murid",
-    schoolName: settings.schoolName,
-    academicYear: settings.academicYear
-  }), activeTab === 'spp' && (isRefreshing ? /*#__PURE__*/React.createElement("div", {
+  }, activeTab === 'spp' && (isRefreshing ? /*#__PURE__*/React.createElement("div", {
     className: "space-y-7 animate-pulse select-none"
   }, /*#__PURE__*/React.createElement("div", {
     className: "glass-panel-modern rounded-[32px] p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-slate-50/80"
@@ -1893,7 +1935,299 @@ function ParentDashboardView({
   }, /*#__PURE__*/React.createElement("span", null, "Baca Selengkapnya"), /*#__PURE__*/React.createElement(Icon, {
     name: "arrow-right",
     size: 14
-  })))))))))));
+  }))))))), activeTab === 'evaluasi' && /*#__PURE__*/React.createElement("section", {
+    className: "space-y-6 animate-in fade-in duration-300"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 mb-6 border-b border-slate-100 pb-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center font-bold"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "file-text",
+    size: 24
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xl font-black text-slate-800"
+  }, "Catatan dari Tata Usaha (TU)"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs sm:text-sm text-slate-500 font-medium mt-0.5"
+  }, "Catatan & perkembangan ananda ", student.name))), myNotes.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "text-center py-12 bg-slate-50 rounded-2xl border border-slate-100"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "inbox",
+    size: 36,
+    className: "mx-auto text-slate-300 mb-2"
+  }), /*#__PURE__*/React.createElement("p", {
+    className: "text-slate-500 font-bold text-sm"
+  }, "Belum ada catatan TU untuk ananda ", student.name, ".")) : /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, myNotes.map(note => /*#__PURE__*/React.createElement("div", {
+    key: note.id,
+    className: "bg-slate-50 rounded-2xl border border-slate-200/80 p-5 sm:p-6 hover:border-indigo-200 transition-colors"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "px-3 py-1 bg-indigo-100 text-indigo-800 font-black rounded-lg text-xs uppercase tracking-wide self-start"
+  }, note.category || 'Catatan TU'), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs font-bold text-slate-400 flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "calendar",
+    size: 13
+  }), " ", note.date)), /*#__PURE__*/React.createElement("h4", {
+    className: "font-black text-slate-800 text-base mb-2"
+  }, note.title), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs sm:text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-wrap"
+  }, note.content), /*#__PURE__*/React.createElement("div", {
+    className: "mt-4 pt-4 border-t border-slate-200/60 space-y-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "message-square",
+    size: 12
+  }), " Tanggapan Wali Murid (", note.comments ? note.comments.length : 0, ")"), note.comments && note.comments.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, note.comments.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "bg-white p-3 rounded-xl border border-slate-200 text-xs"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-extrabold text-indigo-700 mr-1.5"
+  }, c.sender, ":"), /*#__PURE__*/React.createElement("span", {
+    className: "text-slate-700 font-medium"
+  }, c.text)))), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-1"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: replyText[note.id] || '',
+    onChange: e => setReplyText({
+      ...replyText,
+      [note.id]: e.target.value
+    }),
+    onKeyDown: e => {
+      if (e.key === 'Enter' && replyText[note.id]?.trim()) {
+        onAddCommentNote(note.id, {
+          sender: 'Wali Murid',
+          text: replyText[note.id].trim()
+        });
+        setReplyText({
+          ...replyText,
+          [note.id]: ''
+        });
+      }
+    },
+    placeholder: "Tulis balasan untuk TU...",
+    className: "flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      if (replyText[note.id]?.trim()) {
+        onAddCommentNote(note.id, {
+          sender: 'Wali Murid',
+          text: replyText[note.id].trim()
+        });
+        setReplyText({
+          ...replyText,
+          [note.id]: ''
+        });
+      }
+    },
+    className: "px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "send",
+    size: 14
+  }), " Kirim")))))))), activeTab === 'pengaduan' && /*#__PURE__*/React.createElement("section", {
+    className: "space-y-6 animate-in fade-in duration-300"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-6 border-b border-slate-100 pb-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xl font-black text-slate-800 flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "message-square",
+    size: 24,
+    className: "text-blue-600"
+  }), " Layanan Pengaduan & Masukan"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs sm:text-sm text-slate-500 font-medium mt-0.5"
+  }, "Sampaikan keluhan, pertanyaan, atau masukan kepada pihak sekolah"))), /*#__PURE__*/React.createElement("form", {
+    onSubmit: e => {
+      e.preventDefault();
+      if (!complaintTitle.trim() || !complaintContent.trim()) return;
+      onAddComplaint({
+        studentId: student.id,
+        studentName: student.name,
+        waliName: student.wali || 'Wali Murid',
+        title: complaintTitle.trim(),
+        content: complaintContent.trim(),
+        date: new Date().toLocaleDateString('id-ID')
+      });
+      setComplaintTitle('');
+      setComplaintContent('');
+    },
+    className: "bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200/80 mb-8 space-y-4"
+  }, /*#__PURE__*/React.createElement("h4", {
+    className: "font-black text-slate-800 text-sm uppercase tracking-wide"
+  }, "Buat Pengaduan Baru"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-bold text-slate-600 mb-1"
+  }, "Subjek / Judul Pengaduan"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    required: true,
+    value: complaintTitle,
+    onChange: e => setComplaintTitle(e.target.value),
+    placeholder: "Contoh: Kendala Pembayaran SPP / Pertanyaan Kegiatan",
+    className: "w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-bold text-slate-600 mb-1"
+  }, "Pesan / Detail Pengaduan"), /*#__PURE__*/React.createElement("textarea", {
+    required: true,
+    rows: "4",
+    value: complaintContent,
+    onChange: e => setComplaintContent(e.target.value),
+    placeholder: "Tuliskan pengaduan atau pertanyaan Anda secara rinci...",
+    className: "w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "send",
+    size: 16
+  }), " Kirim Pengaduan")), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-4"
+  }, /*#__PURE__*/React.createElement("h4", {
+    className: "font-black text-slate-800 text-sm uppercase tracking-wide"
+  }, "Riwayat Pengaduan Anda (", myComplaints.length, ")"), myComplaints.length === 0 ? /*#__PURE__*/React.createElement("p", {
+    className: "text-center py-8 text-slate-400 font-medium text-xs sm:text-sm"
+  }, "Belum ada pengaduan yang dikirim.") : myComplaints.map(comp => /*#__PURE__*/React.createElement("div", {
+    key: comp.id,
+    className: "bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    className: `px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${comp.status === 'Sudah Ditangani' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`
+  }, comp.status || 'Belum Ditangani'), /*#__PURE__*/React.createElement("h5", {
+    className: "font-black text-slate-800 text-base mt-1"
+  }, comp.title)), /*#__PURE__*/React.createElement("span", {
+    className: "text-[11px] text-slate-400 font-bold"
+  }, comp.date)), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2 max-h-60 overflow-y-auto bg-slate-50 p-3 rounded-xl border border-slate-100"
+  }, comp.messages && comp.messages.map((m, idx) => /*#__PURE__*/React.createElement("div", {
+    key: idx,
+    className: `p-2.5 rounded-xl text-xs ${m.sender === 'Admin TU' ? 'bg-blue-50 text-blue-900 border border-blue-100' : 'bg-white text-slate-800 border border-slate-200'}`
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-between items-center mb-1"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-black"
+  }, m.sender), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] text-slate-400"
+  }, m.time || '')), /*#__PURE__*/React.createElement("p", {
+    className: "font-medium whitespace-pre-wrap"
+  }, m.text)))), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2 pt-1"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: replyText[comp.id] || '',
+    onChange: e => setReplyText({
+      ...replyText,
+      [comp.id]: e.target.value
+    }),
+    onKeyDown: e => {
+      if (e.key === 'Enter' && replyText[comp.id]?.trim()) {
+        onReplyComplaint(comp.id, replyText[comp.id].trim(), 'Wali Murid');
+        setReplyText({
+          ...replyText,
+          [comp.id]: ''
+        });
+      }
+    },
+    placeholder: "Tulis balasan untuk Admin TU...",
+    className: "flex-1 px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      if (replyText[comp.id]?.trim()) {
+        onReplyComplaint(comp.id, replyText[comp.id].trim(), 'Wali Murid');
+        setReplyText({
+          ...replyText,
+          [comp.id]: ''
+        });
+      }
+    },
+    className: "px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "send",
+    size: 14
+  }), " Balas"))))))), activeTab === 'pengaturan' && /*#__PURE__*/React.createElement("section", {
+    className: "space-y-6 animate-in fade-in duration-300"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mx-auto"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center mb-8"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "w-16 h-16 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "settings",
+    size: 32
+  })), /*#__PURE__*/React.createElement("h3", {
+    className: "text-2xl font-black text-slate-800"
+  }, "Pengaturan Akun Wali"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-slate-500 font-medium mt-1"
+  }, "Perbarui password login dan nomor WhatsApp yang dapat dihubungi oleh pihak sekolah.")), /*#__PURE__*/React.createElement("form", {
+    onSubmit: e => {
+      e.preventDefault();
+      const updateObj = {};
+      if (newPhone.trim()) updateObj.telepon = newPhone.trim();
+      if (newPassword.trim()) updateObj.password = newPassword.trim();
+      onUpdateParentSettings(student.id, updateObj);
+      setNewPassword('');
+    },
+    className: "space-y-6"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-black text-slate-700 uppercase tracking-wide"
+  }, "Nomor WhatsApp Baru"), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "phone",
+    size: 18
+  })), /*#__PURE__*/React.createElement("input", {
+    id: "settings-phone",
+    name: "phone",
+    autoComplete: "tel",
+    type: "text",
+    value: newPhone,
+    onChange: e => setNewPhone(e.target.value),
+    placeholder: "Contoh: 08123456789",
+    className: "w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "space-y-2"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "block text-xs font-black text-slate-700 uppercase tracking-wide"
+  }, "Ganti Password (Opsional)"), /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "lock",
+    size: 18
+  })), /*#__PURE__*/React.createElement("input", {
+    id: "settings-password",
+    name: "newPassword",
+    autoComplete: "new-password",
+    type: "password",
+    value: newPassword,
+    onChange: e => setNewPassword(e.target.value),
+    placeholder: "Kosongkan jika tidak ingin mengubah",
+    className: "w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "pt-4"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "submit",
+    className: "w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-sm"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "save",
+    size: 18
+  }), " Simpan Perubahan Akun")))))))));
 }
 
 // ==========================================

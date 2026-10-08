@@ -237,9 +237,6 @@ const mapSettingsFromDb = row => {
     dueDateDay: Number(row.due_date_day || localExt.dueDateDay || 10),
     midtransClientKey: row.midtrans_client_key || localExt.midtransClientKey || '',
     midtransServerKey: row.midtrans_server_key || localExt.midtransServerKey || '',
-    tarifPlaygroup: Number(row.tarif_playgroup || localExt.tarifPlaygroup || 350000),
-    tarifKelasA: Number(row.tarif_kelas_a || localExt.tarifKelasA || 400000),
-    tarifKelasB: Number(row.tarif_kelas_b || localExt.tarifKelasB || 450000),
     startMonth: row.start_month || localExt.startMonth || 'Juli',
     startYear: Number(row.start_year || localExt.startYear || 2025),
     endMonth: row.end_month || localExt.endMonth || 'Juni',
@@ -2852,7 +2849,7 @@ function SiswaListView({
     if (student) {
       setEditingStudent(student);
       const matchCls = (settings.customClasses || []).find(c => c.name === student.kelas);
-      const standardTarif = matchCls ? matchCls.tarif : settings.tarifPlaygroup || 0;
+      const standardTarif = matchCls ? matchCls.tarif : 0;
       const hasDiscount = Boolean(student.keringanan_note && student.keringanan_note.trim().length > 0 || student.tarif && student.tarif !== standardTarif);
       setIsKeringanan(hasDiscount);
       setFormData({
@@ -2876,7 +2873,7 @@ function SiswaListView({
       setEditingStudent(null);
       setIsKeringanan(false);
       const defaultKelas = (settings.customClasses || [])[0]?.name || '';
-      const defaultTarif = (settings.customClasses || [])[0]?.tarif || settings.tarifPlaygroup || 0;
+      const defaultTarif = (settings.customClasses || [])[0]?.tarif || 0;
       setFormData({
         nis: '',
         nipd: '',
@@ -3233,7 +3230,7 @@ function SiswaListView({
     onChange: e => {
       const k = e.target.value;
       const matchCls = (settings.customClasses || []).find(c => c.name === k);
-      let t = matchCls ? matchCls.tarif : settings.tarifPlaygroup || 0;
+      let t = matchCls ? matchCls.tarif : 0;
       setFormData(prev => ({
         ...prev,
         kelas: k,
@@ -3383,7 +3380,7 @@ function SiswaListView({
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500"
   })))), (() => {
     const matchCls = (settings.customClasses || []).find(c => c.name === formData.kelas);
-    const standardTarif = matchCls ? matchCls.tarif : settings.tarifPlaygroup || 0;
+    const standardTarif = matchCls ? matchCls.tarif : 0;
     return /*#__PURE__*/React.createElement("div", {
       className: "bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3"
     }, /*#__PURE__*/React.createElement("div", {
@@ -3716,7 +3713,7 @@ function SiswaListView({
     onChange: e => {
       const target = e.target.value;
       const matchCls = (settings.customClasses || []).find(c => c.name === target);
-      const stdTarif = matchCls ? matchCls.tarif : settings.tarifPlaygroup || 0;
+      const stdTarif = matchCls ? matchCls.tarif : 0;
       setPromotionForm(prev => ({
         ...prev,
         targetClass: target,

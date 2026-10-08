@@ -1171,6 +1171,7 @@ function ParentDashboardView({
       // Settings State
       const [newPassword, setNewPassword] = useState('');
       const [newPhone, setNewPhone] = useState(student.telepon || '');
+      const [historyClassFilter, setHistoryClassFilter] = useState('all');
 
       useEffect(() => {
         const timer = setInterval(() => setNowMs(Date.now()), 5000);
@@ -1183,6 +1184,83 @@ function ParentDashboardView({
           (t.studentName && t.studentName.toLowerCase().trim() === student.name.toLowerCase().trim())
         );
       }, [transactions, student]);
+
+      const academicMonths = useMemo(() => {
+        const baseMonths = getMonthsList(settings);
+        const s = (settings?.semester || '').toLowerCase();
+        let semFilter = 'all';
+        if (s.includes('1') || s.includes('ganjil')) semFilter = '1';
+        if (s.includes('2') || s.includes('genap')) semFilter = '2';
+        return getSemesterMonths(baseMonths, semFilter);
+      }, [settings]);
+
+      const monthlyBills = useMemo(() => {
+        return academicMonths.map(month => ({
+          month,
+          amount: Number(student?.tarif || 0)
+        }));
+      }, [academicMonths, student]);
+
+      const paidBills = useMemo(() => {
+        const paidMonthNames = studentTrx
+          .filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
+          .map(t => (t.month || '').trim().toLowerCase());
+
+        return monthlyBills.filter(b => paidMonthNames.includes(b.month.trim().toLowerCase()));
+      }, [monthlyBills, studentTrx]);
+
+      const unpaidBills = useMemo(() => {
+        const paidMonthNames = studentTrx
+          .filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
+          .map(t => (t.month || '').trim().toLowerCase());
+
+        const dueDateDay = Number(settings?.dueDateDay) || 10;
+        const now = new Date();
+
+        return monthlyBills.filter(b => {
+          const mLower = b.month.trim().toLowerCase();
+          const isPaid = paidMonthNames.some(pm => pm === mLower || (pm && mLower.startsWith(pm)));
+          if (isPaid) return false;
+          return isMonthDueOrElapsed(b.month, now, dueDateDay);
+        });
+      }, [monthlyBills, studentTrx, settings]);
+
+      const upcomingBills = useMemo(() => {
+        const paidMonthNames = studentTrx
+          .filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
+          .map(t => (t.month || '').trim().toLowerCase());
+
+        const dueDateDay = Number(settings?.dueDateDay) || 10;
+        const now = new Date();
+
+        return monthlyBills.filter(b => {
+          const mLower = b.month.trim().toLowerCase();
+          const isPaid = paidMonthNames.some(pm => pm === mLower || (pm && mLower.startsWith(pm)));
+          if (isPaid) return false;
+          return !isMonthDueOrElapsed(b.month, now, dueDateDay);
+        });
+      }, [monthlyBills, studentTrx, settings]);
+
+      const totalDueDebt = useMemo(() => {
+        return unpaidBills.reduce((acc, b) => acc + b.amount, 0);
+      }, [unpaidBills]);
+
+      const allPaidTransactions = useMemo(() => {
+        return studentTrx.filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses');
+      }, [studentTrx]);
+
+      const studentClassHistoryList = useMemo(() => {
+        const list = Array.isArray(student?.classHistory) ? [...student.classHistory] : [];
+        if (student?.kelas && !list.includes(student.kelas)) {
+          list.unshift(student.kelas);
+        }
+        return list;
+      }, [student]);
+
+      const filteredPaidBills = useMemo(() => {
+        if (historyClassFilter === 'all') return allPaidTransactions;
+        return allPaidTransactions.filter(t => (t.kelas || student?.kelas) === historyClassFilter);
+      }, [allPaidTransactions, historyClassFilter, student]);
 
       const myComplaints = useMemo(() => {
         return complaints.filter(c => c.studentId === student.id || c.studentName === student.name);

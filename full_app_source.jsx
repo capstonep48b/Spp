@@ -5552,7 +5552,7 @@ function ParentDashboardView({
         </div>
       );
     }
-  
+
     // ==========================================
     // 7.5. PENGATURAN APLIKASI PANEL ADMIN
     // ==========================================
@@ -5560,7 +5560,8 @@ function ParentDashboardView({
       const [formData, setFormData] = useState({ ...settings });
       const [newAdminPassword, setNewAdminPassword] = useState('');
       const [newClassName, setNewClassName] = useState('');
-      const [newClassTarif, setNewClassTarif] = useState(400000);
+      const [newClassTarif, setNewClassTarif] = useState('');
+      const isDirtyRef = useRef(false);
 
       // State untuk Form Tambah Preset Periode Manual
       const [newPresetName, setNewPresetName] = useState('');
@@ -5571,21 +5572,39 @@ function ParentDashboardView({
       const [newPresetSemester, setNewPresetSemester] = useState('Semua');
 
       useEffect(() => {
-        setFormData({ ...settings });
-        setNewAdminPassword('');
+        if (!isDirtyRef.current) {
+          setFormData({ ...settings });
+          setNewAdminPassword('');
+        }
       }, [settings]);
+
+      // Helper untuk merubah formData sekaligus menjaga isDirtyRef & auto activePeriodName
+      const updateFormState = (patch) => {
+        isDirtyRef.current = true;
+        setFormData((prev) => {
+          const next = { ...prev, ...patch };
+          const semTag = (next.semester && next.semester !== 'Semua') ? ` (${next.semester})` : '';
+          const autoName = `Periode ${next.startMonth || 'Juli'} ${next.startYear || 2025} - ${next.endMonth || 'Juni'} ${next.endYear || 2026}${semTag}`;
+          return {
+            ...next,
+            activePeriodName: autoName
+          };
+        });
+      };
 
       const handleAddClass = () => {
         if (!newClassName.trim()) return;
+        isDirtyRef.current = false;
         const updatedClasses = [...(formData.customClasses || []), { name: newClassName.trim(), tarif: Number(newClassTarif) || 0 }];
         const updated = { ...formData, customClasses: updatedClasses };
         setFormData(updated);
         onSaveSettings(updated);
         setNewClassName('');
-        setNewClassTarif(400000);
+        setNewClassTarif('');
       };
 
       const handleDeleteClass = (idx) => {
+        isDirtyRef.current = false;
         const updatedClasses = (formData.customClasses || []).filter((_, i) => i !== idx);
         const updated = { ...formData, customClasses: updatedClasses };
         setFormData(updated);
@@ -5593,6 +5612,7 @@ function ParentDashboardView({
       };
 
       const handleUpdateClass = (idx, field, value) => {
+        isDirtyRef.current = true;
         const updatedClasses = [...(formData.customClasses || [])];
         updatedClasses[idx] = {
           ...updatedClasses[idx],
@@ -5604,6 +5624,7 @@ function ParentDashboardView({
 
       // Tambah Preset Periode Baru secara Manual
       const handleAddPresetManual = () => {
+        isDirtyRef.current = false;
         const sM = newPresetStartMonth || 'Juli';
         const sY = Number(newPresetStartYear) || 2026;
         const eM = newPresetEndMonth || 'Juni';
@@ -5638,6 +5659,7 @@ function ParentDashboardView({
 
       // Edit langsung item preset di daftar
       const handleUpdatePresetField = (idx, field, value) => {
+        isDirtyRef.current = true;
         const updatedPeriods = [...(formData.academicPeriods || [])];
         const val = (field === 'startYear' || field === 'endYear') ? (Number(value) || 0) : value;
         updatedPeriods[idx] = {
@@ -5647,9 +5669,11 @@ function ParentDashboardView({
 
         let updatedFormData = { ...formData, academicPeriods: updatedPeriods };
         if (updatedPeriods[idx].isActive) {
+          const semTag = (updatedPeriods[idx].semester && updatedPeriods[idx].semester !== 'Semua') ? ` (${updatedPeriods[idx].semester})` : '';
+          const autoName = updatedPeriods[idx].name || `Periode ${updatedPeriods[idx].startMonth} ${updatedPeriods[idx].startYear} - ${updatedPeriods[idx].endMonth} ${updatedPeriods[idx].endYear}${semTag}`;
           updatedFormData = {
             ...updatedFormData,
-            activePeriodName: updatedPeriods[idx].name,
+            activePeriodName: autoName,
             startMonth: updatedPeriods[idx].startMonth,
             startYear: updatedPeriods[idx].startYear,
             endMonth: updatedPeriods[idx].endMonth,
@@ -5662,13 +5686,14 @@ function ParentDashboardView({
       };
 
       const handleSaveCurrentAsPreset = () => {
+        isDirtyRef.current = false;
         const sM = formData.startMonth || 'Juli';
         const sY = parseInt(formData.startYear) || 2025;
         const eM = formData.endMonth || 'Juni';
         const eY = parseInt(formData.endYear) || (sY + 1);
         const sem = formData.semester || 'Semua';
         const semTag = (sem && sem !== 'Semua') ? ` (${sem})` : '';
-        const newName = formData.activePeriodName || `Periode ${sM} ${sY} - ${eM} ${eY}${semTag}`;
+        const newName = `Periode ${sM} ${sY} - ${eM} ${eY}${semTag}`;
         
         const newPeriod = {
           id: Date.now().toString(),
@@ -5706,6 +5731,7 @@ function ParentDashboardView({
       };
 
       const handleApplyPreset = (p) => {
+        isDirtyRef.current = false;
         const sY = parseInt(p.startYear) || 2025;
         const eY = parseInt(p.endYear) || (sY + 1);
         const updatedPeriods = (formData.academicPeriods || []).map(item => ({
@@ -5732,6 +5758,7 @@ function ParentDashboardView({
 
       const handleDeletePreset = (idx, pName) => {
         if (!confirm(`Hapus preset "${pName}"?`)) return;
+        isDirtyRef.current = false;
         const updatedPeriods = (formData.academicPeriods || []).filter((_, i) => i !== idx);
         const updatedFormData = {
           ...formData,
@@ -5743,7 +5770,13 @@ function ParentDashboardView({
 
       const handleSubmit = (e) => {
         e.preventDefault();
-        const payload = { ...formData };
+        isDirtyRef.current = false;
+        const semTag = (formData.semester && formData.semester !== 'Semua') ? ` (${formData.semester})` : '';
+        const autoName = `Periode ${formData.startMonth || 'Juli'} ${formData.startYear || 2025} - ${formData.endMonth || 'Juni'} ${formData.endYear || 2026}${semTag}`;
+        const payload = {
+          ...formData,
+          activePeriodName: autoName
+        };
         if (newAdminPassword && newAdminPassword.trim().length > 0) {
           payload.adminPassword = newAdminPassword.trim();
         }
@@ -5773,7 +5806,7 @@ function ParentDashboardView({
                     type="text"
                     required
                     value={formData.schoolName || ''}
-                    onChange={(e) => setFormData({ ...formData, schoolName: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, schoolName: e.target.value }); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5784,7 +5817,7 @@ function ParentDashboardView({
                     type="text"
                     required
                     value={formData.academicYear || ''}
-                    onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, academicYear: e.target.value }); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5794,7 +5827,7 @@ function ParentDashboardView({
                   <input
                     type="text"
                     value={formData.address || ''}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, address: e.target.value }); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5804,7 +5837,7 @@ function ParentDashboardView({
                   <input
                     type="text"
                     value={formData.phone || ''}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, phone: e.target.value }); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5814,7 +5847,7 @@ function ParentDashboardView({
                   <input
                     type="text"
                     value={formData.adminName || ''}
-                    onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, adminName: e.target.value }); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5824,7 +5857,7 @@ function ParentDashboardView({
                   <input
                     type="text"
                     value={formData.adminUsername || ''}
-                    onChange={(e) => setFormData({ ...formData, adminUsername: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, adminUsername: e.target.value }); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5837,7 +5870,7 @@ function ParentDashboardView({
                     type="password"
                     placeholder="Kosongkan jika tidak mau mengubah password"
                     value={newAdminPassword}
-                    onChange={(e) => setNewAdminPassword(e.target.value)}
+                    onChange={(e) => { isDirtyRef.current = true; setNewAdminPassword(e.target.value); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5849,7 +5882,7 @@ function ParentDashboardView({
                     min="1"
                     max="31"
                     value={formData.dueDateDay || 10}
-                    onChange={(e) => setFormData({ ...formData, dueDateDay: parseInt(e.target.value) || 10 })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, dueDateDay: parseInt(e.target.value) || 10 }); }}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -5869,13 +5902,19 @@ function ParentDashboardView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Nama Periode SPP Aktif</label>
+                <label className="block font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                  <span>Nama Periode SPP Aktif</span>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <Icon name="lock" size={11} /> Otomatis Mengikuti Periode Aktif
+                  </span>
+                </label>
                 <input
                   type="text"
-                  value={formData.activePeriodName || `Periode ${formData.academicYear || '2025/2026'}`}
-                  onChange={(e) => setFormData({ ...formData, activePeriodName: e.target.value })}
-                  placeholder="Contoh: Periode 2025/2026"
-                  className="w-full px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  readOnly
+                  disabled
+                  value={formData.activePeriodName || `Periode ${formData.startMonth || 'Juli'} ${formData.startYear || 2025} - ${formData.endMonth || 'Juni'} ${formData.endYear || 2026}${formData.semester && formData.semester !== 'Semua' ? ` (${formData.semester})` : ''}`}
+                  placeholder="Otomatis mengikuti rentang periode"
+                  className="w-full px-3.5 py-2.5 bg-slate-100 border border-emerald-200 rounded-xl font-bold text-slate-600 cursor-not-allowed focus:outline-none"
                 />
               </div>
 
@@ -5885,7 +5924,7 @@ function ParentDashboardView({
                   <label className="block font-bold text-slate-700 uppercase mb-1">Bulan Mulai</label>
                   <select
                     value={formData.startMonth || 'Juli'}
-                    onChange={(e) => setFormData({ ...formData, startMonth: e.target.value })}
+                    onChange={(e) => updateFormState({ startMonth: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {ALL_MONTHS.map(m => (
@@ -5899,7 +5938,7 @@ function ParentDashboardView({
                   <input
                     type="number"
                     value={formData.startYear || 2025}
-                    onChange={(e) => setFormData({ ...formData, startYear: parseInt(e.target.value) || 2025 })}
+                    onChange={(e) => updateFormState({ startYear: parseInt(e.target.value) || 2025 })}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -5908,7 +5947,7 @@ function ParentDashboardView({
                   <label className="block font-bold text-slate-700 uppercase mb-1">Bulan Akhir</label>
                   <select
                     value={formData.endMonth || 'Juni'}
-                    onChange={(e) => setFormData({ ...formData, endMonth: e.target.value })}
+                    onChange={(e) => updateFormState({ endMonth: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {ALL_MONTHS.map(m => (
@@ -5922,7 +5961,7 @@ function ParentDashboardView({
                   <input
                     type="number"
                     value={formData.endYear || 2026}
-                    onChange={(e) => setFormData({ ...formData, endYear: parseInt(e.target.value) || 2026 })}
+                    onChange={(e) => updateFormState({ endYear: parseInt(e.target.value) || 2026 })}
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -5931,7 +5970,7 @@ function ParentDashboardView({
                   <label className="block font-bold text-slate-700 uppercase mb-1">Pilihan Semester</label>
                   <select
                     value={formData.semester || 'Semua'}
-                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                    onChange={(e) => updateFormState({ semester: e.target.value })}
                     className="w-full px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="Semua">Semua Semester (1 Tahun Penuh)</option>
@@ -5950,8 +5989,7 @@ function ParentDashboardView({
                   type="button"
                   onClick={() => {
                     const y = formData.startYear || 2025;
-                    setFormData({
-                      ...formData,
+                    updateFormState({
                       semester: 'Semester 1',
                       startMonth: 'Juli',
                       startYear: y,
@@ -5968,8 +6006,7 @@ function ParentDashboardView({
                   onClick={() => {
                     const y = formData.startYear || 2025;
                     const nextY = y + 1;
-                    setFormData({
-                      ...formData,
+                    updateFormState({
                       semester: 'Semester 2',
                       startMonth: 'Januari',
                       startYear: nextY,
@@ -5985,8 +6022,7 @@ function ParentDashboardView({
                   type="button"
                   onClick={() => {
                     const y = formData.startYear || 2025;
-                    setFormData({
-                      ...formData,
+                    updateFormState({
                       semester: 'Semua',
                       startMonth: 'Juli',
                       startYear: y,
@@ -6257,7 +6293,7 @@ function ParentDashboardView({
                   <input
                     type="text"
                     value={formData.midtransClientKey || ''}
-                    onChange={(e) => setFormData({ ...formData, midtransClientKey: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, midtransClientKey: e.target.value }); }}
                     placeholder="SB-Mid-client-..."
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
@@ -6268,7 +6304,7 @@ function ParentDashboardView({
                   <input
                     type="password"
                     value={formData.midtransServerKey || ''}
-                    onChange={(e) => setFormData({ ...formData, midtransServerKey: e.target.value })}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, midtransServerKey: e.target.value }); }}
                     placeholder="SB-Mid-server-..."
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
@@ -6298,12 +6334,13 @@ function ParentDashboardView({
                           className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white text-xs"
                         />
                       </div>
+
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1.5">
                           <span className="font-extrabold text-slate-500 text-xs">Rp</span>
                           <input
                             type="number"
-                            value={cls.tarif || 0}
+                            value={cls.tarif || ''}
                             onChange={(e) => handleUpdateClass(idx, 'tarif', e.target.value)}
                             placeholder="Tarif SPP"
                             className="w-36 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-emerald-700 text-right focus:bg-white text-xs"
@@ -7617,7 +7654,15 @@ function ParentDashboardView({
                 semester: newSettings.semester || 'Semua',
                 admin_name: newSettings.adminName,
                 admin_username: newSettings.adminUsername,
-                due_date_day: Number(newSettings.dueDateDay) || 10
+                due_date_day: Number(newSettings.dueDateDay) || 10,
+                midtrans_client_key: newSettings.midtransClientKey || '',
+                midtrans_server_key: newSettings.midtransServerKey || '',
+                start_month: newSettings.startMonth || 'Juli',
+                start_year: Number(newSettings.startYear) || 2025,
+                end_month: newSettings.endMonth || 'Juni',
+                end_year: Number(newSettings.endYear) || 2026,
+                academic_periods: JSON.stringify(newSettings.academicPeriods || []),
+                custom_classes: JSON.stringify(newSettings.customClasses || [])
               };
               if (newSettings.adminPassword && newSettings.adminPassword.trim().length > 0) {
                 basePayload.admin_password = newSettings.adminPassword.trim();

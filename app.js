@@ -5276,7 +5276,8 @@ function AdminPengaturanView({
   });
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newClassName, setNewClassName] = useState('');
-  const [newClassTarif, setNewClassTarif] = useState(400000);
+  const [newClassTarif, setNewClassTarif] = useState('');
+  const isDirtyRef = useRef(false);
 
   // State untuk Form Tambah Preset Periode Manual
   const [newPresetName, setNewPresetName] = useState('');
@@ -5286,13 +5287,33 @@ function AdminPengaturanView({
   const [newPresetEndYear, setNewPresetEndYear] = useState(2027);
   const [newPresetSemester, setNewPresetSemester] = useState('Semua');
   useEffect(() => {
-    setFormData({
-      ...settings
-    });
-    setNewAdminPassword('');
+    if (!isDirtyRef.current) {
+      setFormData({
+        ...settings
+      });
+      setNewAdminPassword('');
+    }
   }, [settings]);
+
+  // Helper untuk merubah formData sekaligus menjaga isDirtyRef & auto activePeriodName
+  const updateFormState = patch => {
+    isDirtyRef.current = true;
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        ...patch
+      };
+      const semTag = next.semester && next.semester !== 'Semua' ? ` (${next.semester})` : '';
+      const autoName = `Periode ${next.startMonth || 'Juli'} ${next.startYear || 2025} - ${next.endMonth || 'Juni'} ${next.endYear || 2026}${semTag}`;
+      return {
+        ...next,
+        activePeriodName: autoName
+      };
+    });
+  };
   const handleAddClass = () => {
     if (!newClassName.trim()) return;
+    isDirtyRef.current = false;
     const updatedClasses = [...(formData.customClasses || []), {
       name: newClassName.trim(),
       tarif: Number(newClassTarif) || 0
@@ -5304,9 +5325,10 @@ function AdminPengaturanView({
     setFormData(updated);
     onSaveSettings(updated);
     setNewClassName('');
-    setNewClassTarif(400000);
+    setNewClassTarif('');
   };
   const handleDeleteClass = idx => {
+    isDirtyRef.current = false;
     const updatedClasses = (formData.customClasses || []).filter((_, i) => i !== idx);
     const updated = {
       ...formData,
@@ -5316,6 +5338,7 @@ function AdminPengaturanView({
     onSaveSettings(updated);
   };
   const handleUpdateClass = (idx, field, value) => {
+    isDirtyRef.current = true;
     const updatedClasses = [...(formData.customClasses || [])];
     updatedClasses[idx] = {
       ...updatedClasses[idx],
@@ -5330,6 +5353,7 @@ function AdminPengaturanView({
 
   // Tambah Preset Periode Baru secara Manual
   const handleAddPresetManual = () => {
+    isDirtyRef.current = false;
     const sM = newPresetStartMonth || 'Juli';
     const sY = Number(newPresetStartYear) || 2026;
     const eM = newPresetEndMonth || 'Juni';
@@ -5360,6 +5384,7 @@ function AdminPengaturanView({
 
   // Edit langsung item preset di daftar
   const handleUpdatePresetField = (idx, field, value) => {
+    isDirtyRef.current = true;
     const updatedPeriods = [...(formData.academicPeriods || [])];
     const val = field === 'startYear' || field === 'endYear' ? Number(value) || 0 : value;
     updatedPeriods[idx] = {
@@ -5371,9 +5396,11 @@ function AdminPengaturanView({
       academicPeriods: updatedPeriods
     };
     if (updatedPeriods[idx].isActive) {
+      const semTag = updatedPeriods[idx].semester && updatedPeriods[idx].semester !== 'Semua' ? ` (${updatedPeriods[idx].semester})` : '';
+      const autoName = updatedPeriods[idx].name || `Periode ${updatedPeriods[idx].startMonth} ${updatedPeriods[idx].startYear} - ${updatedPeriods[idx].endMonth} ${updatedPeriods[idx].endYear}${semTag}`;
       updatedFormData = {
         ...updatedFormData,
-        activePeriodName: updatedPeriods[idx].name,
+        activePeriodName: autoName,
         startMonth: updatedPeriods[idx].startMonth,
         startYear: updatedPeriods[idx].startYear,
         endMonth: updatedPeriods[idx].endMonth,
@@ -5384,13 +5411,14 @@ function AdminPengaturanView({
     setFormData(updatedFormData);
   };
   const handleSaveCurrentAsPreset = () => {
+    isDirtyRef.current = false;
     const sM = formData.startMonth || 'Juli';
     const sY = parseInt(formData.startYear) || 2025;
     const eM = formData.endMonth || 'Juni';
     const eY = parseInt(formData.endYear) || sY + 1;
     const sem = formData.semester || 'Semua';
     const semTag = sem && sem !== 'Semua' ? ` (${sem})` : '';
-    const newName = formData.activePeriodName || `Periode ${sM} ${sY} - ${eM} ${eY}${semTag}`;
+    const newName = `Periode ${sM} ${sY} - ${eM} ${eY}${semTag}`;
     const newPeriod = {
       id: Date.now().toString(),
       name: newName,
@@ -5423,6 +5451,7 @@ function AdminPengaturanView({
     alert(`Rentang "${newName}" berhasil disimpan dan langsung diterapkan sebagai periode aktif!`);
   };
   const handleApplyPreset = p => {
+    isDirtyRef.current = false;
     const sY = parseInt(p.startYear) || 2025;
     const eY = parseInt(p.endYear) || sY + 1;
     const updatedPeriods = (formData.academicPeriods || []).map(item => ({
@@ -5446,6 +5475,7 @@ function AdminPengaturanView({
   };
   const handleDeletePreset = (idx, pName) => {
     if (!confirm(`Hapus preset "${pName}"?`)) return;
+    isDirtyRef.current = false;
     const updatedPeriods = (formData.academicPeriods || []).filter((_, i) => i !== idx);
     const updatedFormData = {
       ...formData,
@@ -5456,8 +5486,12 @@ function AdminPengaturanView({
   };
   const handleSubmit = e => {
     e.preventDefault();
+    isDirtyRef.current = false;
+    const semTag = formData.semester && formData.semester !== 'Semua' ? ` (${formData.semester})` : '';
+    const autoName = `Periode ${formData.startMonth || 'Juli'} ${formData.startYear || 2025} - ${formData.endMonth || 'Juni'} ${formData.endYear || 2026}${semTag}`;
     const payload = {
-      ...formData
+      ...formData,
+      activePeriodName: autoName
     };
     if (newAdminPassword && newAdminPassword.trim().length > 0) {
       payload.adminPassword = newAdminPassword.trim();
@@ -5490,10 +5524,13 @@ function AdminPengaturanView({
     type: "text",
     required: true,
     value: formData.schoolName || '',
-    onChange: e => setFormData({
-      ...formData,
-      schoolName: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        schoolName: e.target.value
+      });
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
@@ -5501,50 +5538,65 @@ function AdminPengaturanView({
     type: "text",
     required: true,
     value: formData.academicYear || '',
-    onChange: e => setFormData({
-      ...formData,
-      academicYear: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        academicYear: e.target.value
+      });
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
   }, "Alamat Sekolah"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: formData.address || '',
-    onChange: e => setFormData({
-      ...formData,
-      address: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        address: e.target.value
+      });
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
   }, "No. Kontak TU / WA"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: formData.phone || '',
-    onChange: e => setFormData({
-      ...formData,
-      phone: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        phone: e.target.value
+      });
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
   }, "Nama Admin / Kasir TU"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: formData.adminName || '',
-    onChange: e => setFormData({
-      ...formData,
-      adminName: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        adminName: e.target.value
+      });
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
   }, "Username Admin"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: formData.adminUsername || '',
-    onChange: e => setFormData({
-      ...formData,
-      adminUsername: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        adminUsername: e.target.value
+      });
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
@@ -5554,7 +5606,10 @@ function AdminPengaturanView({
     type: "password",
     placeholder: "Kosongkan jika tidak mau mengubah password",
     value: newAdminPassword,
-    onChange: e => setNewAdminPassword(e.target.value),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setNewAdminPassword(e.target.value);
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
@@ -5563,10 +5618,13 @@ function AdminPengaturanView({
     min: "1",
     max: "31",
     value: formData.dueDateDay || 10,
-    onChange: e => setFormData({
-      ...formData,
-      dueDateDay: parseInt(e.target.value) || 10
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        dueDateDay: parseInt(e.target.value) || 10
+      });
+    },
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
   })))), /*#__PURE__*/React.createElement("div", {
     className: "p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4"
@@ -5584,24 +5642,26 @@ function AdminPengaturanView({
     name: "check-circle",
     size: 12
   }), " Periode Aktif Berjalan")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    className: "block font-bold text-slate-700 uppercase mb-1"
-  }, "Nama Periode SPP Aktif"), /*#__PURE__*/React.createElement("input", {
+    className: "block font-bold text-slate-700 uppercase mb-1 flex items-center justify-between"
+  }, /*#__PURE__*/React.createElement("span", null, "Nama Periode SPP Aktif"), /*#__PURE__*/React.createElement("span", {
+    className: "text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "lock",
+    size: 11
+  }), " Otomatis Mengikuti Periode Aktif")), /*#__PURE__*/React.createElement("input", {
     type: "text",
-    value: formData.activePeriodName || `Periode ${formData.academicYear || '2025/2026'}`,
-    onChange: e => setFormData({
-      ...formData,
-      activePeriodName: e.target.value
-    }),
-    placeholder: "Contoh: Periode 2025/2026",
-    className: "w-full px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+    readOnly: true,
+    disabled: true,
+    value: formData.activePeriodName || `Periode ${formData.startMonth || 'Juli'} ${formData.startYear || 2025} - ${formData.endMonth || 'Juni'} ${formData.endYear || 2026}${formData.semester && formData.semester !== 'Semua' ? ` (${formData.semester})` : ''}`,
+    placeholder: "Otomatis mengikuti rentang periode",
+    className: "w-full px-3.5 py-2.5 bg-slate-100 border border-emerald-200 rounded-xl font-bold text-slate-600 cursor-not-allowed focus:outline-none"
   })), /*#__PURE__*/React.createElement("div", {
     className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4"
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     className: "block font-bold text-slate-700 uppercase mb-1"
   }, "Bulan Mulai"), /*#__PURE__*/React.createElement("select", {
     value: formData.startMonth || 'Juli',
-    onChange: e => setFormData({
-      ...formData,
+    onChange: e => updateFormState({
       startMonth: e.target.value
     }),
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -5613,8 +5673,7 @@ function AdminPengaturanView({
   }, "Tahun Mulai"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: formData.startYear || 2025,
-    onChange: e => setFormData({
-      ...formData,
+    onChange: e => updateFormState({
       startYear: parseInt(e.target.value) || 2025
     }),
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -5622,8 +5681,7 @@ function AdminPengaturanView({
     className: "block font-bold text-slate-700 uppercase mb-1"
   }, "Bulan Akhir"), /*#__PURE__*/React.createElement("select", {
     value: formData.endMonth || 'Juni',
-    onChange: e => setFormData({
-      ...formData,
+    onChange: e => updateFormState({
       endMonth: e.target.value
     }),
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -5635,8 +5693,7 @@ function AdminPengaturanView({
   }, "Tahun Akhir"), /*#__PURE__*/React.createElement("input", {
     type: "number",
     value: formData.endYear || 2026,
-    onChange: e => setFormData({
-      ...formData,
+    onChange: e => updateFormState({
       endYear: parseInt(e.target.value) || 2026
     }),
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -5644,8 +5701,7 @@ function AdminPengaturanView({
     className: "block font-bold text-slate-700 uppercase mb-1"
   }, "Pilihan Semester"), /*#__PURE__*/React.createElement("select", {
     value: formData.semester || 'Semua',
-    onChange: e => setFormData({
-      ...formData,
+    onChange: e => updateFormState({
       semester: e.target.value
     }),
     className: "w-full px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -5667,8 +5723,7 @@ function AdminPengaturanView({
     type: "button",
     onClick: () => {
       const y = formData.startYear || 2025;
-      setFormData({
-        ...formData,
+      updateFormState({
         semester: 'Semester 1',
         startMonth: 'Juli',
         startYear: y,
@@ -5682,8 +5737,7 @@ function AdminPengaturanView({
     onClick: () => {
       const y = formData.startYear || 2025;
       const nextY = y + 1;
-      setFormData({
-        ...formData,
+      updateFormState({
         semester: 'Semester 2',
         startMonth: 'Januari',
         startYear: nextY,
@@ -5696,8 +5750,7 @@ function AdminPengaturanView({
     type: "button",
     onClick: () => {
       const y = formData.startYear || 2025;
-      setFormData({
-        ...formData,
+      updateFormState({
         semester: 'Semua',
         startMonth: 'Juli',
         startYear: y,
@@ -5921,10 +5974,13 @@ function AdminPengaturanView({
   }, "Midtrans Client Key"), /*#__PURE__*/React.createElement("input", {
     type: "text",
     value: formData.midtransClientKey || '',
-    onChange: e => setFormData({
-      ...formData,
-      midtransClientKey: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        midtransClientKey: e.target.value
+      });
+    },
     placeholder: "SB-Mid-client-...",
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
   })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
@@ -5932,10 +5988,13 @@ function AdminPengaturanView({
   }, "Midtrans Server Key"), /*#__PURE__*/React.createElement("input", {
     type: "password",
     value: formData.midtransServerKey || '',
-    onChange: e => setFormData({
-      ...formData,
-      midtransServerKey: e.target.value
-    }),
+    onChange: e => {
+      isDirtyRef.current = true;
+      setFormData({
+        ...formData,
+        midtransServerKey: e.target.value
+      });
+    },
     placeholder: "SB-Mid-server-...",
     className: "w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
   })))), /*#__PURE__*/React.createElement("div", {
@@ -5971,7 +6030,7 @@ function AdminPengaturanView({
     className: "font-extrabold text-slate-500 text-xs"
   }, "Rp"), /*#__PURE__*/React.createElement("input", {
     type: "number",
-    value: cls.tarif || 0,
+    value: cls.tarif || '',
     onChange: e => handleUpdateClass(idx, 'tarif', e.target.value),
     placeholder: "Tarif SPP",
     className: "w-36 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-emerald-700 text-right focus:bg-white text-xs"
@@ -7221,7 +7280,15 @@ function App() {
             semester: newSettings.semester || 'Semua',
             admin_name: newSettings.adminName,
             admin_username: newSettings.adminUsername,
-            due_date_day: Number(newSettings.dueDateDay) || 10
+            due_date_day: Number(newSettings.dueDateDay) || 10,
+            midtrans_client_key: newSettings.midtransClientKey || '',
+            midtrans_server_key: newSettings.midtransServerKey || '',
+            start_month: newSettings.startMonth || 'Juli',
+            start_year: Number(newSettings.startYear) || 2025,
+            end_month: newSettings.endMonth || 'Juni',
+            end_year: Number(newSettings.endYear) || 2026,
+            academic_periods: JSON.stringify(newSettings.academicPeriods || []),
+            custom_classes: JSON.stringify(newSettings.customClasses || [])
           };
           if (newSettings.adminPassword && newSettings.adminPassword.trim().length > 0) {
             basePayload.admin_password = newSettings.adminPassword.trim();

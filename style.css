@@ -416,13 +416,13 @@ body {
     background-color: #ffffff !important;
     color: #1d4ed8 !important;
     font-weight: 900 !important;
-    border-top-left-radius: 28px !important;
-    border-bottom-left-radius: 28px !important;
+    border-top-left-radius: 24px !important;
+    border-bottom-left-radius: 24px !important;
     border-top-right-radius: 0px !important;
     border-bottom-right-radius: 0px !important;
     margin-right: -1px !important;
     width: calc(100% + 1px) !important;
-    padding-right: 24px !important;
+    padding-right: 20px !important;
     z-index: 25;
     box-shadow: -4px 0 15px rgba(0, 0, 0, 0.03);
   }
@@ -430,11 +430,13 @@ body {
   .scooped-tab-active::before {
     content: '';
     position: absolute;
-    top: -26px;
+    top: -20px;
     right: 0;
-    width: 26px;
-    height: 26px;
-    background: radial-gradient(circle at 0 0, transparent 25.5px, #ffffff 26px);
+    width: 20px;
+    height: 20px;
+    background-color: #ffffff;
+    -webkit-mask: radial-gradient(circle at 0 0, transparent 19.5px, #ffffff 20px);
+    mask: radial-gradient(circle at 0 0, transparent 19.5px, #ffffff 20px);
     pointer-events: none;
     z-index: 25;
   }
@@ -442,11 +444,13 @@ body {
   .scooped-tab-active::after {
     content: '';
     position: absolute;
-    bottom: -26px;
+    bottom: -20px;
     right: 0;
-    width: 26px;
-    height: 26px;
-    background: radial-gradient(circle at 0 100%, transparent 25.5px, #ffffff 26px);
+    width: 20px;
+    height: 20px;
+    background-color: #ffffff;
+    -webkit-mask: radial-gradient(circle at 0 100%, transparent 19.5px, #ffffff 20px);
+    mask: radial-gradient(circle at 0 100%, transparent 19.5px, #ffffff 20px);
     pointer-events: none;
     z-index: 25;
   }

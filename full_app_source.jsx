@@ -283,16 +283,19 @@
     };
 
     // Helper: Validasi apakah aduan dihitung sebagai PENDING
-    // Syarat pending: BELUM expired DAN pesan dari wali murid belum ada balasan sama sekali dari admin
+    // Syarat pending: BELUM expired, BELUM terkunci, DAN belum ada balasan dari admin
     const isComplaintPending = (c, nowMs = Date.now()) => {
       if (!c) return false;
-      const expiresAt = c.expiresAtMs || (c.createdAtMs ? c.createdAtMs + 3600000 : null);
-      if (expiresAt && nowMs > expiresAt) return false; // Expired: tidak dihitung pending!
+      if (c.status === 'Sudah Ditangani' || c.status === 'Selesai' || c.status === 'Tertutup') return false;
+
+      // Cek apakah waktu 1 jam telah berakhir
+      const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : null);
+      const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : null);
+      if (expiresAt && nowMs > expiresAt) return false; // Expired / Kekunci: TIDAK PERNAH PENDING!
 
       const hasAdminReplied = Boolean(
         (c.adminReply && c.adminReply.trim().length > 0) ||
-        (Array.isArray(c.messages) && c.messages.some(m => m.sender === 'Admin TU' || m.sender === 'Admin')) ||
-        c.status === 'Sudah Ditangani'
+        (Array.isArray(c.messages) && c.messages.some(m => m.sender === 'Admin TU' || m.sender === 'Admin'))
       );
       return !hasAdminReplied;
     };
@@ -1148,9 +1151,8 @@ function ParentDashboardView({
         );
       }
 
-      const [activeTab, setActiveTab] = useState('spp');
+      const [activeTab, setActiveTab] = useState('dashboard');
       const [sppSubFilter, setSppSubFilter] = useState('all');
-      const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
       const [complaintTitle, setComplaintTitle] = useState('');
       const [complaintContent, setComplaintContent] = useState('');
       const [showParentBell, setShowParentBell] = useState(false);
@@ -1410,42 +1412,164 @@ function ParentDashboardView({
                   </div>
                 </div>
 
-                {/* Vertical Navigation (All 5 Main Items) */}
-                <nav className="px-3 sm:pl-4 sm:pr-0 py-2 sm:py-4 flex md:flex-col gap-2 sm:gap-3 font-extrabold text-sm sm:text-base relative overflow-x-auto">
-                  {[
-                    { id: 'spp', icon: 'credit-card', label: 'Tagihan SPP', count: unpaidBills.length > 0 ? unpaidBills.length : null, isBadgeDanger: true },
-                    { id: 'berita', icon: 'newspaper', label: 'Pengumuman', count: unreadAnnCount > 0 ? unreadAnnCount : null },
-                    { id: 'evaluasi', icon: 'file-text', label: 'Catatan TU', count: unreadNotesCount > 0 ? unreadNotesCount : null },
-                    { id: 'pengaduan', icon: 'message-square', label: 'Pengaduan', count: unreadComplaintsCount > 0 ? unreadComplaintsCount : null },
-                    { id: 'pengaturan', icon: 'settings', label: 'Pengaturan' }
-                  ].map(tab => {
-                    const isActive = activeTab === tab.id;
-                    return (
-                      <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
-                          isActive
-                            ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
-                            : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 truncate">
-                          <Icon name={tab.icon} size={20} />
-                          <span className="truncate">{tab.label}</span>
-                        </div>
-                        {tab.count ? (
-                          <span className={`ml-2 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[11px] sm:text-xs font-black ${
-                            isActive
-                              ? (tab.isBadgeDanger ? 'bg-rose-100 text-rose-700' : 'bg-blue-100 text-blue-700')
-                              : (tab.isBadgeDanger ? 'bg-rose-500 text-white' : 'bg-white/20 text-white')
+                {/* Vertical Navigation with Collapsible Accordion for SPP */}
+                <nav className="px-3 sm:pl-4 sm:pr-0 py-2 sm:py-4 flex md:flex-col gap-2 sm:gap-2.5 font-extrabold text-sm sm:text-base relative overflow-x-auto">
+                  {/* 1. Dashboard Utama */}
+                  <button
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                      activeTab === 'dashboard'
+                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
+                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon name="home" size={20} />
+                      <span className="truncate">Dashboard Utama</span>
+                    </div>
+                  </button>
+
+                  {/* 2. Tagihan SPP (Accordion with Sub-items) */}
+                  <div className="w-full">
+                    <button
+                      onClick={() => setActiveTab('spp')}
+                      className={`w-full py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                        activeTab === 'spp'
+                          ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
+                          : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        <Icon name="credit-card" size={20} />
+                        <span className="truncate">Tagihan SPP</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {unpaidBills.length > 0 && (
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                            activeTab === 'spp' ? 'bg-rose-100 text-rose-700' : 'bg-rose-500 text-white'
                           }`}>
-                            {tab.count}
+                            {unpaidBills.length}
                           </span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
+                        )}
+                        <Icon name="chevron-down" size={16} className={`transition-transform duration-200 ${activeTab === 'spp' ? 'rotate-180' : ''}`} />
+                      </div>
+                    </button>
+
+                    {/* Sub-menu items for SPP under Tagihan SPP */}
+                    {activeTab === 'spp' && (
+                      <div className="mt-1.5 ml-4 md:ml-6 pl-3 border-l-2 border-white/20 space-y-1 py-1">
+                        {[
+                          { id: 'all', label: 'Semua Ringkasan', icon: 'layers' },
+                          { id: 'unpaid', label: 'Tagihan Menunggak', icon: 'alert-circle', badge: unpaidBills.length, isDanger: true },
+                          { id: 'upcoming', label: 'Belum Jatuh Tempo', icon: 'calendar', badge: upcomingBills.length },
+                          { id: 'paid', label: 'Riwayat Lunas', icon: 'check-circle-2', badge: paidBills.length }
+                        ].map(sub => (
+                          <button
+                            key={sub.id}
+                            onClick={() => setSppSubFilter(sub.id)}
+                            className={`w-[calc(100%-12px)] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
+                              sppSubFilter === sub.id
+                                ? 'bg-white/20 text-white font-black border border-white/30 shadow-sm'
+                                : 'text-white/80 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 truncate">
+                              <Icon name={sub.icon} size={14} />
+                              <span className="truncate">{sub.label}</span>
+                            </div>
+                            {sub.badge !== undefined && sub.badge !== null && (
+                              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                                sub.isDanger && sub.badge > 0 ? 'bg-rose-400 text-white' : 'bg-white/20 text-white'
+                              }`}>
+                                {sub.badge}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Pengumuman */}
+                  <button
+                    onClick={() => setActiveTab('berita')}
+                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                      activeTab === 'berita'
+                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
+                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon name="newspaper" size={20} />
+                      <span className="truncate">Pengumuman</span>
+                    </div>
+                    {unreadAnnCount > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                        activeTab === 'berita' ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                      }`}>
+                        {unreadAnnCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* 4. Catatan TU */}
+                  <button
+                    onClick={() => setActiveTab('evaluasi')}
+                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                      activeTab === 'evaluasi'
+                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
+                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon name="file-text" size={20} />
+                      <span className="truncate">Catatan TU</span>
+                    </div>
+                    {unreadNotesCount > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                        activeTab === 'evaluasi' ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                      }`}>
+                        {unreadNotesCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* 5. Pengaduan */}
+                  <button
+                    onClick={() => setActiveTab('pengaduan')}
+                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                      activeTab === 'pengaduan'
+                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
+                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon name="message-square" size={20} />
+                      <span className="truncate">Pengaduan</span>
+                    </div>
+                    {unreadComplaintsCount > 0 && (
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+                        activeTab === 'pengaduan' ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                      }`}>
+                        {unreadComplaintsCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {/* 6. Pengaturan */}
+                  <button
+                    onClick={() => setActiveTab('pengaturan')}
+                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                      activeTab === 'pengaturan'
+                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
+                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 truncate">
+                      <Icon name="settings" size={20} />
+                      <span className="truncate">Pengaturan</span>
+                    </div>
+                  </button>
                 </nav>
               </div>
 
@@ -1471,6 +1595,7 @@ function ParentDashboardView({
                   <div>
                     <div className="flex items-center gap-3">
                       <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
+                        {activeTab === 'dashboard' && 'Dashboard Utama Wali Murid'}
                         {activeTab === 'spp' && 'Status Pembayaran SPP'}
                         {activeTab === 'berita' && 'Berita & Pengumuman Sekolah'}
                         {activeTab === 'evaluasi' && 'Catatan Siswa (Tata Usaha)'}
@@ -1492,6 +1617,7 @@ function ParentDashboardView({
                       )}
                     </div>
                     <p className="text-xs sm:text-sm md:text-base text-slate-500 font-medium mt-1">
+                      {activeTab === 'dashboard' && 'Ringkasan laporan status SPP, pengumuman sekolah & perkembangan ananda'}
                       {activeTab === 'spp' && 'Informasi tarif, tagihan jatuh tempo, dan riwayat pembayaran resmi'}
                       {activeTab === 'berita' && 'Informasi kegiatan, edaran libur, dan agenda sekolah terkini'}
                       {activeTab === 'evaluasi' && 'Pesan dan catatan penting perkembangan siswa dari Tata Usaha (TU)'}
@@ -1608,101 +1734,175 @@ function ParentDashboardView({
                     </button>
                   </div>
                 </div>
-
-                {/* LEFT-ALIGNED COLLAPSIBLE FILTER DROPDOWN MENU FOR SPP TAB */}
-                {activeTab === 'spp' && (
-                  <div className="relative pt-1.5 self-start">
-                    <button
-                      onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs sm:text-sm font-extrabold transition-all flex items-center gap-2.5 border border-slate-200/80 shadow-sm"
-                    >
-                      <Icon name="filter" size={16} className="text-blue-600" />
-                      <span>
-                        {sppSubFilter === 'all' && 'Semua Ringkasan'}
-                        {sppSubFilter === 'unpaid' && `Tagihan Menunggak (${unpaidBills.length})`}
-                        {sppSubFilter === 'upcoming' && `Belum Jatuh Tempo (${upcomingBills.length})`}
-                        {sppSubFilter === 'paid' && `Riwayat Lunas (${paidBills.length})`}
-                      </span>
-                      <Icon name="chevron-down" size={16} className={`text-blue-600 transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isFilterDropdownOpen && (
-                      <>
-                        <div className="fixed inset-0 z-30" onClick={() => setIsFilterDropdownOpen(false)} />
-                        <div className="absolute left-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 p-2 z-40 space-y-1 animate-in fade-in zoom-in-95 duration-150">
-                          <p className="px-3 py-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Pilih Tampilan Tagihan</p>
-                          
-                          <button
-                            onClick={() => { setSppSubFilter('all'); setIsFilterDropdownOpen(false); }}
-                            className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${
-                              sppSubFilter === 'all' ? 'bg-blue-50 text-blue-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Icon name="layers" size={16} className={sppSubFilter === 'all' ? 'text-blue-600' : 'text-slate-400'} />
-                              <span>Semua Ringkasan</span>
-                            </div>
-                            {sppSubFilter === 'all' && <Icon name="check" size={14} className="text-blue-600" />}
-                          </button>
-
-                          <button
-                            onClick={() => { setSppSubFilter('unpaid'); setIsFilterDropdownOpen(false); }}
-                            className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${
-                              sppSubFilter === 'unpaid' ? 'bg-rose-50 text-rose-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Icon name="alert-circle" size={16} className={sppSubFilter === 'unpaid' ? 'text-rose-600' : 'text-slate-400'} />
-                              <span>Tagihan Menunggak</span>
-                            </div>
-                            {unpaidBills.length > 0 ? (
-                              <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-500 text-white">
-                                {unpaidBills.length}
-                              </span>
-                            ) : (
-                              sppSubFilter === 'unpaid' && <Icon name="check" size={14} className="text-rose-600" />
-                            )}
-                          </button>
-
-                          <button
-                            onClick={() => { setSppSubFilter('upcoming'); setIsFilterDropdownOpen(false); }}
-                            className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${
-                              sppSubFilter === 'upcoming' ? 'bg-sky-50 text-sky-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Icon name="calendar" size={16} className={sppSubFilter === 'upcoming' ? 'text-sky-600' : 'text-slate-400'} />
-                              <span>Belum Jatuh Tempo</span>
-                            </div>
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-sky-100 text-sky-800">
-                              {upcomingBills.length}
-                            </span>
-                          </button>
-
-                          <button
-                            onClick={() => { setSppSubFilter('paid'); setIsFilterDropdownOpen(false); }}
-                            className={`w-full px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-between transition-colors ${
-                              sppSubFilter === 'paid' ? 'bg-emerald-50 text-emerald-700 font-extrabold' : 'text-slate-700 hover:bg-slate-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <Icon name="check-circle-2" size={16} className={sppSubFilter === 'paid' ? 'text-emerald-600' : 'text-slate-400'} />
-                              <span>Riwayat Lunas</span>
-                            </div>
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800">
-                              {paidBills.length}
-                            </span>
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
               </header>
 
               {/* Main Content Body */}
               <div key={activeTab} className="p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-7 flex-1 animate-tab-switch">
-                {/* TAB 1: SPP */}
+                {/* TAB 0: DASHBOARD UTAMA */}
+                {activeTab === 'dashboard' && (
+                  <section className="space-y-6 sm:space-y-7 animate-in fade-in duration-300">
+                    {/* GREETING & WAVING MASCOT BANNER */}
+                    <GreetingMascotBanner 
+                      name={student.name || 'Wali Murid'} 
+                      role="Wali Murid" 
+                      schoolName={settings.schoolName} 
+                      academicYear={settings.academicYear} 
+                    />
+
+                    {/* 4 SUMMARY STAT CARDS */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+                      <div 
+                        onClick={() => { setActiveTab('spp'); setSppSubFilter('unpaid'); }}
+                        className={`p-5 rounded-2xl sm:rounded-3xl border cursor-pointer transition-all hover:scale-[1.01] ${
+                          unpaidBills.length > 0 ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-black uppercase text-slate-500">Status SPP</span>
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${unpaidBills.length > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                            <Icon name={unpaidBills.length > 0 ? "alert-circle" : "shield-check"} size={18} />
+                          </div>
+                        </div>
+                        <p className={`text-xl sm:text-2xl font-black ${unpaidBills.length > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                          {unpaidBills.length > 0 ? formatRupiah(totalDueDebt) : 'Status Aman / Lunas'}
+                        </p>
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {unpaidBills.length > 0 ? `${unpaidBills.length} Bulan Tertunggak` : 'Tidak ada tunggakan SPP'}
+                        </p>
+                      </div>
+
+                      <div 
+                        onClick={() => { setActiveTab('spp'); setSppSubFilter('paid'); }}
+                        className="p-5 rounded-2xl sm:rounded-3xl bg-blue-50 border border-blue-200 shadow-sm cursor-pointer hover:scale-[1.01] transition-all"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-black uppercase text-slate-500">SPP Lunas</span>
+                          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center">
+                            <Icon name="check-circle-2" size={18} />
+                          </div>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-black text-blue-900">
+                          {paidBills.length} <span className="text-xs text-slate-500 font-bold">/ {monthlyBills.length} Bulan</span>
+                        </p>
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          Tarif: {formatRupiah(student.tarif)}/bulan
+                        </p>
+                      </div>
+
+                      <div 
+                        onClick={() => setActiveTab('berita')}
+                        className="p-5 rounded-2xl sm:rounded-3xl bg-teal-50 border border-teal-200 shadow-sm cursor-pointer hover:scale-[1.01] transition-all"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-black uppercase text-slate-500">Pengumuman</span>
+                          <div className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center">
+                            <Icon name="newspaper" size={18} />
+                          </div>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-black text-teal-900">{announcements.length} Berita</p>
+                        <p className="text-xs text-slate-500 font-medium mt-1">
+                          {unreadAnnCount > 0 ? `${unreadAnnCount} Belum Dibaca` : 'Semua telah dibaca'}
+                        </p>
+                      </div>
+
+                      <div 
+                        onClick={() => setActiveTab('evaluasi')}
+                        className="p-5 rounded-2xl sm:rounded-3xl bg-indigo-50 border border-indigo-200 shadow-sm cursor-pointer hover:scale-[1.01] transition-all"
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-black uppercase text-slate-500">Catatan TU</span>
+                          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
+                            <Icon name="file-text" size={18} />
+                          </div>
+                        </div>
+                        <p className="text-xl sm:text-2xl font-black text-indigo-900">{myNotes.length} Catatan</p>
+                        <p className="text-xs text-slate-500 font-medium mt-1">Perkembangan siswa</p>
+                      </div>
+                    </div>
+
+                    {/* OVERVIEW CONTENT CARDS */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* SPP Status Summary Card */}
+                      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+                            <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                              <Icon name="credit-card" size={20} className="text-blue-600" /> Ringkasan Tagihan SPP
+                            </h3>
+                            <button
+                              onClick={() => { setActiveTab('spp'); setSppSubFilter('all'); }}
+                              className="text-xs font-extrabold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                            >
+                              Rincian SPP <Icon name="arrow-right" size={14} />
+                            </button>
+                          </div>
+
+                          {unpaidBills.length > 0 ? (
+                            <div className="space-y-3">
+                              <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200">
+                                <p className="text-xs font-black text-rose-700 uppercase">Ada {unpaidBills.length} Bulan Belum Dibayar</p>
+                                <p className="text-xl font-black text-rose-900 mt-1">Total: {formatRupiah(totalDueDebt)}</p>
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {unpaidBills.map((b, idx) => (
+                                    <span key={idx} className="px-2.5 py-1 bg-rose-100 text-rose-800 text-xs font-black rounded-lg">
+                                      {b.month}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-6 bg-emerald-50 rounded-2xl border border-emerald-200 text-center">
+                              <Icon name="shield-check" size={36} className="mx-auto text-emerald-600 mb-2" />
+                              <p className="font-black text-slate-800 text-base">Semua SPP Berjalan Lunas!</p>
+                              <p className="text-xs text-slate-500 font-medium mt-1">Terima kasih atas kedisiplinan Bapak/Ibu wali murid.</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {unpaidBills.length > 0 && (
+                          <button
+                            onClick={() => onPayMidtrans(unpaidBills[0])}
+                            className="mt-6 w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-2xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-sm"
+                          >
+                            <Icon name="credit-card" size={18} /> Bayar Tagihan {unpaidBills[0].month} ({formatRupiah(unpaidBills[0].amount)})
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Latest Announcement Summary Card */}
+                      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm flex flex-col justify-between">
+                        <div>
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-4">
+                            <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                              <Icon name="newspaper" size={20} className="text-teal-600" /> Pengumuman Resmi Terbaru
+                            </h3>
+                            <button
+                              onClick={() => setActiveTab('berita')}
+                              className="text-xs font-extrabold text-teal-600 hover:text-teal-800 flex items-center gap-1"
+                            >
+                              Lihat Semua <Icon name="arrow-right" size={14} />
+                            </button>
+                          </div>
+
+                          {announcements.length > 0 ? (
+                            <div className="space-y-3">
+                              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
+                                <span className="text-[11px] font-bold text-teal-600 uppercase flex items-center gap-1 mb-1">
+                                  <Icon name="calendar" size={12} /> {announcements[0].date}
+                                </span>
+                                <h4 className="font-black text-slate-800 text-base">{announcements[0].title}</h4>
+                                <p className="text-xs text-slate-600 font-medium line-clamp-3 mt-1.5">{announcements[0].content}</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 font-medium text-center py-8">Belum ada pengumuman sekolah.</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </section>
+                )}
                 {activeTab === 'spp' && (
                   isRefreshing ? (
                     <div className="space-y-7 animate-pulse select-none">

@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 
-const PORT = process.env.PORT || 3000;
+let currentPort = Number(process.env.PORT) || 3000;
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -88,8 +88,8 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  const url = `http://localhost:${PORT}`;
+server.on('listening', () => {
+  const url = `http://localhost:${currentPort}`;
   console.log('\n======================================================');
   console.log(`🚀 Aplikasi SPP berhasil berjalan di: ${url}`);
   console.log('🌐 Membuka browser secara otomatis...');
@@ -105,3 +105,18 @@ server.listen(PORT, () => {
   
   exec(startCmd, () => {});
 });
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.warn(`\n⚠️  Port ${currentPort} sedang dipakai oleh proses lain.`);
+    currentPort += 1;
+    console.log(`🔄 Mencoba beralih ke port ${currentPort}...\n`);
+    setTimeout(() => {
+      server.listen(currentPort);
+    }, 250);
+  } else {
+    console.error('❌ Server error:', err);
+  }
+});
+
+server.listen(currentPort);

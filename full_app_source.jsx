@@ -29,6 +29,24 @@
       return cleaned;
     };
 
+    // Helper Generator Password Default Siswa: Kombinasi Huruf Besar, Huruf Kecil, dan Angka (Sangat Aman)
+    const generateDefaultStudentPassword = (prefix = 'Sb') => {
+      // Menggunakan kombinasi karakter aman (tanpa karakter ambigu seperti 0/O atau 1/I/l)
+      const uppers = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+      const lowers = 'abcdefghijkmnpqrstuvwxyz';
+      const numbers = '23456789';
+      const all = uppers + lowers + numbers;
+
+      let pwd = prefix; // Awalan sekolah: 'Sb'
+      pwd += numbers[Math.floor(Math.random() * numbers.length)];
+      pwd += uppers[Math.floor(Math.random() * uppers.length)];
+      pwd += lowers[Math.floor(Math.random() * lowers.length)];
+      for (let i = 0; i < 3; i++) {
+        pwd += all[Math.floor(Math.random() * all.length)];
+      }
+      return pwd; // Contoh hasil: Sb7Nx4q9 (8 karakter campuran angka & huruf)
+    };
+
     // Mappers Database Supabase & App State
     const mapStudentFromDb = (row) => {
       let classHistory = [];
@@ -58,7 +76,7 @@
         tarif: Number(row.tarif || 0),
         wali: row.wali || '',
         telepon: row.telepon || '',
-        password: row.password || row.nis || '123456',
+        password: row.password || (row.nis ? `Sb${row.nis}` : '123456'),
         statusAktif: row.status ? (row.status === 'Aktif') : (row.status_aktif !== undefined ? row.status_aktif : true),
         fotoUrl: row.photo_url || row.foto_url || '',
         keringanan_note: row.keringanan_note || '',
@@ -68,19 +86,26 @@
       };
     };
 
-    const mapTransactionFromDb = (row) => ({
-      id: row.id,
-      studentId: row.student_id,
-      studentName: row.student_name,
-      kelas: row.kelas,
-      month: row.month,
-      amount: Number(row.amount || 0),
-      method: row.method || '-',
-      status: row.status,
-      isRead: row.is_read || false,
-      date: row.date || '-',
-      kuitansiNo: row.kuitansi_no || '-'
-    });
+    const mapTransactionFromDb = (row) => {
+      let localAdminRead = false;
+      try {
+        const readList = JSON.parse(localStorage.getItem('spp_admin_read_trx') || '[]');
+        if (readList.includes(row.id)) localAdminRead = true;
+      } catch (e) {}
+      return {
+        id: row.id,
+        studentId: row.student_id,
+        studentName: row.student_name,
+        kelas: row.kelas,
+        month: row.month,
+        amount: Number(row.amount || 0),
+        method: row.method || '-',
+        status: row.status,
+        isRead: Boolean(row.is_read || localAdminRead),
+        date: row.date || '-',
+        kuitansiNo: row.kuitansi_no || '-'
+      };
+    };
 
     const mapAnnouncementFromDb = (row) => ({
       id: row.id,
@@ -91,21 +116,30 @@
       date: row.date || new Date().toLocaleDateString('id-ID')
     });
 
-    const mapComplaintFromDb = (row) => ({
-      id: row.id,
-      studentId: row.student_id,
-      studentName: row.student_name,
-      waliName: row.wali_name,
-      title: row.title || 'Pengaduan / Masukan',
-      content: row.content || '',
-      adminReply: row.admin_reply || '',
-      messages: row.messages ? (typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages) : [],
-      status: row.status || 'Belum Ditangani',
-      isRead: row.is_read || false,
-      date: row.date || new Date().toLocaleDateString('id-ID'),
-      createdAtMs: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-      expiresAtMs: row.expires_at ? new Date(row.expires_at).getTime() : (Date.now() + 3600000)
-    });
+    const mapComplaintFromDb = (row) => {
+      const createdTime = row.created_at ? new Date(row.created_at).getTime() : (typeof row.id === 'number' ? row.id : Date.now());
+      const expiresTime = row.expires_at ? new Date(row.expires_at).getTime() : (createdTime + 3600000);
+      let localAdminRead = false;
+      try {
+        const readList = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
+        if (readList.includes(row.id)) localAdminRead = true;
+      } catch (e) {}
+      return {
+        id: row.id,
+        studentId: row.student_id,
+        studentName: row.student_name,
+        waliName: row.wali_name,
+        title: row.title || 'Pengaduan / Masukan',
+        content: row.content || '',
+        adminReply: row.admin_reply || '',
+        messages: row.messages ? (typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages) : [],
+        status: row.status || 'Belum Ditangani',
+        isRead: Boolean(row.is_read || localAdminRead),
+        date: row.date || new Date().toLocaleDateString('id-ID'),
+        createdAtMs: createdTime,
+        expiresAtMs: expiresTime
+      };
+    };
 
     const mapNoteFromDb = (row) => ({
       id: row.id,
@@ -240,8 +274,8 @@
     function getSupabaseClient() {
       if (_supabaseClient) return _supabaseClient;
       
-      const url = window.ENV?.SUPABASE_URL || 'https://mgywbrmneeorynisujkf.supabase.co';
-      const key = window.ENV?.SUPABASE_KEY || 'sb_publishable_BT_1lHhvJerwY0k4fWzIbg_51-VQ7V5';
+      const url = window.ENV?.SUPABASE_URL;
+      const key = window.ENV?.SUPABASE_KEY;
 
       if (!url || !key) {
         console.warn("Supabase URL / Key tidak ditemukan!");
@@ -283,15 +317,22 @@
     };
 
     // Helper: Validasi apakah aduan dihitung sebagai PENDING
-    // Syarat pending: BELUM expired, BELUM terkunci, DAN belum ada balasan dari admin
+    // Syarat pending: Hanya yang masih LIVE (< 1 jam), BELUM terkunci/selesai, BELUM dibalas, dan BELUM dibaca
     const isComplaintPending = (c, nowMs = Date.now()) => {
       if (!c) return false;
-      if (c.status === 'Sudah Ditangani' || c.status === 'Selesai' || c.status === 'Tertutup') return false;
+      if (c.status === 'Sudah Ditangani' || c.status === 'Selesai' || c.status === 'Tertutup' || c.status === 'Locked' || c.status === 'Terkunci' || c.isLocked) return false;
 
-      // Cek apakah waktu 1 jam telah berakhir
+      // Cek apakah waktu 1 jam telah berakhir (Terkunci / Expired) -> TIDAK DIHITUNG!
       const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : null);
       const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : null);
-      if (expiresAt && nowMs > expiresAt) return false; // Expired / Kekunci: TIDAK PERNAH PENDING!
+      if (expiresAt && nowMs > expiresAt) return false; // Expired / Terkunci: TIDAK PERNAH PENDING!
+
+      try {
+        const readList = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
+        if (readList.includes(c.id)) return false;
+      } catch(e) {}
+
+      if (c.isRead) return false;
 
       const hasAdminReplied = Boolean(
         (c.adminReply && c.adminReply.trim().length > 0) ||
@@ -562,37 +603,37 @@
       }
 
       return (
-        <div className="fixed inset-0 bg-white z-[99999] flex flex-col items-center justify-center p-4 sm:p-6 text-slate-800 overflow-hidden select-none loading-screen-pure-white">
+        <div className="loading-screen-royal-nuance select-none">
           {/* Faint School Watermark in the background */}
-          <div className="luxury-watermark-bg" aria-hidden="true">
-            <div className="luxury-school-watermark opacity-[0.035] flex items-center justify-center">
-              <img src="logo.png" alt="watermark" className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none" />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden" aria-hidden="true">
+            <div className="w-[min(85vw,640px)] h-[min(85vw,640px)] opacity-[0.045] flex items-center justify-center pointer-events-none select-none">
+              <img src="logo.png" alt="watermark" className="w-full h-full object-contain filter brightness-125 select-none pointer-events-none" />
             </div>
           </div>
 
-          {/* Ambient Glowing Aura Mesh (Soft subtle royal blue & cyan on pure white) */}
-          <div className="absolute top-1/4 left-1/4 w-[420px] h-[420px] bg-blue-400/8 rounded-full blur-[110px] pointer-events-none -translate-x-1/2 -translate-y-1/2 animate-pulse-halo"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-[420px] h-[420px] bg-sky-300/10 rounded-full blur-[120px] pointer-events-none translate-x-1/3 translate-y-1/3"></div>
+          {/* Ambient Glowing Aura Mesh (Electric cyan and royal blue on dark midnight) */}
+          <div className="absolute top-1/4 left-1/4 w-[460px] h-[460px] bg-cyan-500/18 rounded-full blur-[130px] pointer-events-none -translate-x-1/2 -translate-y-1/2 animate-pulse-halo"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-[480px] h-[480px] bg-blue-600/25 rounded-full blur-[140px] pointer-events-none translate-x-1/3 translate-y-1/3"></div>
 
-          {/* Central Luxury Container (Pristine Pure White Card) */}
-          <div className="relative w-full max-w-lg p-7 sm:p-9 rounded-[38px] bg-white border border-slate-200/90 shadow-[0_25px_70px_-15px_rgba(30,58,138,0.12),0_0_0_1px_rgba(241,245,249,1)] space-y-7 animate-in fade-in zoom-in-95 duration-300">
+          {/* Central Luxury Container (Glassmorphic Frosted Card with Rich Nuance) */}
+          <div className="relative w-full max-w-lg p-7 sm:p-9 rounded-[38px] loading-glass-card text-white space-y-7 animate-in fade-in zoom-in-95 duration-300 relative z-10 border border-white/20 shadow-[0_25px_80px_-15px_rgba(0,0,0,0.65),0_0_50px_-10px_rgba(6,182,212,0.22)]">
             {/* Floating Luxury School Emblem with Orbiting Rings and Jewel Beads */}
             <div className="relative mx-auto w-36 h-36 flex items-center justify-center">
               {/* Outer Glowing Pulsing Halo */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-blue-600 via-sky-400 to-indigo-600 rounded-full blur-2xl opacity-40 animate-pulse-halo"></div>
+              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500 via-blue-500 to-indigo-600 rounded-full blur-2xl opacity-60 animate-pulse-halo"></div>
               
               {/* Dual Counter-Rotating Orbit Rings with Glowing Jewels */}
-              <div className="absolute -inset-4 rounded-full border-2 border-dashed border-blue-400/70 loading-orbit-ring pointer-events-none">
-                <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_10px_#f59e0b] border-2 border-white"></span>
-                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_8px_#38bdf8] border border-white"></span>
+              <div className="absolute -inset-4 rounded-full border-2 border-dashed border-cyan-400/60 loading-orbit-ring pointer-events-none">
+                <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_12px_#f59e0b] border-2 border-slate-900"></span>
+                <span className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_10px_#38bdf8] border border-slate-900"></span>
               </div>
-              <div className="absolute -inset-7 rounded-full border border-dotted border-sky-400/80 loading-orbit-counter pointer-events-none">
-                <span className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-blue-600 shadow-[0_0_10px_#2563eb] border-2 border-white"></span>
-                <span className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#22d3ee]"></span>
+              <div className="absolute -inset-7 rounded-full border border-dotted border-blue-400/70 loading-orbit-counter pointer-events-none">
+                <span className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee] border-2 border-slate-900"></span>
+                <span className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#818cf8]"></span>
               </div>
 
               {/* Central Official PAUD SETIA BHAKTI Logo Badge with 3D Ring */}
-              <div className="relative w-28 h-28 rounded-full p-2 bg-gradient-to-tr from-amber-400 via-sky-400 to-blue-600 shadow-[0_15px_35px_rgba(37,99,235,0.32)] overflow-hidden flex items-center justify-center border-4 border-white bg-white group hover:scale-105 transition-transform animate-pulse-glow">
+              <div className="relative w-28 h-28 rounded-full p-2 bg-gradient-to-tr from-cyan-400 via-blue-500 to-indigo-600 shadow-[0_15px_40px_rgba(6,182,212,0.4)] overflow-hidden flex items-center justify-center border-4 border-white/90 bg-white group hover:scale-105 transition-transform animate-pulse-glow">
                 <img 
                   src="logo.png" 
                   alt="Logo PAUD Setia Bhakti" 
@@ -603,19 +644,19 @@
 
             {/* Header Titles */}
             <div className="text-center space-y-2">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 shadow-2xs">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shadow-[0_0_8px_#2563eb] animate-pulse"></span>
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-cyan-400/40 text-cyan-300 shadow-sm">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_#22d3ee] animate-pulse"></span>
                 <span className="text-[11px] font-black tracking-widest uppercase">
                   {isAdmin ? 'ADMINISTRATOR TU WORKSPACE' : 'PORTAL RESMI WALI MURID'}
                 </span>
               </div>
-              <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+              <h3 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow-md">
                 {isAdmin ? 'Memuat Sistem Keuangan SPP...' : 'Menyiapkan Portal Ananda...'}
               </h3>
-              <p className="text-xs font-black text-blue-800 tracking-wide uppercase">
+              <p className="text-xs font-black text-cyan-300 tracking-wider uppercase">
                 PAUD SETIA BHAKTI • BEKASI
               </p>
-              <p className="text-xs font-semibold text-slate-500 italic max-w-xs mx-auto truncate">
+              <p className="text-xs font-medium text-slate-300 italic max-w-xs mx-auto truncate">
                 "Mewujudkan Generasi Cerdas & Berakhlak Mulia"
               </p>
             </div>
@@ -634,19 +675,19 @@
                     key={s.step}
                     className={`p-2.5 rounded-2xl border transition-all ${
                       isPassed
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800 shadow-2xs'
+                        ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
                         : isCurrent
-                          ? 'bg-blue-50 border-blue-400 text-blue-900 shadow-sm ring-2 ring-blue-500/20 animate-pulse'
-                          : 'bg-slate-50 border-slate-200 text-slate-400'
+                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.35)] ring-2 ring-cyan-400/40 animate-pulse'
+                          : 'bg-white/5 border-white/10 text-white/40'
                     }`}
                   >
                     <div className="flex items-center gap-1.5 mb-1">
                       {isPassed ? (
-                        <div className="w-4 h-4 rounded-full bg-emerald-600 text-white flex items-center justify-center font-black text-[10px] shadow-sm">
+                        <div className="w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-[10px] shadow-sm">
                           ✓
                         </div>
                       ) : (
-                        <span className={`w-2.5 h-2.5 rounded-full ${isCurrent ? 'bg-blue-600 animate-ping' : 'bg-slate-300'}`}></span>
+                        <span className={`w-2.5 h-2.5 rounded-full ${isCurrent ? 'bg-cyan-400 animate-ping' : 'bg-white/20'}`}></span>
                       )}
                       <span className="text-[10px] font-black uppercase tracking-wider">Tahap {s.step}</span>
                     </div>
@@ -659,33 +700,33 @@
             {/* Animated Royal Progress Bar */}
             <div className="space-y-2.5 pt-1">
               <div className="flex justify-between items-center text-xs font-bold px-1">
-                <span className="text-xs text-blue-700 font-bold truncate max-w-[320px]">
+                <span className="text-xs text-cyan-200 font-bold truncate max-w-[320px]">
                   {stepText}
                 </span>
-                <span className="text-base font-black text-blue-700 font-mono tracking-wider">
+                <span className="text-base font-black text-cyan-300 font-mono tracking-wider">
                   {progress}%
                 </span>
               </div>
 
-              <div className="w-full bg-blue-50/80 rounded-full h-4 p-0.5 border border-blue-200 shadow-inner relative overflow-hidden">
+              <div className="w-full bg-slate-950/80 rounded-full h-4 sm:h-5 p-0.5 border border-white/20 shadow-inner relative overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-blue-600 via-sky-500 to-indigo-600 transition-all duration-200 ease-out relative shadow-[0_2px_10px_rgba(37,99,235,0.4)] overflow-hidden"
+                  className="h-full rounded-full bg-gradient-to-r from-blue-600 via-cyan-400 to-sky-300 transition-all duration-200 ease-out relative shadow-[0_0_15px_rgba(6,182,212,0.6)] overflow-hidden"
                   style={{ width: `${progress}%` }}
                 >
                   {/* Laser Scanning Sweep Effect */}
                   <div className="animate-laser-sweep"></div>
                   
                   {/* Glowing Leading Head Pointer */}
-                  <div className="absolute right-0 top-0 bottom-0 w-3 bg-white rounded-full shadow-[0_0_8px_#ffffff]"></div>
+                  <div className="absolute right-0 top-0 bottom-0 w-3 bg-white rounded-full shadow-[0_0_10px_#ffffff]"></div>
                 </div>
               </div>
             </div>
 
             {/* Footer Institutional Tagline */}
-            <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-semibold tracking-wide">
-              <span className="truncate font-bold text-slate-700">PAUD Setia Bhakti • Bekasi</span>
-              <span className="flex items-center gap-1.5 text-emerald-700 font-extrabold text-[11px] bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                <Icon name="shield-check" size={13} className="text-emerald-600" />
+            <div className="pt-3 border-t border-white/10 flex items-center justify-between text-xs text-slate-300 font-medium tracking-wide">
+              <span className="truncate font-bold text-white">PAUD Setia Bhakti • Bekasi</span>
+              <span className="flex items-center gap-1.5 text-emerald-300 font-extrabold text-[11px] bg-emerald-500/20 px-2.5 py-1 rounded-full border border-emerald-400/40 shadow-sm">
+                <Icon name="shield-check" size={13} className="text-emerald-400" />
                 <span>Koneksi Aman Terverifikasi</span>
               </span>
             </div>
@@ -777,14 +818,48 @@
             setErrorMsg('Username atau Password Admin tidak cocok. Silakan coba lagi.');
           }
         } else {
-          const student = students.find(s => 
-            s.nis.toString().trim() === username.trim() && 
-            (s.password.toString().trim() === password.trim() || s.nis.toString().trim() === password.trim())
-          );
-          if (student) {
+          const student = students.find(s => s.nis && s.nis.toString().trim() === username.trim());
+          if (!student) {
+            setErrorMsg('NIS Wali Siswa tidak ditemukan dalam sistem. Silakan periksa kembali.');
+            return;
+          }
+
+          const enteredPwd = password.trim();
+
+          // Cek apakah password akun saat ini adalah status Default Sistem:
+          // Default: belum ada password kustom, ATAU password sama dengan Sb[NIS], ATAU sama dengan [NIS]
+          const isDefault = !student.password || 
+                            student.password.toString().trim() === student.nis.toString().trim() || 
+                            student.password.toString().trim() === `Sb${student.nis.toString().trim()}`;
+
+          let isValid = false;
+          if (isDefault) {
+            // ATURAN: Jika akun telah diatur/dikembalikan ke default:
+            // Pengguna HANYA bisa masuk menggunakan password default (Sb[NIS] atau [NIS]).
+            // Password lama kustom tidak berlaku lagi.
+            const validDefaults = [
+              `Sb${student.nis.toString().trim()}`,
+              student.nis.toString().trim()
+            ];
+            if (student.password && student.password.toString().trim().length > 0) {
+              validDefaults.push(student.password.toString().trim());
+            }
+            isValid = validDefaults.includes(enteredPwd);
+          } else {
+            // Jika akun telah diset menggunakan password kustom terbaru:
+            // Pengguna HANYA bisa masuk menggunakan password kustom yang aktif tersebut.
+            // Password lama lain atau default tidak berlaku.
+            isValid = (enteredPwd === student.password.toString().trim());
+          }
+
+          if (isValid) {
             onLogin({ role: 'parent', student: student });
           } else {
-            setErrorMsg('NIS atau Password Wali Siswa tidak ditemukan dalam sistem.');
+            if (isDefault) {
+              setErrorMsg(`Password akun telah diatur ke Default Sistem. Silakan masuk menggunakan password default: Sb${student.nis} (atau NIS Anda), bukan password lama.`);
+            } else {
+              setErrorMsg('Password akun tidak cocok dengan password yang aktif saat ini. Silakan coba lagi.');
+            }
           }
         }
       };
@@ -798,7 +873,12 @@
       };
       const greeting = getTimeGreeting();
 
-      const waPhone = settings.phone ? settings.phone.replace(/[^0-9]/g, '') : '6281234567890';
+      let waPhone = settings.phone ? settings.phone.replace(/[^0-9]/g, '') : '6281234567890';
+      if (waPhone.startsWith('0')) {
+        waPhone = '62' + waPhone.slice(1);
+      } else if (waPhone.startsWith('8')) {
+        waPhone = '62' + waPhone;
+      }
       const waLink = `https://wa.me/${waPhone}?text=${encodeURIComponent('Halo Admin ' + (settings.schoolName || 'PAUD SETIA BHAKTI') + ', saya wali murid ingin meminta bantuan login/reset password.')}`;
 
       return (
@@ -814,11 +894,11 @@
           <div className="absolute top-10 left-10 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
           <div className="absolute bottom-10 right-10 w-96 h-96 bg-sky-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
-          {/* Main Card: Split Screen Responsive */}
-          <div className="w-full max-w-4xl bg-white rounded-[32px] shadow-[0_20px_60px_-15px_rgba(29,78,216,0.18)] border border-blue-100/70 overflow-hidden relative z-10 flex flex-col md:flex-row">
+          {/* Main Card: Split Screen Responsive with comfortable normal proportions */}
+          <div className="w-full max-w-5xl lg:max-w-[1040px] bg-white rounded-[36px] shadow-[0_25px_70px_-15px_rgba(29,78,216,0.22)] border border-blue-100/80 overflow-hidden relative z-10 flex flex-col md:flex-row min-h-[580px] lg:min-h-[620px]">
             
             {/* Left Hero Panel (Royal Blue with Cloud Wave Divider) */}
-            <div className="relative md:w-5/12 bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 text-white p-8 sm:p-10 flex flex-col justify-between overflow-hidden">
+            <div className="relative md:w-[42%] lg:w-5/12 bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 text-white p-8 sm:p-10 lg:p-12 flex flex-col justify-between overflow-hidden">
               
               {/* Subtle background circles for depth */}
               <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-white/10 blur-xl pointer-events-none"></div>
@@ -849,39 +929,39 @@
               <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left my-auto pt-4 pb-8 md:py-6 md:pr-8">
                 
                 {/* Waving Mascot & School Badge */}
-                <div className="relative mb-4 group">
-                  <div className="w-24 h-24 bg-white rounded-full p-1.5 shadow-2xl shadow-blue-950/40 border-4 border-white/80 overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105 animate-mascot-sway">
+                <div className="relative mb-5 group">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white rounded-full p-2 shadow-2xl shadow-blue-950/40 border-4 border-white/80 overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105 animate-mascot-sway">
                     <img src="logo.png" alt="Logo PAUD Setia Bhakti" className="w-full h-full object-contain" />
                   </div>
                   {/* Waving Hand Badge floating on top right of logo */}
-                  <div className="absolute -top-1 -right-2 bg-white text-slate-800 p-1.5 rounded-full shadow-lg border-2 border-blue-100 flex items-center justify-center animate-bounce">
-                    <span className="animate-waving-hand text-lg leading-none inline-block">👋</span>
+                  <div className="absolute -top-1 -right-2 bg-white text-slate-800 p-1.5 sm:p-2 rounded-full shadow-lg border-2 border-blue-100 flex items-center justify-center animate-bounce">
+                    <span className="animate-waving-hand text-lg sm:text-xl leading-none inline-block">👋</span>
                   </div>
                 </div>
 
                 {/* Dynamic Time Greeting Badge */}
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-xs font-bold text-white mb-3 shadow-sm border border-white/20">
-                  <span className="animate-waving-hand text-sm inline-block">👋</span>
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-xs sm:text-sm font-bold text-white mb-3.5 shadow-sm border border-white/20">
+                  <span className="animate-waving-hand text-sm sm:text-base inline-block">👋</span>
                   <span>{greeting.emoji} {greeting.text}!</span>
                 </div>
                 
-                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-tight mb-2">
+                <h1 className="text-2xl sm:text-3xl lg:text-[28px] font-black text-white tracking-tight leading-tight mb-2.5">
                   {settings.schoolName || 'PAUD SETIA BHAKTI'}
                 </h1>
 
-                <p className="text-xs text-blue-100/90 font-medium leading-relaxed max-w-xs mb-6">
+                <p className="text-xs sm:text-[13px] text-blue-100/90 font-medium leading-relaxed max-w-xs sm:max-w-sm mb-6">
                   Sistem Informasi Pembayaran SPP & Administrasi Siswa Terpadu. Mewujudkan Generasi Cerdas & Berakhlak Mulia.
                 </p>
 
                 {/* Quick Info Tags */}
-                <div className="hidden md:flex flex-col gap-2.5 w-full pt-4 border-t border-white/15 text-[11px] text-blue-100 font-semibold">
-                  <div className="flex items-center gap-2">
+                <div className="hidden md:flex flex-col gap-3 w-full pt-4 border-t border-white/15 text-xs text-blue-100 font-semibold">
+                  <div className="flex items-center gap-2.5">
                     <div className="w-5 h-5 rounded-full bg-sky-400/20 flex items-center justify-center text-sky-300 shrink-0">
                       <Icon name="check" size={12} />
                     </div>
                     <span>Konfirmasi Pembayaran Instan</span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <div className="w-5 h-5 rounded-full bg-sky-400/20 flex items-center justify-center text-sky-300 shrink-0">
                       <Icon name="check" size={12} />
                     </div>
@@ -891,27 +971,27 @@
               </div>
 
               {/* Footer info matching reference */}
-              <div className="relative z-10 pt-4 border-t border-white/10 hidden md:flex items-center justify-between text-[10px] font-bold tracking-wider text-blue-200 uppercase">
+              <div className="relative z-10 pt-4 border-t border-white/10 hidden md:flex items-center justify-between text-[11px] font-bold tracking-wider text-blue-200 uppercase">
                 <span>PORTAL RESMI SPP</span>
                 <span>VERSI 2.4</span>
               </div>
             </div>
 
             {/* Right Form Panel */}
-            <div className="md:w-7/12 bg-white p-8 sm:p-12 flex flex-col justify-between relative z-10">
+            <div className="md:w-[58%] lg:w-7/12 bg-white p-8 sm:p-10 lg:p-12 flex flex-col justify-between relative z-10">
               <div>
                 {/* Header Title */}
                 <div className="mb-6">
-                  <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
                     Masuk ke Akun
                   </h2>
-                  <p className="text-xs text-slate-500 font-medium mt-1">
+                  <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
                     Silakan pilih peran dan masukkan data akun Anda untuk melanjutkan.
                   </p>
                 </div>
 
                 {/* Role Switcher Pill Tabs with Smooth Visual Indicator */}
-                <div className="p-1 bg-slate-100 rounded-2xl flex items-center mb-6 border border-slate-200/80 shadow-inner">
+                <div className="p-1.5 bg-slate-100 rounded-2xl flex items-center mb-6 border border-slate-200/80 shadow-inner">
                   <button
                     type="button"
                     onClick={() => { 
@@ -923,13 +1003,13 @@
                         try { sessionStorage.setItem('spp_intended_role', 'parent'); } catch(e){} 
                       }
                     }}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
+                    className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
                       role === 'parent'
                         ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 scale-[1.02]'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                     }`}
                   >
-                    <Icon name="users" size={15} />
+                    <Icon name="users" size={16} />
                     <span>Wali Murid</span>
                   </button>
 
@@ -944,20 +1024,20 @@
                         try { sessionStorage.setItem('spp_intended_role', 'admin'); } catch(e){} 
                       }
                     }}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
+                    className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
                       role === 'admin'
                         ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 scale-[1.02]'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                     }`}
                   >
-                    <Icon name="shield-check" size={15} />
+                    <Icon name="shield-check" size={16} />
                     <span>Admin TU</span>
                   </button>
                 </div>
 
                 {/* Error Banner */}
                 {errorMsg && (
-                  <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-2xl flex items-center gap-3 animate-in fade-in duration-200">
+                  <div className="mb-5 p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-bold rounded-2xl flex items-center gap-3 animate-in fade-in duration-200">
                     <Icon name="alert-circle" size={18} className="text-rose-600 shrink-0" />
                     <span>{errorMsg}</span>
                   </div>
@@ -967,31 +1047,31 @@
                 <div key={role} className="animate-luxury-view space-y-4">
                   {/* Dynamic Interactive Role Welcome Banner */}
                   {role === 'parent' ? (
-                    <div className="greeting-welcome-banner p-4 rounded-2xl flex items-center gap-3.5 mb-5 border border-blue-100 shadow-sm relative overflow-hidden">
+                    <div className="greeting-welcome-banner p-4 sm:p-4.5 rounded-2xl flex items-center gap-3.5 mb-5 border border-blue-100 shadow-sm relative overflow-hidden">
                       <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white flex items-center justify-center font-black text-xl shadow-md shrink-0 animate-mascot-sway">
                         <span className="animate-waving-hand inline-block">👋</span>
                       </div>
                       <div>
-                        <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                        <h3 className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                           <span>Halo Wali Murid!</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">Wali Siswa</span>
                         </h3>
-                        <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-snug">
-                          Masukkan NIS & Password Ananda untuk melihat tagihan & kuitansi SPP.
+                        <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-0.5 leading-snug">
+                          Masukkan NIS & Password Ananda (Default: <strong className="text-blue-700">Sb[NIS]</strong> atau NIS).
                         </p>
                       </div>
                     </div>
                   ) : (
-                    <div className="greeting-welcome-banner p-4 rounded-2xl flex items-center gap-3.5 mb-5 border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-r from-slate-900/5 to-indigo-900/5">
+                    <div className="greeting-welcome-banner p-4 sm:p-4.5 rounded-2xl flex items-center gap-3.5 mb-5 border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-r from-slate-900/5 to-indigo-900/5">
                       <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-700 to-purple-600 text-white flex items-center justify-center font-black text-xl shadow-md shrink-0 animate-mascot-sway">
                         <span className="animate-waving-hand inline-block">👋</span>
                       </div>
                       <div>
-                        <h3 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                        <h3 className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
                           <span>Halo Administrator TU!</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold">Admin TU</span>
                         </h3>
-                        <p className="text-[11px] text-slate-600 font-medium mt-0.5 leading-snug">
+                        <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-0.5 leading-snug">
                           Portal Khusus Pengelolaan SPP, Data Siswa & Administrasi Sekolah.
                         </p>
                       </div>
@@ -1001,8 +1081,8 @@
                   {/* Login Form */}
                   <form onSubmit={handleLoginSubmit} className="space-y-4">
                     {/* Field 1: Username / NIS */}
-                    <div className="space-y-1">
-                      <label htmlFor="login-username" className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    <div className="space-y-1.5">
+                      <label htmlFor="login-username" className="block text-xs sm:text-[13px] font-bold text-slate-700 uppercase tracking-wide">
                         {role === 'admin' ? 'Username Admin' : 'NIS (Nomor Induk Siswa)'}
                       </label>
                       <div className="relative flex items-center">
@@ -1015,10 +1095,10 @@
                           value={username}
                           onChange={(e) => setUsername(e.target.value)}
                           placeholder={role === 'admin' ? 'Masukkan username admin' : 'Contoh: 1001'}
-                          className="w-full py-3 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
+                          className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
                         />
                         {username.trim().length > 0 && (
-                          <div className="absolute right-3.5 text-blue-600">
+                          <div className="absolute right-4 text-blue-600">
                             <Icon name="check" size={18} />
                           </div>
                         )}
@@ -1026,8 +1106,8 @@
                     </div>
 
                     {/* Field 2: Password */}
-                    <div className="space-y-1">
-                      <label htmlFor="login-password" className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
+                    <div className="space-y-1.5">
+                      <label htmlFor="login-password" className="block text-xs sm:text-[13px] font-bold text-slate-700 uppercase tracking-wide">
                         Password
                       </label>
                       <div className="relative flex items-center">
@@ -1039,13 +1119,13 @@
                           required
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder={role === 'admin' ? 'Masukkan password admin' : 'Masukkan password atau NIS'}
-                          className="w-full py-3 px-3.5 pr-11 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
+                          placeholder={role === 'admin' ? 'Masukkan password admin' : 'Masukkan password kustom atau Sb[NIS]'}
+                          className="w-full py-3.5 px-4 pr-12 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3.5 text-slate-400 hover:text-blue-600 transition-colors"
+                          className="absolute right-4 text-slate-400 hover:text-blue-600 transition-colors"
                           title={showPassword ? "Sembunyikan password" : "Lihat password"}
                         >
                           <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
@@ -1054,7 +1134,7 @@
                     </div>
 
                     {/* Options row */}
-                    <div className="flex items-center justify-between pt-1 text-xs">
+                    <div className="flex items-center justify-between pt-1 text-xs sm:text-sm">
                       <label htmlFor="login-remember" className="flex items-center gap-2 cursor-pointer text-slate-600 select-none font-medium">
                         <input
                           id="login-remember"
@@ -1077,7 +1157,7 @@
                           <span>Lupa Password?</span>
                         </a>
                       ) : (
-                        <span className="text-slate-400 text-[11px] font-semibold">Administrator TU</span>
+                        <span className="text-slate-400 text-xs font-semibold">Administrator TU</span>
                       )}
                     </div>
 
@@ -1085,14 +1165,14 @@
                     <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
                       <button
                         type="submit"
-                        className={`w-full sm:flex-1 py-3.5 px-6 rounded-full text-white font-extrabold text-sm shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
+                        className={`w-full sm:flex-1 py-4 px-7 rounded-full text-white font-extrabold text-sm sm:text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
                           role === 'parent'
                             ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30 hover:shadow-blue-500/40'
                             : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30 hover:shadow-indigo-500/40'
                         }`}
                       >
                         <span>Masuk Sekarang</span>
-                        <Icon name="arrow-right" size={16} />
+                        <Icon name="arrow-right" size={18} />
                       </button>
 
                       <button
@@ -1105,10 +1185,10 @@
                           setUsername('');
                           setPassword('');
                         }}
-                        className="w-full sm:w-auto py-3.5 px-6 rounded-full border border-slate-300 hover:border-blue-400 text-slate-600 hover:text-blue-600 font-bold text-xs active:scale-[0.98] transition-all bg-white hover:bg-blue-50/50 flex items-center justify-center gap-1.5"
+                        className="w-full sm:w-auto py-4 px-6 rounded-full border border-slate-300 hover:border-blue-400 text-slate-700 hover:text-blue-600 font-bold text-xs sm:text-sm active:scale-[0.98] transition-all bg-white hover:bg-blue-50/50 flex items-center justify-center gap-2"
                       >
                         <span>{role === 'parent' ? 'Akses Admin' : 'Akses Wali'}</span>
-                        <Icon name="arrow-right-left" size={14} className="text-slate-400" />
+                        <Icon name="arrow-right-left" size={15} className="text-slate-400" />
                       </button>
                     </div>
                   </form>
@@ -1117,6 +1197,118 @@
 
             </div>
           </div>
+        </div>
+      );
+    }
+
+    function ParentNoteCardItem({ note, student, onAddCommentNote }) {
+      const [isChatOpen, setIsChatOpen] = useState(false);
+      const [commentText, setCommentText] = useState('');
+
+      // Cek apakah user (Wali Murid) sudah pernah mengirim tanggapan untuk catatan ini
+      const hasUserReplied = useMemo(() => {
+        return (note.comments || []).some(c => 
+          c.sender === 'Wali Murid' || 
+          c.sender === student.name || 
+          (student.wali && c.sender === student.wali)
+        );
+      }, [note.comments, student]);
+
+      const handleSubmit = (e) => {
+        if (e) e.preventDefault();
+        if (!commentText.trim() || hasUserReplied) return;
+        onAddCommentNote(note.id, {
+          sender: 'Wali Murid',
+          text: commentText.trim(),
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+        });
+        setCommentText('');
+      };
+
+      return (
+        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-5 sm:p-6 hover:border-indigo-200 transition-colors shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 font-black rounded-lg text-xs uppercase tracking-wide self-start">
+              {note.category || 'Catatan TU'}
+            </span>
+            <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
+              <Icon name="calendar" size={13} /> {note.date}
+            </span>
+          </div>
+          <h4 className="font-black text-slate-800 text-base mb-2">{note.title}</h4>
+          <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{note.content}</p>
+
+          {/* Tombol Accordion untuk Buka/Tutup Riwayat Percakapan Catatan TU */}
+          <button
+            type="button"
+            onClick={() => setIsChatOpen(prev => !prev)}
+            className="mt-4 w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100/90 border border-slate-200 flex items-center justify-between transition-colors text-xs font-black text-slate-700 active:scale-[0.99]"
+          >
+            <div className="flex items-center gap-2">
+              <Icon name="message-square" size={14} className="text-indigo-600" />
+              <span>Tanggapan Wali Murid ({note.comments ? note.comments.length : 0})</span>
+              {hasUserReplied && (
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center gap-1">
+                  <Icon name="lock" size={10} /> Sudah Dibalas (Terkunci)
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5 text-indigo-600 text-[11px] font-bold">
+              <span>{isChatOpen ? 'Tutup Percakapan' : 'Klik untuk buka riwayat percakapan'}</span>
+              <Icon name={isChatOpen ? 'chevron-up' : 'chevron-down'} size={15} />
+            </div>
+          </button>
+
+          {/* Konten Percakapan (Hanya Tampil Jika Diklik) */}
+          {isChatOpen && (
+            <div className="mt-3 pt-3 border-t border-slate-200/60 space-y-3 animate-in fade-in duration-200">
+              {note.comments && note.comments.length > 0 ? (
+                <div className="space-y-2">
+                  {note.comments.map((c, i) => (
+                    <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 text-xs shadow-xs">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="font-extrabold text-indigo-700">{c.sender}</span>
+                        <span className="text-[10px] text-slate-400">{c.time || ''}</span>
+                      </div>
+                      <span className="text-slate-700 font-medium">{c.text}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic text-center py-2">Belum ada riwayat tanggapan untuk catatan ini.</p>
+              )}
+
+              {/* Status Terkunci (Jika user sudah membalas 1x) ATAU Form Balas (Hanya bisa 1x) */}
+              {hasUserReplied ? (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-xs text-amber-900 font-bold">
+                  <Icon name="lock" size={16} className="text-amber-600 shrink-0" />
+                  <span>Anda sudah memberikan 1 tanggapan untuk catatan ini. Percakapan telah terkunci otomatis.</span>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-1.5 pt-1">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={commentText}
+                      onChange={e => setCommentText(e.target.value)}
+                      placeholder="Tulis tanggapan untuk TU (hanya 1x kesempatan membalas)..."
+                      className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+                    >
+                      <Icon name="send" size={14} /> Kirim
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-semibold italic">
+                    * Catatan: Anda hanya dapat membalas 1 kali untuk setiap catatan TU. Setelah terkirim, form akan terkunci otomatis.
+                  </p>
+                </form>
+              )}
+            </div>
+          )}
         </div>
       );
     }
@@ -1168,16 +1360,22 @@ function ParentDashboardView({
       });
       const [previewImage, setPreviewImage] = useState(null);
       const [selectedAnnouncement, setSelectedAnnouncement] = useState(null);
+
+      // On mount: mark all already-read items (stored in localStorage) - notifs opened before are already tracked
       const [replyText, setReplyText] = useState({});
       const [nowMs, setNowMs] = useState(Date.now());
+      const [showPastComplaints, setShowPastComplaints] = useState(false);
 
       // Settings State
       const [newPassword, setNewPassword] = useState('');
+      const [confirmPassword, setConfirmPassword] = useState('');
+      const [showNewPassword, setShowNewPassword] = useState(false);
       const [newPhone, setNewPhone] = useState(student.telepon || '');
+      const [settingsFeedback, setSettingsFeedback] = useState(null);
       const [historyClassFilter, setHistoryClassFilter] = useState('all');
 
       useEffect(() => {
-        const timer = setInterval(() => setNowMs(Date.now()), 5000);
+        const timer = setInterval(() => setNowMs(Date.now()), 1000);
         return () => clearInterval(timer);
       }, []);
 
@@ -1283,12 +1481,37 @@ function ParentDashboardView({
       }, [complaints, student]);
 
       const activeComplaint = useMemo(() => {
-        return myComplaints.find(c => nowMs <= (c.expiresAtMs || (c.createdAtMs + 3600000)));
+        return myComplaints.find(c => {
+          const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : new Date(c.date).getTime());
+          const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : null);
+          const isExpired = expiresAt ? nowMs > expiresAt : false;
+          const isResolved = c.status === 'Sudah Ditangani' || c.status === 'Selesai';
+          return !isExpired && !isResolved;
+        });
       }, [myComplaints, nowMs]);
       
-      const expiredComplaints = useMemo(() => {
-        return myComplaints.filter(c => nowMs > (c.expiresAtMs || (c.createdAtMs + 3600000))).sort((a,b) => b.createdAtMs - a.createdAtMs);
+      const pastComplaints = useMemo(() => {
+        return myComplaints.filter(c => {
+          const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : new Date(c.date).getTime());
+          const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : null);
+          const isExpired = expiresAt ? nowMs > expiresAt : false;
+          const isResolved = c.status === 'Sudah Ditangani' || c.status === 'Selesai';
+          return isExpired || isResolved;
+        }).sort((a,b) => {
+          const timeA = a.createdAtMs || (typeof a.id === 'number' ? a.id : 0);
+          const timeB = b.createdAtMs || (typeof b.id === 'number' ? b.id : 0);
+          return timeB - timeA;
+        });
       }, [myComplaints, nowMs]);
+
+      const formatCountdown = (expiresAtMs, currentMs) => {
+        const diffMs = expiresAtMs - currentMs;
+        if (diffMs <= 0) return '00:00';
+        const totalSecs = Math.floor(diffMs / 1000);
+        const minutes = Math.floor(totalSecs / 60);
+        const seconds = totalSecs % 60;
+        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      };
 
       const myNotes = useMemo(() => {
         return notes.filter(n => n.studentId === student.id || n.studentName === student.name).sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now()));
@@ -1333,7 +1556,7 @@ function ParentDashboardView({
         } else if (activeTab === 'berita' && announcements.length > 0) {
           const unreadIds = announcements.filter(a => !readAnnouncements.includes(a.id)).map(a => a.id);
           if (unreadIds.length > 0) {
-            const next = [...readAnnouncements, ...readAnnouncements.map(a => a.id)];
+            const next = [...new Set([...readAnnouncements, ...unreadIds])];
             setReadAnnouncements(next);
             try { localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
           }
@@ -1344,6 +1567,7 @@ function ParentDashboardView({
         if (!numStr) return '#';
         let clean = numStr.replace(/[^0-9]/g, '');
         if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+        else if (clean.startsWith('8')) clean = '62' + clean;
         return `https://wa.me/${clean}`;
       };
       
@@ -1357,7 +1581,7 @@ function ParentDashboardView({
       };
 
       return (
-        <div className="min-h-screen bg-[#edf2f7] bg-aesthetic-pattern p-2 sm:p-3 md:p-4 lg:p-6 flex flex-col items-center justify-start text-slate-800">
+        <div className="min-h-screen bg-slate-100 flex flex-col w-full text-slate-800">
           {previewImage && (
             <ImagePreviewModal imageUrl={previewImage.url} title={previewImage.title} onClose={() => setPreviewImage(null)} />
           )}
@@ -1387,45 +1611,74 @@ function ParentDashboardView({
             </div>
           )}
 
-          {/* MAIN FLOATING APP CARD CONTAINER */}
-          <div className="w-full max-w-[1720px] bg-white rounded-2xl md:rounded-[32px] shadow-2xl shadow-blue-900/10 flex flex-col md:flex-row overflow-hidden min-h-[96vh] border border-slate-200/80">
-            {/* LEFT ROYAL BLUE SIDEBAR */}
-            <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20">
-              <div>
-                {/* Brand / School Header */}
-                <div className="p-5 sm:p-7 pb-4 sm:pb-6 flex items-center gap-3.5 sm:gap-4">
+          {/* MAIN FULL-WIDTH APP CONTAINER */}
+          <div className="w-full flex-1 bg-white flex flex-col md:flex-row min-h-screen mobile-full-height">
+            {/* LEFT ROYAL BLUE SIDEBAR - Hidden on mobile, replaced by bottom nav */}
+            <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
+              
+              {/* Luminous Cyber-Neon Wave Vector Art at Bottom-Left of Sidebar (Matching Image 3) */}
+              <div className="absolute -bottom-8 -left-8 w-80 h-80 pointer-events-none select-none z-0 overflow-hidden opacity-90">
+                <svg viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full filter drop-shadow-[0_0_20px_rgba(6,182,212,0.45)]">
+                  <path d="M-20,320 C30,260 60,190 20,120 C-10,70 10,20 60,0 C90,60 70,140 130,200 C180,250 250,270 320,290 L320,340 L-20,340 Z" fill="url(#cyan-glow-mesh-wali-1)" opacity="0.35" />
+                  <path d="M-10,320 C40,240 90,210 120,160 C150,110 200,90 260,120 C210,160 170,220 130,260 C90,300 40,320 -10,320 Z" fill="url(#cyan-glow-mesh-wali-2)" opacity="0.55" />
+                  <path d="M0,320 C60,250 110,220 160,190 C210,160 260,170 310,210 C260,230 200,250 150,280 C100,310 40,320 0,320 Z" fill="url(#cyan-glow-mesh-wali-3)" opacity="0.75" />
+                  <path d="M-10,310 Q80,240 140,180 T290,140" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" filter="drop-shadow(0 0 6px #38bdf8)" />
+                  <path d="M0,320 Q100,260 170,210 T320,190" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" opacity="0.95" filter="drop-shadow(0 0 8px #22d3ee)" />
+                  <path d="M10,330 Q120,280 190,240 T340,230" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
+                  <defs>
+                    <linearGradient id="cyan-glow-mesh-wali-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.85" />
+                      <stop offset="100%" stopColor="#1e40af" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="cyan-glow-mesh-wali-2" x1="0%" y1="100%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.9" />
+                      <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.5" />
+                      <stop offset="100%" stopColor="#1e3a8a" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="cyan-glow-mesh-wali-3" x1="30%" y1="100%" x2="90%" y2="10%">
+                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
+                      <stop offset="100%" stopColor="#6366f1" stopOpacity="0.1" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+
+              <div className="relative z-10">
+                {/* Brand / School Header with Frosted Glass Container (Matching Image 3) */}
+                <div className="p-4 sm:p-5 m-3 sm:m-4 mb-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex items-center gap-3.5 shadow-lg shadow-blue-950/20">
                   <div 
                     onClick={() => student.fotoUrl && setPreviewImage({ url: student.fotoUrl, title: `Foto Profil - ${student.name}` })}
-                    className="w-12 h-12 sm:w-14 sm:h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-white border border-white/30 overflow-hidden shrink-0 shadow-lg cursor-pointer hover:scale-105 transition-transform"
+                    className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/30 overflow-hidden shrink-0 shadow-md cursor-pointer hover:scale-105 transition-transform"
                   >
                     {student.fotoUrl ? (
                       <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover" />
                     ) : (
-                      <img src="logo.png" alt="PAUD Setia Bhakti" className="w-10 h-10 sm:w-11 sm:h-11 object-contain filter drop-shadow" />
+                      <img src="logo.png" alt="PAUD Setia Bhakti" className="w-9 h-9 object-contain filter drop-shadow" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h1 className="font-black text-base lg:text-lg leading-tight text-white tracking-tight truncate">{settings.schoolName}</h1>
-                    <div className="inline-flex items-center gap-1.5 mt-1">
-                      <span className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse"></span>
-                      <span className="text-xs font-black text-blue-100 uppercase tracking-wider">Wali Murid</span>
+                    <h1 className="font-black text-sm sm:text-base leading-tight text-white tracking-tight truncate">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h1>
+                    <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full bg-cyan-400/20 border border-cyan-400/30">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-[10px] font-black text-cyan-200 uppercase tracking-wider">Wali Murid</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Vertical Navigation with Collapsible Accordion for SPP */}
-                <nav className="px-3 sm:pl-4 sm:pr-0 py-2 sm:py-4 flex md:flex-col gap-2 sm:gap-2.5 font-extrabold text-sm sm:text-base relative overflow-x-auto">
+                {/* Vertical Navigation - Pill Style */}
+                <nav className="px-3 sm:px-4 py-2 sm:py-3 flex md:flex-col gap-1.5 font-extrabold text-sm relative overflow-y-auto overflow-x-hidden no-scrollbar">
+
                   {/* 1. Dashboard Utama */}
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'dashboard'
-                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
-                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
+                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
-                      <Icon name="home" size={20} />
+                      <Icon name="home" size={18} />
                       <span className="truncate">Dashboard Utama</span>
                     </div>
                   </button>
@@ -1441,44 +1694,44 @@ function ParentDashboardView({
                           setIsSppExpanded(!isSppExpanded);
                         }
                       }}
-                      className={`w-full py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                      className={`w-full py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                         activeTab === 'spp'
-                          ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
-                          : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                          ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
+                          : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
                       }`}
                     >
                       <div className="flex items-center gap-3 truncate">
-                        <Icon name="credit-card" size={20} />
+                        <Icon name="credit-card" size={18} />
                         <span className="truncate">Tagihan SPP</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         {unpaidBills.length > 0 && (
-                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                            activeTab === 'spp' ? 'bg-rose-100 text-rose-700' : 'bg-rose-500 text-white'
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                            activeTab === 'spp' ? 'bg-rose-100 text-rose-700' : 'badge-danger-active animate-pulse ring-1 ring-rose-300'
                           }`}>
                             {unpaidBills.length}
                           </span>
                         )}
-                        <Icon name="chevron-down" size={16} className={`transition-transform duration-200 ${activeTab === 'spp' && isSppExpanded ? 'rotate-180' : ''}`} />
+                        <Icon name="chevron-down" size={15} className={`transition-transform duration-200 ${activeTab === 'spp' && isSppExpanded ? 'rotate-180' : ''}`} />
                       </div>
                     </button>
 
-                    {/* Sub-menu items for SPP under Tagihan SPP */}
+                    {/* Sub-menu items for SPP with Distinctive Colored Badges */}
                     {activeTab === 'spp' && isSppExpanded && (
-                      <div className="mt-1.5 ml-4 md:ml-6 pl-3 border-l-2 border-white/20 space-y-1 py-1">
+                      <div className="mt-1 ml-2 space-y-0.5 py-1">
                         {[
                           { id: 'all', label: 'Semua Ringkasan', icon: 'layers' },
-                          { id: 'unpaid', label: 'Tagihan Menunggak', icon: 'alert-circle', badge: unpaidBills.length, isDanger: true },
-                          { id: 'upcoming', label: 'Belum Jatuh Tempo', icon: 'calendar', badge: upcomingBills.length },
-                          { id: 'paid', label: 'Riwayat Lunas', icon: 'check-circle-2', badge: paidBills.length }
+                          { id: 'unpaid', label: 'Tagihan Menunggak', icon: 'alert-circle', badge: unpaidBills.length, type: 'danger' },
+                          { id: 'upcoming', label: 'Belum Jatuh Tempo', icon: 'calendar', badge: upcomingBills.length, type: 'warning' },
+                          { id: 'paid', label: 'Riwayat Lunas', icon: 'check-circle-2', badge: paidBills.length, type: 'success' }
                         ].map(sub => (
                           <button
                             key={sub.id}
                             onClick={() => setSppSubFilter(sub.id)}
-                            className={`w-[calc(100%-12px)] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
+                            className={`w-full px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
                               sppSubFilter === sub.id
-                                ? 'bg-white/20 text-white font-black border border-white/30 shadow-sm'
-                                : 'text-white/80 hover:text-white hover:bg-white/10'
+                                ? 'bg-white/20 text-white font-black border border-white/25 shadow-sm'
+                                : 'text-white/75 hover:text-white hover:bg-white/10'
                             }`}
                           >
                             <div className="flex items-center gap-2 truncate">
@@ -1486,8 +1739,14 @@ function ParentDashboardView({
                               <span className="truncate">{sub.label}</span>
                             </div>
                             {sub.badge !== undefined && sub.badge !== null && (
-                              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                                sub.isDanger && sub.badge > 0 ? 'bg-rose-400 text-white' : 'bg-white/20 text-white'
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                sub.badge === 0 
+                                  ? 'badge-zero-muted' 
+                                  : sub.type === 'danger'
+                                    ? 'badge-danger-active animate-pulse ring-1 ring-rose-300'
+                                    : sub.type === 'warning'
+                                      ? 'badge-warning-active'
+                                      : 'badge-success-active'
                               }`}>
                                 {sub.badge}
                               </span>
@@ -1501,104 +1760,120 @@ function ParentDashboardView({
                   {/* 3. Pengumuman */}
                   <button
                     onClick={() => setActiveTab('berita')}
-                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'berita'
-                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
-                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
+                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
-                      <Icon name="newspaper" size={20} />
+                      <Icon name="newspaper" size={18} />
                       <span className="truncate">Pengumuman</span>
                     </div>
-                    {unreadAnnCount > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                        activeTab === 'berita' ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                    {unreadAnnCount > 0 ? (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        activeTab === 'berita' ? 'bg-cyan-100 text-cyan-800' : 'badge-cyan-active animate-pulse'
                       }`}>
                         {unreadAnnCount}
                       </span>
-                    )}
+                    ) : null}
                   </button>
 
                   {/* 4. Catatan TU */}
                   <button
                     onClick={() => setActiveTab('evaluasi')}
-                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'evaluasi'
-                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
-                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
+                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
-                      <Icon name="file-text" size={20} />
+                      <Icon name="file-text" size={18} />
                       <span className="truncate">Catatan TU</span>
                     </div>
-                    {unreadNotesCount > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                        activeTab === 'evaluasi' ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                    {unreadNotesCount > 0 ? (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        activeTab === 'evaluasi' ? 'bg-purple-100 text-purple-800' : 'badge-purple-active animate-pulse'
                       }`}>
                         {unreadNotesCount}
                       </span>
-                    )}
+                    ) : null}
                   </button>
 
-                  {/* 5. Pengaduan */}
+                  {/* 5. Pengaduan (Warm Coral/Orange Badge when > 0, matching Image 3) */}
                   <button
                     onClick={() => setActiveTab('pengaduan')}
-                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'pengaduan'
-                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
-                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
+                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
-                      <Icon name="message-square" size={20} />
+                      <Icon name="message-square" size={18} />
                       <span className="truncate">Pengaduan</span>
                     </div>
-                    {unreadComplaintsCount > 0 && (
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                        activeTab === 'pengaduan' ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
+                    {unreadComplaintsCount > 0 ? (
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        activeTab === 'pengaduan' ? 'bg-orange-100 text-orange-800' : 'badge-orange-active animate-pulse'
                       }`}>
                         {unreadComplaintsCount}
                       </span>
-                    )}
+                    ) : null}
                   </button>
 
                   {/* 6. Pengaturan */}
                   <button
                     onClick={() => setActiveTab('pengaturan')}
-                    className={`py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
+                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'pengaturan'
-                        ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-xl md:rounded-l-2xl md:rounded-r-none md:mr-0 shadow-sm'
-                        : 'md:w-[calc(100%-16px)] md:mr-4 rounded-xl md:rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
+                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
+                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
-                      <Icon name="settings" size={20} />
+                      <Icon name="settings" size={18} />
                       <span className="truncate">Pengaturan</span>
                     </div>
                   </button>
                 </nav>
               </div>
 
-              {/* Sidebar Footer: Student Profile Chip */}
-              <div className="p-3.5 sm:p-4 m-3 sm:m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-white hidden md:block">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white shrink-0">
-                    {student.name ? student.name.charAt(0) : 'S'}
+              {/* Sidebar Footer: Student Profile Chip with Quick Logout Button (Matching Image 3) */}
+              <div className="p-3 sm:p-3.5 m-3 sm:m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white hidden md:block relative z-10 shadow-lg shadow-blue-950/20">
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white overflow-hidden border border-white/25">
+                        {student.fotoUrl ? (
+                          <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover" />
+                        ) : (
+                          student.name ? student.name.charAt(0) : 'S'
+                        )}
+                      </div>
+                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse"></span>
+                    </div>
+                    <div className="truncate flex-1">
+                      <p className="text-sm font-black text-white truncate">{student.name}</p>
+                      <p className="text-xs text-blue-100/80 font-semibold truncate">Kelas {student.kelas} • NIS {student.nis}</p>
+                    </div>
                   </div>
-                  <div className="truncate flex-1">
-                    <p className="text-sm font-black text-white truncate">{student.name}</p>
-                    <p className="text-xs text-blue-100 font-semibold truncate">Kelas {student.kelas} • NIS {student.nis}</p>
-                  </div>
+                  <button
+                    onClick={onLogout}
+                    title="Keluar Akun"
+                    className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/90 hover:text-white transition-all shadow-sm shrink-0"
+                  >
+                    <Icon name="log-out" size={16} />
+                  </button>
                 </div>
               </div>
             </aside>
 
-            {/* RIGHT WHITE CONTENT PANEL */}
-            <main className="flex-1 bg-white flex flex-col min-w-0 min-h-0 overflow-y-auto">
+            {/* RIGHT AESTHETIC CONTENT PANEL */}
+            <main className="flex-1 bg-[#f0f4f9] bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
               {/* Header Top Bar */}
-              <header className="px-4 sm:px-6 md:px-10 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-slate-100 flex flex-col gap-4 bg-white/95 backdrop-blur-md sticky top-0 z-10">
+              <header className="px-4 sm:px-6 md:px-10 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-slate-200/80 flex flex-col gap-4 bg-white/90 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3">
@@ -1660,75 +1935,97 @@ function ParentDashboardView({
                       </button>
 
                       {showParentBell && (
-                        <div className="absolute right-0 mt-3 w-72 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
-                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-extrabold text-xs uppercase text-slate-700">Notifikasi</h4>
-                              {totalParentUnread > 0 && (
-                                <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
-                                  {totalParentUnread} Baru
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {totalParentUnread > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newAnnIds = [...new Set([...readAnnouncements, ...announcements.map(a => a.id)])];
-                                    setReadAnnouncements(newAnnIds);
-                                    try {
-                                      localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(newAnnIds));
-                                    } catch(e) {}
-                                  }}
-                                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
-                                >
-                                  Tandai Dibaca
-                                </button>
-                              )}
-                              <button onClick={() => setShowParentBell(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Tutup</button>
-                            </div>
-                          </div>
+                        <>
+                          {/* Mobile Backdrop Overlay */}
+                          <div 
+                            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 sm:hidden"
+                            onClick={() => setShowParentBell(false)}
+                          />
+                          <div className="fixed inset-x-3 top-20 sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:mt-3 w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-extrabold text-xs uppercase text-slate-700">Notifikasi</h4>
+                                {totalParentUnread > 0 && (
+                                  <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
+                                    {totalParentUnread} Baru
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {totalParentUnread > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newAnnIds = [...new Set([...readAnnouncements, ...announcements.map(a => a.id)])];
+                                      setReadAnnouncements(newAnnIds);
+                                      try {
+                                        localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(newAnnIds));
+                                      } catch(e) {}
 
-                          <div className="space-y-2 max-h-72 overflow-y-auto text-xs">
-                            {announcements.length === 0 && (
-                              <p className="text-slate-400 text-center py-4 font-medium">Tidak ada notifikasi pengumuman saat ini.</p>
-                            )}
+                                      const newNoteIds = [...new Set([...readNotes, ...myNotes.map(n => n.id)])];
+                                      setReadNotes(newNoteIds);
+                                      try {
+                                        localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(newNoteIds));
+                                      } catch(e) {}
 
-                            {announcements.slice(0, 6).map(ann => {
-                              const isUnread = !readAnnouncements.includes(ann.id);
-                              return (
-                                <div
-                                  key={ann.id}
-                                  onClick={() => {
-                                    if (isUnread) {
-                                      const next = [...readAnnouncements, ann.id];
-                                      setReadAnnouncements(next);
-                                      try { localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
-                                    }
-                                    setShowParentBell(false);
-                                    setActiveTab('berita');
-                                  }}
-                                  className={`p-3 rounded-xl border cursor-pointer transition-all hover:scale-[0.99] ${
-                                    isUnread 
-                                      ? 'bg-blue-50/80 border-blue-200 font-extrabold text-blue-950 shadow-sm' 
-                                      : 'bg-slate-50/80 border-slate-200 text-slate-600'
-                                  }`}
-                                >
-                                  <div className="flex justify-between items-center mb-1">
-                                    <span className="font-extrabold text-[12px] truncate">Pengumuman: {ann.title}</span>
-                                    {isUnread ? (
-                                      <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[9px] font-black shrink-0">Baru</span>
-                                    ) : (
-                                      <span className="text-[10px] text-slate-400 font-semibold shrink-0">Dibaca</span>
-                                    )}
+                                      const updatedMsgs = { ...readComplaintMsgs };
+                                      myComplaints.forEach(c => {
+                                        if (c.messages) updatedMsgs[c.id] = c.messages.length;
+                                      });
+                                      setReadComplaintMsgs(updatedMsgs);
+                                      try {
+                                        localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updatedMsgs));
+                                      } catch(e) {}
+                                    }}
+                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                                  >
+                                    Tandai Dibaca
+                                  </button>
+                                )}
+                                <button onClick={() => setShowParentBell(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Tutup</button>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2 max-h-72 overflow-y-auto text-xs">
+                              {announcements.length === 0 && (
+                                <p className="text-slate-400 text-center py-4 font-medium">Tidak ada notifikasi pengumuman saat ini.</p>
+                              )}
+
+                              {announcements.slice(0, 6).map(ann => {
+                                const isUnread = !readAnnouncements.includes(ann.id);
+                                return (
+                                  <div
+                                    key={ann.id}
+                                    onClick={() => {
+                                      if (isUnread) {
+                                        const next = [...readAnnouncements, ann.id];
+                                        setReadAnnouncements(next);
+                                        try { localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
+                                      }
+                                      setShowParentBell(false);
+                                      setActiveTab('berita');
+                                    }}
+                                    className={`p-3 rounded-xl border cursor-pointer transition-all hover:scale-[0.99] ${
+                                      isUnread 
+                                        ? 'bg-blue-50/80 border-blue-200 font-extrabold text-blue-950 shadow-sm' 
+                                        : 'bg-slate-50/80 border-slate-200 text-slate-600'
+                                    }`}
+                                  >
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="font-extrabold text-[12px] truncate">Pengumuman: {ann.title}</span>
+                                      {isUnread ? (
+                                        <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[9px] font-black shrink-0">Baru</span>
+                                      ) : (
+                                        <span className="text-[10px] text-slate-400 font-semibold shrink-0">Dibaca</span>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-500 font-normal line-clamp-1">{ann.content || 'Klik untuk membuka pengumuman sekolah'}</p>
                                   </div>
-                                  <p className="text-[10px] text-slate-500 font-normal line-clamp-1">{ann.content || 'Klik untuk membuka pengumuman sekolah'}</p>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
+                        </>
                       )}
                     </div>
 
@@ -2064,6 +2361,35 @@ function ParentDashboardView({
                         </div>
                       </div>
 
+                      {/* Quick Sub-Filter Pills on Mobile */}
+                      <div className="flex md:hidden items-center gap-2 pb-1 overflow-x-auto no-scrollbar">
+                        {[
+                          { id: 'all', label: 'Semua', count: monthlyBills.length },
+                          { id: 'unpaid', label: 'Menunggak', count: unpaidBills.length, isDanger: true },
+                          { id: 'upcoming', label: 'Mendatang', count: upcomingBills.length },
+                          { id: 'paid', label: 'Lunas', count: paidBills.length }
+                        ].map(sf => (
+                          <button
+                            key={sf.id}
+                            onClick={() => setSppSubFilter(sf.id)}
+                            className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                              sppSubFilter === sf.id 
+                                ? 'bg-blue-600 text-white shadow-sm' 
+                                : 'bg-white text-slate-600 border border-slate-200 shadow-xs'
+                            }`}
+                          >
+                            <span>{sf.label}</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                              sppSubFilter === sf.id 
+                                ? 'bg-white/20 text-white' 
+                                : sf.isDanger && sf.count > 0 ? 'bg-rose-100 text-rose-700 font-black' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {sf.count}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
                       {/* 1. Tagihan Menunggak */}
                       {(sppSubFilter === 'all' || sppSubFilter === 'unpaid') && (
                         <section className={`bg-white rounded-2xl sm:rounded-3xl border shadow-sm overflow-hidden relative transition-all ${
@@ -2379,63 +2705,12 @@ function ParentDashboardView({
                       ) : (
                         <div className="space-y-4">
                           {myNotes.map(note => (
-                            <div key={note.id} className="bg-slate-50 rounded-2xl border border-slate-200/80 p-5 sm:p-6 hover:border-indigo-200 transition-colors">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-                                <span className="px-3 py-1 bg-indigo-100 text-indigo-800 font-black rounded-lg text-xs uppercase tracking-wide self-start">
-                                  {note.category || 'Catatan TU'}
-                                </span>
-                                <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                                  <Icon name="calendar" size={13} /> {note.date}
-                                </span>
-                              </div>
-                              <h4 className="font-black text-slate-800 text-base mb-2">{note.title}</h4>
-                              <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{note.content}</p>
-
-                              {/* Komentar / Balasan Wali */}
-                              <div className="mt-4 pt-4 border-t border-slate-200/60 space-y-3">
-                                <p className="text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                                  <Icon name="message-square" size={12} /> Tanggapan Wali Murid ({note.comments ? note.comments.length : 0})
-                                </p>
-                                {note.comments && note.comments.length > 0 && (
-                                  <div className="space-y-2">
-                                    {note.comments.map((c, i) => (
-                                      <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 text-xs">
-                                        <span className="font-extrabold text-indigo-700 mr-1.5">{c.sender}:</span>
-                                        <span className="text-slate-700 font-medium">{c.text}</span>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-
-                                <div className="flex gap-2 pt-1">
-                                  <input
-                                    type="text"
-                                    value={replyText[note.id] || ''}
-                                    onChange={e => setReplyText({ ...replyText, [note.id]: e.target.value })}
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter' && replyText[note.id]?.trim()) {
-                                        onAddCommentNote(note.id, { sender: 'Wali Murid', text: replyText[note.id].trim() });
-                                        setReplyText({ ...replyText, [note.id]: '' });
-                                      }
-                                    }}
-                                    placeholder="Tulis balasan untuk TU..."
-                                    className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (replyText[note.id]?.trim()) {
-                                        onAddCommentNote(note.id, { sender: 'Wali Murid', text: replyText[note.id].trim() });
-                                        setReplyText({ ...replyText, [note.id]: '' });
-                                      }
-                                    }}
-                                    className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5"
-                                  >
-                                    <Icon name="send" size={14} /> Kirim
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
+                            <ParentNoteCardItem
+                              key={note.id}
+                              note={note}
+                              student={student}
+                              onAddCommentNote={onAddCommentNote}
+                            />
                           ))}
                         </div>
                       )}
@@ -2446,132 +2721,262 @@ function ParentDashboardView({
                 {/* TAB 4: PENGADUAN */}
                 {activeTab === 'pengaduan' && (
                   <section className="space-y-6 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-4xl mx-auto">
-                      <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 w-full max-w-6xl mx-auto">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-slate-100 pb-4">
                         <div>
                           <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
                             <Icon name="message-square" size={24} className="text-blue-600" /> Layanan Pengaduan & Masukan
                           </h3>
-                          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">Sampaikan keluhan, pertanyaan, atau masukan kepada pihak sekolah</p>
+                          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">Sampaikan keluhan, pertanyaan, atau masukan langsung kepada pihak sekolah</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-200 flex items-center gap-1.5">
+                            <Icon name="clock" size={13} className="text-blue-600" /> Durasi Sesi: 1 Jam
+                          </span>
                         </div>
                       </div>
 
-                      {/* Form Tambah Pengaduan */}
-                      <form
-                        onSubmit={e => {
-                          e.preventDefault();
-                          if (!complaintTitle.trim() || !complaintContent.trim()) return;
-                          onAddComplaint({
-                            studentId: student.id,
-                            studentName: student.name,
-                            waliName: student.wali || 'Wali Murid',
-                            title: complaintTitle.trim(),
-                            content: complaintContent.trim(),
-                            date: new Date().toLocaleDateString('id-ID')
-                          });
-                          setComplaintTitle('');
-                          setComplaintContent('');
-                        }}
-                        className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200/80 mb-8 space-y-4"
-                      >
-                        <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">Buat Pengaduan Baru</h4>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">Subjek / Judul Pengaduan</label>
-                          <input
-                            type="text"
-                            required
-                            value={complaintTitle}
-                            onChange={e => setComplaintTitle(e.target.value)}
-                            placeholder="Contoh: Kendala Pembayaran SPP / Pertanyaan Kegiatan"
-                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-slate-600 mb-1">Pesan / Detail Pengaduan</label>
-                          <textarea
-                            required
-                            rows="4"
-                            value={complaintContent}
-                            onChange={e => setComplaintContent(e.target.value)}
-                            placeholder="Tuliskan pengaduan atau pertanyaan Anda secara rinci..."
-                            className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                          ></textarea>
-                        </div>
-                        <button
-                          type="submit"
-                          className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2"
-                        >
-                          <Icon name="send" size={16} /> Kirim Pengaduan
-                        </button>
-                      </form>
-
-                      {/* Daftar Pengaduan Aktif */}
-                      <div className="space-y-4">
-                        <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide">Riwayat Pengaduan Anda ({myComplaints.length})</h4>
-                        {myComplaints.length === 0 ? (
-                          <p className="text-center py-8 text-slate-400 font-medium text-xs sm:text-sm">Belum ada pengaduan yang dikirim.</p>
-                        ) : (
-                          myComplaints.map(comp => (
-                            <div key={comp.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                                <div>
-                                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                    comp.status === 'Sudah Ditangani' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                                  }`}>
-                                    {comp.status || 'Belum Ditangani'}
-                                  </span>
-                                  <h5 className="font-black text-slate-800 text-base mt-1">{comp.title}</h5>
+                      {/* JIKA ADA PENGADUAN AKTIF: Tampilkan Banner Info & Timer + Form Terkunci */}
+                      {activeComplaint ? (
+                        <div className="space-y-6 mb-8">
+                          {/* Banner Pemberitahuan Pengaduan Aktif Sedang Berjalan */}
+                          <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-sky-50 border border-blue-200 rounded-3xl p-5 sm:p-6 shadow-xs">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-start gap-3.5">
+                                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shrink-0 shadow-md shadow-blue-500/20">
+                                  <Icon name="message-circle" size={22} className="animate-bounce" />
                                 </div>
-                                <span className="text-[11px] text-slate-400 font-bold">{comp.date}</span>
-                              </div>
-
-                              {/* Chat Thread */}
-                              <div className="space-y-2 max-h-60 overflow-y-auto bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                {comp.messages && comp.messages.map((m, idx) => (
-                                  <div key={idx} className={`p-2.5 rounded-xl text-xs ${
-                                    m.sender === 'Admin TU' ? 'bg-blue-50 text-blue-900 border border-blue-100' : 'bg-white text-slate-800 border border-slate-200'
-                                  }`}>
-                                    <div className="flex justify-between items-center mb-1">
-                                      <span className="font-black">{m.sender}</span>
-                                      <span className="text-[10px] text-slate-400">{m.time || ''}</span>
-                                    </div>
-                                    <p className="font-medium whitespace-pre-wrap">{m.text}</p>
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-600 text-white shadow-xs">
+                                      Pengaduan Aktif
+                                    </span>
+                                    <span className="text-xs font-extrabold text-slate-800">Satu Pengaduan Dalam Satu Waktu</span>
                                   </div>
-                                ))}
+                                  <p className="text-xs sm:text-sm text-slate-600 font-semibold leading-relaxed">
+                                    Anda sedang memiliki pengaduan aktif. Sesuai aturan, Anda baru dapat membuat pengaduan baru setelah pengaduan ini selesai ditangani atau durasi maksimal 1 jam telah berakhir.
+                                  </p>
+                                </div>
                               </div>
 
-                              {/* Reply Form */}
-                              <div className="flex gap-2 pt-1">
-                                <input
-                                  type="text"
-                                  value={replyText[comp.id] || ''}
-                                  onChange={e => setReplyText({ ...replyText, [comp.id]: e.target.value })}
-                                  onKeyDown={e => {
-                                    if (e.key === 'Enter' && replyText[comp.id]?.trim()) {
-                                      onReplyComplaint(comp.id, replyText[comp.id].trim(), 'Wali Murid');
-                                      setReplyText({ ...replyText, [comp.id]: '' });
-                                    }
-                                  }}
-                                  placeholder="Tulis balasan untuk Admin TU..."
-                                  className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (replyText[comp.id]?.trim()) {
-                                      onReplyComplaint(comp.id, replyText[comp.id].trim(), 'Wali Murid');
-                                      setReplyText({ ...replyText, [comp.id]: '' });
-                                    }
-                                  }}
-                                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5"
-                                >
-                                  <Icon name="send" size={14} /> Balas
-                                </button>
+                              {/* Live Countdown Timer Badge */}
+                              <div className="shrink-0 bg-white px-5 py-3 rounded-2xl border border-blue-200 shadow-sm flex items-center gap-3 self-start md:self-auto">
+                                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                                  <Icon name="timer" size={20} className="animate-pulse" />
+                                </div>
+                                <div>
+                                  <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">Sisa Waktu Sesi</p>
+                                  <p className="text-xl font-black text-blue-700 font-mono tracking-wider">
+                                    {formatCountdown(activeComplaint.expiresAtMs || ((activeComplaint.createdAtMs || activeComplaint.id) + 3600000), nowMs)}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-                          ))
-                        )}
-                      </div>
+                          </div>
+
+                          {/* Kartu Chat Pengaduan Aktif */}
+                          <div className="bg-white rounded-3xl border-2 border-blue-400 shadow-md p-5 sm:p-6 space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-800">
+                                    {activeComplaint.status || 'Sedang Diproses'}
+                                  </span>
+                                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-800 flex items-center gap-1 font-mono">
+                                    <Icon name="clock" size={11} />
+                                    {formatCountdown(activeComplaint.expiresAtMs || ((activeComplaint.createdAtMs || activeComplaint.id) + 3600000), nowMs)}
+                                  </span>
+                                </div>
+                                <h4 className="font-black text-slate-800 text-lg mt-1.5">{activeComplaint.title}</h4>
+                              </div>
+                              <span className="text-xs text-slate-400 font-bold">{activeComplaint.date}</span>
+                            </div>
+
+                            {/* Thread Pesan Live */}
+                            <div className="space-y-2.5 max-h-80 overflow-y-auto bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                              {activeComplaint.messages && activeComplaint.messages.map((m, idx) => (
+                                <div key={idx} className={`p-3 rounded-2xl text-xs max-w-[85%] ${
+                                  m.sender === 'Admin TU'
+                                    ? 'bg-blue-600 text-white ml-auto rounded-tr-none shadow-xs'
+                                    : 'bg-white text-slate-800 border border-slate-200 mr-auto rounded-tl-none shadow-xs'
+                                }`}>
+                                  <div className={`flex justify-between items-center gap-2 mb-1 ${m.sender === 'Admin TU' ? 'text-blue-100' : 'text-slate-400'}`}>
+                                    <span className="font-black text-[11px]">{m.sender}</span>
+                                    <span className="text-[10px]">{m.time || ''}</span>
+                                  </div>
+                                  <p className="font-medium whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Form Balas Chat Aktif */}
+                            <div className="flex gap-2 pt-1">
+                              <input
+                                type="text"
+                                value={replyText[activeComplaint.id] || ''}
+                                onChange={e => setReplyText({ ...replyText, [activeComplaint.id]: e.target.value })}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter' && replyText[activeComplaint.id]?.trim()) {
+                                    onReplyComplaint(activeComplaint.id, replyText[activeComplaint.id].trim(), 'Wali Murid');
+                                    setReplyText({ ...replyText, [activeComplaint.id]: '' });
+                                  }
+                                }}
+                                placeholder="Tulis balasan untuk Admin TU..."
+                                className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (replyText[activeComplaint.id]?.trim()) {
+                                    onReplyComplaint(activeComplaint.id, replyText[activeComplaint.id].trim(), 'Wali Murid');
+                                    setReplyText({ ...replyText, [activeComplaint.id]: '' });
+                                  }
+                                }}
+                                className="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl text-xs sm:text-sm transition-all flex items-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 shrink-0"
+                              >
+                                <Icon name="send" size={15} /> Balas
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* JIKA TIDAK ADA PENGADUAN AKTIF: Tampilkan Form Buat Pengaduan Baru */
+                        <form
+                          onSubmit={e => {
+                            e.preventDefault();
+                            if (!complaintTitle.trim() || !complaintContent.trim()) return;
+                            onAddComplaint({
+                              studentId: student.id,
+                              studentName: student.name,
+                              waliName: student.wali || 'Wali Murid',
+                              title: complaintTitle.trim(),
+                              content: complaintContent.trim(),
+                              date: new Date().toLocaleDateString('id-ID')
+                            });
+                            setComplaintTitle('');
+                            setComplaintContent('');
+                          }}
+                          className="bg-slate-50 p-5 sm:p-7 rounded-3xl border border-slate-200/80 mb-8 space-y-4 shadow-xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-black text-slate-800 text-sm uppercase tracking-wide flex items-center gap-2">
+                              <Icon name="plus-circle" size={17} className="text-blue-600" /> Buat Pengaduan Baru
+                            </h4>
+                            <span className="text-[11px] font-bold text-slate-400">Durasi Respons: Maks. 1 Jam</span>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Subjek / Judul Pengaduan</label>
+                            <input
+                              type="text"
+                              required
+                              value={complaintTitle}
+                              onChange={e => setComplaintTitle(e.target.value)}
+                              placeholder="Contoh: Kendala Pembayaran SPP / Pertanyaan Kegiatan"
+                              className="w-full px-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Pesan / Detail Pengaduan</label>
+                            <textarea
+                              required
+                              rows="4"
+                              value={complaintContent}
+                              onChange={e => setComplaintContent(e.target.value)}
+                              placeholder="Tuliskan pengaduan atau pertanyaan Anda secara rinci..."
+                              className="w-full px-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-inner"
+                            ></textarea>
+                          </div>
+
+                          <div className="pt-2">
+                            <button
+                              type="submit"
+                              className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
+                            >
+                              <Icon name="send" size={16} /> Kirim Pengaduan (Mulai Sesi 1 Jam)
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium italic text-center">
+                            * Anda hanya dapat membuat 1 pengaduan dalam satu waktu. Pengaduan baru berikutnya dapat dibuat setelah pengaduan selesai atau waktu 1 jam habis.
+                          </p>
+                        </form>
+                      )}
+
+                      {/* RIWAYAT PENGADUAN TERDAHULU / TERKUNCI (KE HIDE SECARA DEFAULT) */}
+                      {pastComplaints.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => setShowPastComplaints(prev => !prev)}
+                            className="w-full py-3.5 px-5 bg-slate-50 hover:bg-slate-100/80 rounded-2xl border border-slate-200 flex items-center justify-between text-xs font-black text-slate-700 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <Icon name="archive" size={16} className="text-slate-500" />
+                              <span>Riwayat Pengaduan Selesai / Terkunci ({pastComplaints.length})</span>
+                              <span className="px-2 py-0.5 rounded-full bg-slate-200 text-slate-600 text-[10px] font-bold">
+                                Batas 1 Jam Selesai
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-blue-600 font-bold">
+                              <span>{showPastComplaints ? 'Sembunyikan' : 'Buka Riwayat Percakapan'}</span>
+                              <Icon name={showPastComplaints ? 'chevron-up' : 'chevron-down'} size={15} />
+                            </div>
+                          </button>
+
+                          {showPastComplaints && (
+                            <div className="mt-4 space-y-4 animate-in fade-in duration-200">
+                              {pastComplaints.map(comp => (
+                                <div key={comp.id} className="bg-slate-50/70 rounded-2xl border border-slate-200 p-5 shadow-xs space-y-3">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-200 text-slate-700">
+                                          {comp.status === 'Sudah Ditangani' ? 'Sudah Ditangani' : 'Terkunci (1 Jam Berakhir)'}
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-500 border border-slate-200 flex items-center gap-1">
+                                          <Icon name="lock" size={10} /> Sesi Ditutup
+                                        </span>
+                                      </div>
+                                      <h5 className="font-black text-slate-800 text-base mt-1">{comp.title}</h5>
+                                    </div>
+                                    <span className="text-[11px] text-slate-400 font-bold">{comp.date}</span>
+                                  </div>
+
+                                  {/* Chat Thread */}
+                                  <div className="space-y-2 max-h-60 overflow-y-auto bg-white p-3.5 rounded-xl border border-slate-200">
+                                    {comp.messages && comp.messages.map((m, idx) => (
+                                      <div key={idx} className={`p-2.5 rounded-xl text-xs max-w-[85%] ${
+                                        m.sender === 'Admin TU'
+                                          ? 'bg-blue-50 text-blue-900 border border-blue-100 ml-auto'
+                                          : 'bg-slate-50 text-slate-800 border border-slate-200 mr-auto'
+                                      }`}>
+                                        <div className="flex justify-between items-center gap-2 mb-1">
+                                          <span className="font-black text-[11px]">{m.sender}</span>
+                                          <span className="text-[10px] text-slate-400">{m.time || ''}</span>
+                                        </div>
+                                        <p className="font-medium whitespace-pre-wrap">{m.text}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+
+                                  {/* Locked Notice */}
+                                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-800 font-bold">
+                                    <Icon name="lock" size={14} className="text-amber-600 shrink-0" />
+                                    <span>Sesi pengaduan ini telah selesai & terkunci otomatis karena durasi 1 jam telah berakhir.</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {!activeComplaint && pastComplaints.length === 0 && (
+                        <p className="text-center py-6 text-slate-400 font-medium text-xs sm:text-sm">
+                          Belum ada riwayat pengaduan sebelumnya.
+                        </p>
+                      )}
                     </div>
                   </section>
                 )}
@@ -2579,28 +2984,125 @@ function ParentDashboardView({
                 {/* TAB 5: PENGATURAN */}
                 {activeTab === 'pengaturan' && (
                   <section className="space-y-6 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 max-w-2xl mx-auto">
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8 w-full max-w-4xl mx-auto">
                       <div className="text-center mb-8">
-                        <div className="w-16 h-16 bg-slate-100 text-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-blue-100 shadow-inner">
                           <Icon name="settings" size={32} />
                         </div>
-                        <h3 className="text-2xl font-black text-slate-800">Pengaturan Akun Wali</h3>
-                        <p className="text-sm text-slate-500 font-medium mt-1">Perbarui password login dan nomor WhatsApp yang dapat dihubungi oleh pihak sekolah.</p>
+                        <h3 className="text-2xl font-black text-slate-800 tracking-tight">Pengaturan Akun Wali Murid</h3>
+                        <p className="text-sm text-slate-500 font-medium mt-1">Perbarui nomor WhatsApp dan ganti password akun login portal ananda.</p>
                       </div>
+
+                      {/* Info Status Akun & Password */}
+                      <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 mb-6 space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">Status Kredensial Login</span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs font-mono font-black text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+                                NIS: {student.nis}
+                              </span>
+                              {student.password && 
+                               student.password.toString().trim() !== student.nis.toString().trim() && 
+                               student.password.toString().trim() !== `Sb${student.nis.toString().trim()}` ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-black">
+                                  <Icon name="lock" size={13} className="text-emerald-600" />
+                                  <span>Password Kustom Aktif</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-800 border border-blue-300 text-xs font-black">
+                                  <Icon name="key" size={13} className="text-blue-600" />
+                                  <span>Default Sistem (Sb{student.nis})</span>
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const defaultPwd = student.nis ? `Sb${student.nis}` : '123456';
+                              if (confirm(`Apakah Anda ingin mengembalikan password akun ke Default Sistem (${defaultPwd})?\n\nSetelah direset, password lama Anda tidak akan berlaku lagi dan Anda harus masuk menggunakan password default (${defaultPwd}).`)) {
+                                onUpdateParentSettings(student.id, { password: defaultPwd, nis: student.nis });
+                                setNewPassword('');
+                                setConfirmPassword('');
+                                setSettingsFeedback({
+                                  type: 'success',
+                                  text: `Password akun berhasil direset ke Default Sistem (${defaultPwd})! Password lama tidak berlaku lagi, gunakan password default ini untuk masuk.`
+                                });
+                              }
+                            }}
+                            className="px-3.5 py-2 bg-white hover:bg-slate-100 text-slate-700 hover:text-blue-600 rounded-xl border border-slate-300 font-extrabold text-xs shadow-sm transition-all flex items-center gap-1.5 shrink-0 active:scale-95"
+                            title="Reset password ke default sistem (Sb[NIS])"
+                          >
+                            <Icon name="rotate-ccw" size={14} />
+                            <span>Reset ke Default Sistem</span>
+                          </button>
+                        </div>
+                        <p className="text-[11.5px] text-slate-500 font-medium leading-relaxed">
+                          Password default akun adalah <strong>Sb[NIS]</strong> (contoh: <code>Sb{student.nis}</code>). Jika Anda mengembalikan password ke default, password lama Anda otomatis dibatalkan dan Anda masuk menggunakan password default tersebut.
+                        </p>
+                      </div>
+
+                      {/* Feedback Banner */}
+                      {settingsFeedback && (
+                        <div className={`p-4 rounded-2xl mb-6 text-xs sm:text-sm font-bold flex items-center gap-3 animate-in fade-in ${
+                          settingsFeedback.type === 'error'
+                            ? 'bg-rose-50 border border-rose-200 text-rose-700'
+                            : 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+                        }`}>
+                          <Icon name={settingsFeedback.type === 'error' ? "alert-circle" : "check-circle"} size={18} className="shrink-0" />
+                          <span>{settingsFeedback.text}</span>
+                        </div>
+                      )}
 
                       <form
                         onSubmit={e => {
                           e.preventDefault();
+                          setSettingsFeedback(null);
                           const updateObj = {};
-                          if (newPhone.trim()) updateObj.telepon = newPhone.trim();
-                          if (newPassword.trim()) updateObj.password = newPassword.trim();
+
+                          if (newPhone.trim() && newPhone.trim() !== student.telepon) {
+                            updateObj.telepon = newPhone.trim();
+                          }
+
+                          if (newPassword.trim()) {
+                            if (newPassword.trim().length < 6) {
+                              setSettingsFeedback({ type: 'error', text: 'Password baru minimal harus 6 karakter demi keamanan akun.' });
+                              return;
+                            }
+                            const hasLetter = /[a-zA-Z]/.test(newPassword.trim());
+                            const hasNumber = /[0-9]/.test(newPassword.trim());
+                            if (!hasLetter || !hasNumber) {
+                              setSettingsFeedback({ type: 'error', text: 'Password baru harus berupa campuran angka dan huruf (seaman mungkin)!' });
+                              return;
+                            }
+                            if (newPassword.trim() !== confirmPassword.trim()) {
+                              setSettingsFeedback({ type: 'error', text: 'Konfirmasi password tidak cocok dengan password baru!' });
+                              return;
+                            }
+                            updateObj.password = newPassword.trim();
+                          }
+
+                          if (Object.keys(updateObj).length === 0) {
+                            setSettingsFeedback({ type: 'error', text: 'Tidak ada perubahan data yang disimpan.' });
+                            return;
+                          }
+
                           onUpdateParentSettings(student.id, updateObj);
                           setNewPassword('');
+                          setConfirmPassword('');
+                          setSettingsFeedback({
+                            type: 'success',
+                            text: updateObj.password
+                              ? 'Password akun berhasil diperbarui! Gunakan password baru ini untuk login berikutnya.'
+                              : 'Nomor WhatsApp berhasil diperbarui!'
+                          });
                         }}
                         className="space-y-6"
                       >
                         <div className="space-y-2">
-                          <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">Nomor WhatsApp Baru</label>
+                          <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">Nomor WhatsApp Wali Murid</label>
                           <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                               <Icon name="phone" size={18} />
@@ -2613,36 +3115,70 @@ function ParentDashboardView({
                               value={newPhone}
                               onChange={e => setNewPhone(e.target.value)}
                               placeholder="Contoh: 08123456789"
-                              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                             />
                           </div>
                         </div>
 
-                        <div className="space-y-2">
-                          <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">Ganti Password (Opsional)</label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                              <Icon name="lock" size={18} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">
+                              Password Baru <span className="text-slate-400 font-normal lowercase">(opsional)</span>
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                                <Icon name="lock" size={18} />
+                              </div>
+                              <input
+                                id="settings-password"
+                                name="newPassword"
+                                autoComplete="new-password"
+                                type={showNewPassword ? "text" : "password"}
+                                value={newPassword}
+                                onChange={e => setNewPassword(e.target.value)}
+                                placeholder="Kosongkan jika tidak ganti"
+                                className="w-full pl-11 pr-11 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                              >
+                                <Icon name={showNewPassword ? "eye-off" : "eye"} size={17} />
+                              </button>
                             </div>
-                            <input
-                              id="settings-password"
-                              name="newPassword"
-                              autoComplete="new-password"
-                              type="password"
-                              value={newPassword}
-                              onChange={e => setNewPassword(e.target.value)}
-                              placeholder="Kosongkan jika tidak ingin mengubah"
-                              className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="block text-xs font-black text-slate-700 uppercase tracking-wide">
+                              Konfirmasi Password Baru
+                            </label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                                <Icon name="shield-check" size={18} />
+                              </div>
+                              <input
+                                id="settings-confirm-password"
+                                name="confirmPassword"
+                                autoComplete="new-password"
+                                type={showNewPassword ? "text" : "password"}
+                                value={confirmPassword}
+                                onChange={e => setConfirmPassword(e.target.value)}
+                                placeholder="Ulangi password baru"
+                                disabled={!newPassword}
+                                className="w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-300 rounded-2xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        <div className="pt-4">
+                        <div className="pt-2">
                           <button
                             type="submit"
-                            className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-sm"
+                            className="w-full py-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white font-black rounded-2xl shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
                           >
-                            <Icon name="save" size={18} /> Simpan Perubahan Akun
+                            <Icon name="save" size={18} />
+                            <span>Simpan Perubahan Akun</span>
                           </button>
                         </div>
                       </form>
@@ -2652,6 +3188,35 @@ function ParentDashboardView({
               </div>
             </main>
           </div>
+
+          {/* MOBILE BOTTOM NAVIGATION BAR - Wali Murid */}
+          <nav className="mobile-bottom-nav" role="navigation" aria-label="Mobile Navigation">
+            {[
+              { id: 'dashboard', label: 'Dasbor', icon: 'layout-grid', badge: 0 },
+              { id: 'spp', label: 'Tagihan', icon: 'credit-card', badge: unpaidBills.length, badgeType: 'danger' },
+              { id: 'berita', label: 'Berita', icon: 'newspaper', badge: unreadAnnCount, badgeType: 'info' },
+              { id: 'evaluasi', label: 'Catatan', icon: 'file-text', badge: unreadNotesCount, badgeType: 'info' },
+              { id: 'pengaduan', label: 'Aduan', icon: 'message-square', badge: unreadComplaintsCount, badgeType: 'danger' },
+              { id: 'pengaturan', label: 'Akun', icon: 'settings', badge: 0 }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`mobile-bottom-nav-item ${activeTab === tab.id ? 'active' : ''}`}
+                aria-label={tab.label}
+                aria-current={activeTab === tab.id ? 'page' : undefined}
+              >
+                <span className="mobile-bottom-nav-icon">
+                  <Icon name={tab.icon} size={22} />
+                  {tab.badge > 0 && (
+                    <span className={`mobile-bottom-nav-badge ${tab.badgeType || 'danger'}`}>{tab.badge > 99 ? '99+' : tab.badge}</span>
+                  )}
+                </span>
+                <span className="mobile-bottom-nav-label">{tab.label}</span>
+              </button>
+            ))}
+          </nav>
+
         </div>
       );
     }
@@ -2744,7 +3309,13 @@ function ParentDashboardView({
                 </button>
 
                 {showBellDropdown && (
-                  <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
+                  <>
+                    {/* Mobile Backdrop Overlay */}
+                    <div 
+                      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 sm:hidden"
+                      onClick={() => setShowBellDropdown(false)}
+                    />
+                    <div className="fixed inset-x-3 top-20 sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:mt-3 w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-2">
                       <div className="flex items-center gap-2">
                         <h4 className="font-extrabold text-xs uppercase text-slate-700">Notifikasi Admin</h4>
@@ -2833,7 +3404,8 @@ function ParentDashboardView({
                       ))}
                     </div>
                   </div>
-                )}
+                </>
+              )}
               </div>
 
               <button 
@@ -3209,7 +3781,7 @@ function ParentDashboardView({
             alamat: student.alamat || '',
             rt: student.rt || '',
             rw: student.rw || '',
-            password: student.password || '',
+            password: student.password || (student.nis ? `Sb${student.nis}` : generateDefaultStudentPassword()),
             keringanan_note: student.keringanan_note || '',
             arrearsAmount: 0,
             arrearsNote: ''
@@ -3237,7 +3809,7 @@ function ParentDashboardView({
             wali: '',
             telepon: '',
             fotoUrl: '',
-            password: '',
+            password: generateDefaultStudentPassword(),
             statusAktif: true,
             keringanan_note: '',
             arrearsAmount: 0,
@@ -3249,10 +3821,13 @@ function ParentDashboardView({
 
       const handleSubmit = (e) => {
         e.preventDefault();
+        const effectivePassword = (formData.password && formData.password.trim().length > 0)
+          ? formData.password.trim()
+          : (formData.nis ? `Sb${formData.nis.toString().trim()}` : '123456');
         const payload = {
           ...formData,
           tarif: Number(formData.tarif) || 0,
-          password: formData.password ? formData.password.trim() : (formData.nis ? formData.nis.toString().trim() : ''),
+          password: effectivePassword,
           keringanan_note: isKeringanan ? (formData.keringanan_note || 'Diringankan') : '',
           arrearsAmount: 0,
           arrearsNote: ''
@@ -3280,6 +3855,7 @@ function ParentDashboardView({
         if (!numStr) return '#';
         let clean = numStr.replace(/[^0-9]/g, '');
         if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+        else if (clean.startsWith('8')) clean = '62' + clean;
         return `https://wa.me/${clean}`;
       };
 
@@ -3331,6 +3907,7 @@ function ParentDashboardView({
 
         let clean = phoneToUse.replace(/[^0-9]/g, '');
         if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+        else if (clean.startsWith('8')) clean = '62' + clean;
 
         if (clean.length < 9) {
           alert('Nomor WhatsApp tidak valid (minimal 9 digit)!');
@@ -3450,6 +4027,28 @@ function ParentDashboardView({
                                 <Icon name="alert-circle" size={12} /> No. WA belum ada
                               </span>
                             )}
+                          </div>
+
+                          {/* KREDENSIAL PASSWORD AKUN WALI */}
+                          <div className="flex items-center gap-1.5 py-0.5">
+                            <span className="text-[10px] font-bold text-slate-400">Password:</span>
+                            <span className="font-mono font-black text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 select-all tracking-wider" title="Password login akun siswa (campuran huruf & angka)">
+                              {s.password || (s.nis ? `Sb${s.nis}` : '-')}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const pwdToCopy = s.password || (s.nis ? `Sb${s.nis}` : '');
+                                if (pwdToCopy) {
+                                  navigator.clipboard.writeText(pwdToCopy);
+                                  alert(`Password '${pwdToCopy}' untuk siswa ${s.name} berhasil disalin ke clipboard!`);
+                                }
+                              }}
+                              className="p-1 text-slate-400 hover:text-blue-600 transition-colors"
+                              title="Salin password ke clipboard"
+                            >
+                              <Icon name="copy" size={12} />
+                            </button>
                           </div>
 
                           {/* TOMBOL CHAT WA LOGIN KHUSUS SISWA INI */}
@@ -3874,17 +4473,121 @@ function ParentDashboardView({
                       </div>
                     </div>
 
-                    <div>
-                      <label className="block font-black text-slate-700 uppercase mb-1">Password Login Wali Murid</label>
-                      <input
-                        type="text"
-                        placeholder="Kosongkan jika ingin default sama dengan NIS"
-                        value={formData.password || ''}
-                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500"
-                      />
-                      <p className="text-[10px] text-slate-500 mt-1 font-medium">* Default password sama dengan nomor NIS siswa jika dikosongkan.</p>
-                    </div>
+                    {!editingStudent ? (
+                      <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                              <Icon name="shield-check" size={16} />
+                            </div>
+                            <div>
+                              <h5 className="font-black text-blue-900 text-xs uppercase tracking-wide">Password Default Sistem (Kombinasi Angka & Huruf)</h5>
+                              <p className="text-[11px] text-blue-700 font-medium">Otomatis digenerate by sistem seaman mungkin.</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newGen = generateDefaultStudentPassword();
+                              setFormData(prev => ({ ...prev, password: newGen }));
+                            }}
+                            className="px-2.5 py-1.5 bg-white hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 text-xs font-bold transition-all flex items-center gap-1 shadow-sm active:scale-95 shrink-0"
+                            title="Generate ulang password default"
+                          >
+                            <Icon name="refresh-cw" size={12} />
+                            <span>Acak Ulang</span>
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white px-3.5 py-2.5 rounded-xl border border-blue-200 shadow-inner">
+                          <span className="text-xs text-slate-400 font-bold">Password Akun:</span>
+                          <span className="font-mono font-black text-sm text-blue-700 tracking-widest flex-1 select-all">{formData.password || '...'}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (formData.password) {
+                                navigator.clipboard.writeText(formData.password);
+                                alert(`Password '${formData.password}' berhasil disalin ke clipboard!`);
+                              }
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Salin password ke clipboard"
+                          >
+                            <Icon name="copy" size={15} />
+                          </button>
+                        </div>
+                        <p className="text-[10.5px] text-blue-600 font-medium leading-relaxed">
+                          * Sistem telah otomatis membuat password aman campuran huruf dan angka di atas. Password ini akan tersimpan di database dan otomatis terkirim saat klik "Kirim Info Login" WhatsApp ke wali murid. Wali murid juga dapat menggantinya sendiri di portal mereka.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <span className="block font-black text-slate-700 uppercase text-xs tracking-wide">Password Akun Wali Murid</span>
+                            <div className="flex items-center gap-2 mt-1.5">
+                              <span className="font-mono font-black text-sm bg-white px-3 py-1 rounded-xl border border-slate-300 text-blue-700 tracking-widest select-all shadow-inner">
+                                {formData.password || (formData.nis ? `Sb${formData.nis}` : '-')}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const pwdToCopy = formData.password || (formData.nis ? `Sb${formData.nis}` : '');
+                                  if (pwdToCopy) {
+                                    navigator.clipboard.writeText(pwdToCopy);
+                                    alert(`Password '${pwdToCopy}' disalin ke clipboard!`);
+                                  }
+                                }}
+                                className="p-1.5 bg-white text-slate-500 hover:text-blue-600 rounded-lg border border-slate-200 transition-colors shadow-sm"
+                                title="Salin password"
+                              >
+                                <Icon name="copy" size={14} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const defPwd = formData.nis ? `Sb${formData.nis}` : '123456';
+                                setFormData(prev => ({ ...prev, password: defPwd }));
+                                alert(`Password diset ke Default Sistem: ${defPwd}.\n\nSetelah klik 'Simpan Data Siswa', password lama tidak berlaku lagi dan wali murid harus masuk menggunakan password default ini.`);
+                              }}
+                              className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-xl text-xs font-black border border-amber-300 shadow-sm transition-all flex items-center gap-1.5 shrink-0 active:scale-95"
+                              title="Kembalikan ke password default sistem (Sb[NIS])"
+                            >
+                              <Icon name="rotate-ccw" size={14} />
+                              <span>Reset ke Default</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newGen = generateDefaultStudentPassword();
+                                setFormData(prev => ({ ...prev, password: newGen }));
+                                alert(`Password baru campuran huruf & angka di-generate: ${newGen}. Klik 'Simpan Data Siswa' untuk menyimpan ke database.`);
+                              }}
+                              className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black shadow-md shadow-blue-500/20 transition-all flex items-center gap-1.5 shrink-0 active:scale-95"
+                              title="Generate password acak baru kombinasi angka & huruf"
+                            >
+                              <Icon name="refresh-cw" size={14} />
+                              <span>Acak Baru</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="pt-2 border-t border-slate-200">
+                          <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                            Atur Manual Password (Atau kosongkan untuk menggunakan default Sb[NIS]):
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Ketik password baru jika ingin manual"
+                            value={formData.password || ''}
+                            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                            className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Modal Sticky Footer Actions */}
@@ -6173,9 +6876,23 @@ function ParentDashboardView({
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">
-                    Ganti Password Admin <span className="normal-case text-slate-400 font-normal">(Opsional)</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block font-bold text-slate-700 uppercase">
+                      Ganti Password Admin <span className="normal-case text-slate-400 font-normal">(Opsional)</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        isDirtyRef.current = true;
+                        setNewAdminPassword('admin123');
+                        alert("Password admin diatur ke default ('admin123'). Klik 'Simpan Pengaturan' untuk menyimpan perubahan.");
+                      }}
+                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
+                      title="Set password admin kembali ke default (admin123)"
+                    >
+                      Reset Default (admin123)
+                    </button>
+                  </div>
                   <input
                     type="password"
                     placeholder="Kosongkan jika tidak mau mengubah password"
@@ -6974,6 +7691,93 @@ function ParentDashboardView({
     // 9. MAIN APP CONTROLLER WITH SUPABASE SYNC
     // ==========================================
     
+    function AdminNoteCardItem({ n, onDeleteNote }) {
+      const hasReplies = Boolean(n.comments && n.comments.length > 0);
+      // Per request 4: jika sudah pernah dibalas langsung tertutup, harus diklik baru terbuka
+      const [isOpen, setIsOpen] = useState(!hasReplies);
+
+      return (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all">
+          <button
+            type="button"
+            onClick={() => setIsOpen(prev => !prev)}
+            className="w-full p-4 sm:p-5 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center text-left hover:bg-slate-100/70 transition-colors"
+          >
+            <div className="flex-1 min-w-0 pr-3">
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-teal-100 text-teal-800 rounded-lg text-[10px] font-black uppercase">
+                  <Icon name="tag" size={11} /> {n.category || 'Catatan TU'}
+                </span>
+                {hasReplies ? (
+                  <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black flex items-center gap-1">
+                    <Icon name="message-circle" size={11} /> {n.comments.length} Balasan Masuk
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-slate-200/70 text-slate-600 rounded-full text-[10px] font-bold">
+                    Menunggu Tanggapan
+                  </span>
+                )}
+              </div>
+              <h4 className="font-black text-slate-800 text-sm sm:text-base truncate">Siswa: {n.studentName}</h4>
+              <p className="text-xs text-slate-500 font-bold mt-0.5 flex items-center gap-1">
+                <Icon name="calendar" size={12} /> {n.date}
+                {hasReplies && (
+                  <span className="text-blue-600 font-bold ml-2 text-[11px]">
+                    • {isOpen ? 'Tutup percakapan' : 'Klik untuk buka riwayat percakapan'}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-slate-200/60 flex items-center justify-center text-slate-600 transition-transform">
+                <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} />
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDeleteNote && onDeleteNote(n.id); }}
+                className="w-8 h-8 bg-rose-50 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl transition-colors flex items-center justify-center shadow-xs"
+                title="Hapus Catatan"
+              >
+                <Icon name="trash-2" size={14} />
+              </button>
+            </div>
+          </button>
+
+          {isOpen && (
+            <div className="animate-in fade-in duration-200">
+              <div className="p-5 text-sm text-slate-700 font-medium whitespace-pre-wrap leading-relaxed bg-white">
+                {n.content}
+              </div>
+              <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100">
+                <p className="text-xs font-black text-slate-600 uppercase mb-2 flex items-center gap-1.5">
+                  <Icon name="message-circle" size={13} className="text-blue-600"/> Balasan Wali Murid ({n.comments ? n.comments.length : 0})
+                </p>
+                {n.comments && n.comments.length > 0 ? (
+                  <div className="space-y-2 mt-2">
+                    {n.comments.map((cm, i) => (
+                      <div key={i} className="bg-white p-3.5 border border-slate-200 rounded-2xl shadow-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[11px] font-black text-slate-800 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                            {cm.sender}
+                          </p>
+                          <span className="text-[10px] text-slate-400 font-medium">{cm.time || 'Wali'}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium leading-relaxed">{cm.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">Belum ada tanggapan dari wali murid.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function AdminCatatanView({ students, notes, onAddNote, onDeleteNote }) {
       const [selectedStudent, setSelectedStudent] = useState('');
       const [content, setContent] = useState('');
@@ -7055,38 +7859,7 @@ function ParentDashboardView({
                  </div>
                ) : (
                  notes.sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now())).map(n => (
-                   <div key={n.id} className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                     <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-start">
-                       <div>
-                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-100 text-teal-800 rounded-lg text-[10px] font-black uppercase mb-2">
-                           <Icon name="tag" size={12} /> {n.category || 'Catatan TU'}
-                         </div>
-                         <h4 className="font-black text-slate-800 text-lg">Siswa: {n.studentName}</h4>
-                         <p className="text-xs text-slate-500 font-bold mt-1"><Icon name="calendar" size={12} className="inline mr-1"/>{n.date}</p>
-                       </div>
-                       <button onClick={() => onDeleteNote && onDeleteNote(n.id)} className="p-2 bg-rose-50 text-rose-600 hover:bg-rose-500 hover:text-white rounded-xl transition-colors" title="Hapus Catatan">
-                         <Icon name="trash-2" size={16} />
-                       </button>
-                     </div>
-                     <div className="p-5 text-sm text-slate-700 font-medium whitespace-pre-wrap leading-relaxed">
-                       {n.content}
-                     </div>
-                     <div className="p-4 bg-slate-50 border-t border-slate-100">
-                        <p className="text-xs font-black text-slate-500 uppercase mb-2"><Icon name="message-circle" size={12} className="inline mr-1"/> Balasan Wali Murid ({n.comments ? n.comments.length : 0})</p>
-                        {n.comments && n.comments.length > 0 ? (
-                          <div className="space-y-2 mt-3">
-                             {n.comments.map((cm, i) => (
-                               <div key={i} className="bg-white p-3 border border-slate-200 rounded-xl">
-                                  <p className="text-[10px] font-black text-slate-800">{cm.sender}</p>
-                                  <p className="text-xs text-slate-600 font-medium">{cm.text}</p>
-                               </div>
-                             ))}
-                          </div>
-                        ) : (
-                          <p className="text-xs text-slate-400 italic">Belum ada tanggapan dari wali murid.</p>
-                        )}
-                     </div>
-                   </div>
+                   <AdminNoteCardItem key={n.id} n={n} onDeleteNote={onDeleteNote} />
                  ))
                )}
             </div>
@@ -7705,7 +8478,7 @@ function ParentDashboardView({
       
       const [settings, setSettings] = useState(() => {
         try {
-          const c = localStorage.getItem('spp_cached_settings');
+          const c = localStorage.getItem('spp_extended_settings') || localStorage.getItem('spp_cached_settings');
           return c ? JSON.parse(c) : DEFAULT_SETTINGS;
         } catch(e) { return DEFAULT_SETTINGS; }
       });
@@ -7966,6 +8739,7 @@ function ParentDashboardView({
         setSettings(newSettings);
         try {
           localStorage.setItem('spp_extended_settings', JSON.stringify(newSettings));
+          localStorage.setItem('spp_cached_settings', JSON.stringify(newSettings));
         } catch (e) {}
         showToast("Pengaturan Disimpan", "Pengaturan sekolah & database berhasil diperbarui.", "success");
 
@@ -8199,11 +8973,25 @@ function ParentDashboardView({
       const handleMarkReadNotification = async (type, id) => {
         const supabase = getSupabaseClient();
         if (type === 'complaint') {
+          try {
+            const list = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
+            if (!list.includes(id)) {
+              list.push(id);
+              localStorage.setItem('spp_admin_read_complaints', JSON.stringify(list));
+            }
+          } catch(e) {}
           setComplaints(prev => prev.map(c => c.id === id ? { ...c, isRead: true } : c));
           if (supabase && typeof id !== 'number') {
             try { await supabase.from('complaints').update({ is_read: true }).eq('id', id); } catch (err) {}
           }
         } else if (type === 'transaction') {
+          try {
+            const list = JSON.parse(localStorage.getItem('spp_admin_read_trx') || '[]');
+            if (!list.includes(id)) {
+              list.push(id);
+              localStorage.setItem('spp_admin_read_trx', JSON.stringify(list));
+            }
+          } catch(e) {}
           setTransactions(prev => prev.map(t => t.id === id ? { ...t, isRead: true } : t));
           if (supabase && typeof id !== 'number') {
             try { await supabase.from('transactions').update({ is_read: true }).eq('id', id); } catch (err) {}
@@ -8253,8 +9041,13 @@ function ParentDashboardView({
     };
     
     const handleAddStudent = async (stObj) => {
-        const newStudent = { id: Date.now(), ...stObj };
-        setStudents(prev => [...prev, newStudent]);
+        const defaultPwd = stObj.password || (stObj.nis ? `Sb${stObj.nis}` : '123456');
+        const newStudent = { id: Date.now(), ...stObj, password: defaultPwd };
+        setStudents(prev => {
+          const next = [...prev, newStudent];
+          try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
         showToast("Data Murid Ditambahkan", `Murid atas nama ${stObj.name} (NIS: ${stObj.nis}) berhasil diinput.`, "success");
 
         const supabase = getSupabaseClient();
@@ -8277,7 +9070,7 @@ function ParentDashboardView({
               tarif: stObj.tarif,
               wali: stObj.wali,
               telepon: stObj.telepon,
-              password: stObj.password || stObj.nis,
+              password: defaultPwd,
               photo_url: stObj.fotoUrl || '',
               status: stObj.statusAktif ? 'Aktif' : 'Non-Aktif',
               keringanan_note: stObj.keringanan_note || '',
@@ -8289,12 +9082,31 @@ function ParentDashboardView({
       };
 
       const handleUpdateStudent = async (id, updatedObj) => {
-        setStudents(prev => prev.map(s => s.id === id ? { ...s, ...updatedObj } : s));
+        setStudents(prev => {
+          const next = prev.map(s => (s.id === id || (updatedObj.nis && s.nis === updatedObj.nis)) ? { ...s, ...updatedObj } : s);
+          try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
+
+        setCurrentUser(prev => {
+          if (prev && prev.role === 'parent' && prev.student && (prev.student.id === id || prev.student.nis === updatedObj.nis)) {
+            const updatedUser = {
+              ...prev,
+              student: { ...prev.student, ...updatedObj }
+            };
+            try {
+              sessionStorage.setItem('spp_tab_session', JSON.stringify(updatedUser));
+              localStorage.setItem('spp_parent_session', JSON.stringify(updatedUser));
+            } catch (e) {}
+            return updatedUser;
+          }
+          return prev;
+        });
         const studentNameDisplay = updatedObj.name || 'tersebut';
         showToast("Data Murid Diperbarui", `Profil siswa ${studentNameDisplay} berhasil diperbarui.`, "success");
 
         const supabase = getSupabaseClient();
-        if (supabase && typeof id !== 'number') {
+        if (supabase) {
           try {
             const dbUpdateObj = {};
             if ('nis' in updatedObj) dbUpdateObj.nis = updatedObj.nis;
@@ -8320,15 +9132,27 @@ function ParentDashboardView({
             dbUpdateObj.arrears_amount = 0;
             if ('arrearsNote' in updatedObj) dbUpdateObj.arrears_note = updatedObj.arrearsNote;
             
-            await supabase.from('students').update(dbUpdateObj).eq('id', id);
-          } catch (err) {}
+            if (typeof id === 'string' && id.includes('-')) {
+              await supabase.from('students').update(dbUpdateObj).eq('id', id);
+            } else if (updatedObj.nis) {
+              await supabase.from('students').update(dbUpdateObj).eq('nis', updatedObj.nis);
+            } else {
+              await supabase.from('students').update(dbUpdateObj).eq('id', id);
+            }
+          } catch (err) {
+            console.error("Gagal update student ke Supabase:", err);
+          }
         }
       };
 
       const handleDeleteStudent = async (id) => {
         if (confirm("Apakah Anda yakin ingin menghapus data siswa ini?")) {
           const target = students.find(s => s.id === id);
-          setStudents(prev => prev.filter(s => s.id !== id));
+          setStudents(prev => {
+            const next = prev.filter(s => s.id !== id);
+            try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
+            return next;
+          });
           showToast("Data Murid Dihapus", `Data murid ${target ? target.name : ''} telah berhasil dihapus.`, "delete");
 
           const supabase = getSupabaseClient();
@@ -8396,24 +9220,24 @@ function ParentDashboardView({
       }
 
       const RefreshLoadingOverlay = () => (
-        <div className="fixed inset-0 z-[99999] bg-slate-900/40 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200 select-none">
-          <div className="bg-white/95 rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-white/80 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[99999] bg-slate-950/60 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+          <div className="loading-glass-card rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-white/20 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in-95 duration-200 text-white">
             {/* Ambient Decorative Blurs */}
-            <div className="absolute -top-10 -left-10 w-32 h-32 bg-blue-400/20 rounded-full blur-2xl pointer-events-none"></div>
-            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-sky-400/20 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -top-10 -left-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-blue-600/25 rounded-full blur-2xl pointer-events-none"></div>
 
-            <div className="w-20 h-20 bg-blue-50/80 rounded-full p-2 mb-4 border-2 border-blue-100 flex items-center justify-center relative shadow-inner">
-              <div className="w-16 h-16 rounded-full border-4 border-blue-600 border-t-transparent animate-spin absolute inset-0 m-auto"></div>
+            <div className="w-20 h-20 bg-white/10 rounded-full p-2 mb-4 border border-cyan-400/30 flex items-center justify-center relative shadow-inner">
+              <div className="w-16 h-16 rounded-full border-4 border-cyan-400 border-t-transparent animate-spin absolute inset-0 m-auto"></div>
               <img src="logo.png" alt="PAUD Setia Bhakti" className="w-10 h-10 object-contain relative z-10 animate-pulse" />
             </div>
 
-            <h3 className="text-lg font-black text-slate-800 tracking-tight">Menyinkronkan Data...</h3>
-            <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+            <h3 className="text-lg font-black text-white tracking-tight">Menyinkronkan Data...</h3>
+            <p className="text-xs text-slate-300 font-medium mt-1 leading-relaxed">
               Harap tunggu sebentar, memperbarui data SPP, siswa & transaksi terbaru...
             </p>
 
-            <div className="w-full bg-slate-100 h-2 rounded-full mt-5 overflow-hidden relative border border-slate-200/50">
-              <div className="bg-gradient-to-r from-blue-600 via-sky-400 to-indigo-600 h-full w-full animate-loading-bar"></div>
+            <div className="w-full bg-slate-950/80 h-2 rounded-full mt-5 overflow-hidden relative border border-white/15">
+              <div className="bg-gradient-to-r from-blue-600 via-cyan-400 to-sky-300 h-full w-full animate-loading-bar shadow-[0_0_10px_#22d3ee]"></div>
             </div>
           </div>
         </div>
@@ -8488,171 +9312,229 @@ function ParentDashboardView({
 
       return (
         <>
-          <div className="min-h-screen bg-[#edf2f7] bg-aesthetic-pattern p-2 sm:p-3 md:p-4 lg:p-6 flex flex-col items-center justify-start text-slate-800">
-          <div className="w-full max-w-[1720px] bg-white rounded-2xl md:rounded-[32px] shadow-2xl shadow-blue-900/10 flex flex-col md:flex-row overflow-hidden min-h-[96vh] border border-slate-200/80">
-            {/* ROYAL BLUE SIDEBAR WITH SCOOPED TAB CUTOUT */}
-            <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20">
-              <div>
-                {/* Brand / School Header */}
-                <div className="p-6 sm:p-7 pb-6 flex items-center gap-4">
-                  <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center font-bold text-white shadow-lg border border-white/30 shrink-0 p-1.5 overflow-hidden">
-                    <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain filter drop-shadow" />
-                  </div>
-                  <div className="min-w-0">
-                    <h1 className="font-black text-base lg:text-lg leading-tight text-white tracking-tight truncate">{settings.schoolName}</h1>
-                    <div className="inline-flex items-center gap-1.5 mt-1">
-                      <span className="w-2 h-2 rounded-full bg-cyan-300 animate-pulse"></span>
-                      <span className="text-xs font-black text-blue-100 uppercase tracking-wider">Admin Panel</span>
+          <div className="min-h-screen bg-slate-100 flex flex-col w-full text-slate-800">
+            <div className="w-full flex-1 bg-white flex flex-col md:flex-row min-h-screen mobile-full-height">
+              {/* ROYAL BLUE SIDEBAR - Hidden on mobile */}
+              <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
+                
+                {/* Luminous Cyber-Neon Wave Vector Art at Bottom-Left of Admin Sidebar */}
+                <div className="absolute -bottom-8 -left-8 w-80 h-80 pointer-events-none select-none z-0 overflow-hidden opacity-90">
+                  <svg viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full filter drop-shadow-[0_0_20px_rgba(6,182,212,0.45)]">
+                    <path d="M-20,320 C30,260 60,190 20,120 C-10,70 10,20 60,0 C90,60 70,140 130,200 C180,250 250,270 320,290 L320,340 L-20,340 Z" fill="url(#cyan-glow-mesh-admin-1)" opacity="0.35" />
+                    <path d="M-10,320 C40,240 90,210 120,160 C150,110 200,90 260,120 C210,160 170,220 130,260 C90,300 40,320 -10,320 Z" fill="url(#cyan-glow-mesh-admin-2)" opacity="0.55" />
+                    <path d="M0,320 C60,250 110,220 160,190 C210,160 260,170 310,210 C260,230 200,250 150,280 C100,310 40,320 0,320 Z" fill="url(#cyan-glow-mesh-admin-3)" opacity="0.75" />
+                    <path d="M-10,310 Q80,240 140,180 T290,140" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" filter="drop-shadow(0 0 6px #38bdf8)" />
+                    <path d="M0,320 Q100,260 170,210 T320,190" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" opacity="0.95" filter="drop-shadow(0 0 8px #22d3ee)" />
+                    <path d="M10,330 Q120,280 190,240 T340,230" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
+                    <defs>
+                      <linearGradient id="cyan-glow-mesh-admin-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.85" />
+                        <stop offset="100%" stopColor="#1e40af" stopOpacity="0" />
+                      </linearGradient>
+                      <linearGradient id="cyan-glow-mesh-admin-2" x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.9" />
+                        <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.5" />
+                        <stop offset="100%" stopColor="#1e3a8a" stopOpacity="0" />
+                      </linearGradient>
+                      <linearGradient id="cyan-glow-mesh-admin-3" x1="30%" y1="100%" x2="90%" y2="10%">
+                        <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
+                        <stop offset="100%" stopColor="#6366f1" stopOpacity="0.1" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+
+                <div className="relative z-10">
+                  {/* Brand / School Header with Frosted Glass Container (Matching Image 3) */}
+                  <div className="p-4 sm:p-5 m-3 sm:m-4 mb-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex items-center gap-3.5 shadow-lg shadow-blue-950/20">
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/30 overflow-hidden shrink-0 shadow-md">
+                      <img src="logo.png" alt="PAUD Setia Bhakti" className="w-9 h-9 object-contain filter drop-shadow" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h1 className="font-black text-sm sm:text-base leading-tight text-white tracking-tight truncate">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h1>
+                      <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full bg-cyan-400/20 border border-cyan-400/30">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="text-[10px] font-black text-cyan-200 uppercase tracking-wider">Admin Panel</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* 5 Grouped Main Categories on the left with vertical accordions */}
-                <nav className="pl-4 pr-0 py-4 space-y-2.5 font-extrabold text-sm sm:text-base relative">
-                  {[
-                    { id: 'dashboard', label: 'Dashboard', icon: 'home', defaultView: 'dashboard', views: ['dashboard'] },
-                    { 
-                      id: 'keuangan', 
-                      label: 'Keuangan SPP', 
-                      icon: 'credit-card', 
-                      defaultView: 'transaksi', 
-                      views: ['transaksi', 'tunggakan', 'laporan'],
-                      subItems: [
-                        { id: 'transaksi', label: 'Catat Bayar Manual', icon: 'plus-circle' },
-                        { id: 'tunggakan', label: 'Follow-Up Tunggakan', icon: 'phone-call' },
-                        { id: 'laporan', label: 'Cetak Laporan PDF', icon: 'printer' }
-                      ]
-                    },
-                    { 
-                      id: 'kesiswaan', 
-                      label: 'Kesiswaan', 
-                      icon: 'users', 
-                      defaultView: 'siswa', 
-                      views: ['siswa', 'catatan'], 
-                      badge: students.length,
-                      subItems: [
-                        { id: 'siswa', label: 'Data Murid', icon: 'user-check', badge: students.length },
-                        { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text', badge: notes.length }
-                      ]
-                    },
-                    { 
-                      id: 'komunikasi', 
-                      label: 'Komunikasi', 
-                      icon: 'message-square', 
-                      defaultView: 'pengumuman', 
-                      views: ['pengumuman', 'pengaduan'], 
-                      badge: (announcements.length + complaints.length) || null,
-                      subItems: [
-                        { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper', badge: announcements.length },
-                        { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: complaints.length }
-                      ]
-                    },
-                    { id: 'pengaturan', label: 'Pengaturan', icon: 'settings', defaultView: 'pengaturan', views: ['pengaturan'] }
-                  ].map(group => {
-                    const isGroupActive = group.views.includes(currentView);
-                    const isExpanded = adminExpandedGroup === group.id;
+                  {/* Admin Navigation - Pill Style Groups */}
+                  <nav className="px-3 pr-3 py-2 sm:py-3 space-y-1.5 font-extrabold text-sm relative">
+                    {[
+                      { id: 'dashboard', label: 'Dashboard', icon: 'home', defaultView: 'dashboard', views: ['dashboard'] },
+                      { 
+                        id: 'keuangan', 
+                        label: 'Keuangan SPP', 
+                        icon: 'credit-card', 
+                        defaultView: 'transaksi', 
+                        views: ['transaksi', 'tunggakan', 'laporan'],
+                        subItems: [
+                          { id: 'transaksi', label: 'Catat Bayar Manual', icon: 'plus-circle' },
+                          { id: 'tunggakan', label: 'Follow-Up Tunggakan', icon: 'phone-call', badge: students.filter(s => (s.unpaidMonths && s.unpaidMonths.length > 0) || (s.unpaidCount > 0)).length || null, badgeType: 'danger' },
+                          { id: 'laporan', label: 'Cetak Laporan PDF', icon: 'printer' }
+                        ]
+                      },
+                      { 
+                        id: 'kesiswaan', 
+                        label: 'Kesiswaan', 
+                        icon: 'users', 
+                        defaultView: 'siswa', 
+                        views: ['siswa', 'catatan'], 
+                        badge: students.length,
+                        badgeType: 'sky',
+                        subItems: [
+                          { id: 'siswa', label: 'Data Murid', icon: 'user-check', badge: students.length, badgeType: 'sky' },
+                          { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text', badge: notes.length, badgeType: 'purple' }
+                        ]
+                      },
+                      { 
+                        id: 'komunikasi', 
+                        label: 'Komunikasi', 
+                        icon: 'message-square', 
+                        defaultView: 'pengumuman', 
+                        views: ['pengumuman', 'pengaduan'], 
+                        badge: (complaints.filter(c => isComplaintPending(c)).length) || null,
+                        badgeType: 'danger',
+                        subItems: [
+                          { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper', badge: announcements.length, badgeType: 'cyan' },
+                          { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: complaints.filter(c => isComplaintPending(c)).length, badgeType: 'danger' }
+                        ]
+                      },
+                      { id: 'pengaturan', label: 'Pengaturan', icon: 'settings', defaultView: 'pengaturan', views: ['pengaturan'] }
+                    ].map(group => {
+                      const isGroupActive = group.views.includes(currentView);
+                      const isExpanded = adminExpandedGroup === group.id;
 
-                    return (
-                      <div key={group.id} className="w-full">
-                        <button
-                          onClick={() => {
-                            if (group.subItems) {
-                              if (isExpanded) {
-                                setAdminExpandedGroup(null);
+                      return (
+                        <div key={group.id} className="w-full">
+                          <button
+                            onClick={() => {
+                              if (group.subItems) {
+                                if (isExpanded) {
+                                  setAdminExpandedGroup(null);
+                                } else {
+                                  setAdminExpandedGroup(group.id);
+                                  if (!isGroupActive) {
+                                    setCurrentView(group.defaultView);
+                                  }
+                                }
                               } else {
                                 setAdminExpandedGroup(group.id);
-                                if (!isGroupActive) {
-                                  setCurrentView(group.defaultView);
-                                }
+                                setCurrentView(group.defaultView);
                               }
-                            } else {
-                              setAdminExpandedGroup(group.id);
-                              setCurrentView(group.defaultView);
-                            }
-                          }}
-                          className={`w-full py-3.5 px-4 sm:px-6 flex items-center justify-between transition-all text-xs sm:text-[15px] whitespace-nowrap shrink-0 ${
-                            isGroupActive
-                              ? 'scooped-tab-active bg-white text-blue-700 font-black rounded-l-2xl rounded-r-none mr-0 shadow-sm'
-                              : 'w-[calc(100%-16px)] mr-4 rounded-2xl text-white/90 hover:text-white hover:bg-white/10 font-extrabold'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 truncate">
-                            <Icon name={group.icon} size={20} />
-                            <span className="truncate">{group.label}</span>
-                          </div>
+                            }}
+                            className={`w-full py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap rounded-2xl ${
+                              isGroupActive
+                                ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
+                                : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 truncate">
+                              <Icon name={group.icon} size={18} />
+                              <span className="truncate">{group.label}</span>
+                            </div>
 
-                          <div className="flex items-center gap-1.5">
-                            {group.badge ? (
-                              <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
-                                isGroupActive ? 'bg-blue-100 text-blue-700' : 'bg-white/20 text-white'
-                              }`}>
-                                {group.badge}
-                              </span>
-                            ) : null}
+                            <div className="flex items-center gap-1.5">
+                              {group.badge !== undefined && group.badge !== null && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                  group.badge === 0 
+                                    ? 'badge-zero-muted'
+                                    : group.badgeType === 'danger'
+                                      ? 'badge-danger-active animate-pulse ring-1 ring-rose-300'
+                                      : group.badgeType === 'sky'
+                                        ? 'badge-cyan-active'
+                                        : 'badge-purple-active'
+                                }`}>
+                                  {group.badge}
+                                </span>
+                              )}
 
-                            {group.subItems && (
-                              <Icon 
-                                name="chevron-down" 
-                                size={16} 
-                                className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
-                              />
-                            )}
-                          </div>
-                        </button>
+                              {group.subItems && (
+                                <Icon 
+                                  name="chevron-down" 
+                                  size={15} 
+                                  className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
+                                />
+                              )}
+                            </div>
+                          </button>
 
-                        {/* Vertical Sub-Items List when Expanded */}
-                        {group.subItems && isExpanded && (
-                          <div className="mt-1.5 ml-4 md:ml-6 pl-3 border-l-2 border-white/20 space-y-1 py-1">
-                            {group.subItems.map(sub => (
-                              <button
-                                key={sub.id}
-                                onClick={() => {
-                                  setCurrentView(sub.id);
-                                  setAdminExpandedGroup(group.id);
-                                }}
-                                className={`w-[calc(100%-12px)] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
-                                  currentView === sub.id
-                                    ? 'bg-white/20 text-white font-black border border-white/30 shadow-sm'
-                                    : 'text-white/80 hover:text-white hover:bg-white/10'
-                                }`}
-                              >
-                                <div className="flex items-center gap-2 truncate">
-                                  <Icon name={sub.icon} size={14} />
-                                  <span className="truncate">{sub.label}</span>
-                                </div>
-                                {sub.badge !== undefined && sub.badge !== null && sub.badge > 0 && (
-                                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-white/20 text-white">
-                                    {sub.badge}
-                                  </span>
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                          {/* Sub-Items when Expanded */}
+                          {group.subItems && isExpanded && (
+                            <div className="mt-1 ml-2 space-y-0.5 py-1">
+                              {group.subItems.map(sub => (
+                                <button
+                                  key={sub.id}
+                                  onClick={() => {
+                                    setCurrentView(sub.id);
+                                    setAdminExpandedGroup(group.id);
+                                  }}
+                                  className={`w-full px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
+                                    currentView === sub.id
+                                      ? 'bg-white/20 text-white font-black border border-white/25 shadow-sm'
+                                      : 'text-white/75 hover:text-white hover:bg-white/10'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <Icon name={sub.icon} size={14} />
+                                    <span className="truncate">{sub.label}</span>
+                                  </div>
+                                  {sub.badge !== undefined && sub.badge !== null && (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                      sub.badge === 0
+                                        ? 'badge-zero-muted'
+                                        : sub.badgeType === 'danger'
+                                          ? 'badge-danger-active animate-pulse ring-1 ring-rose-300'
+                                          : sub.badgeType === 'sky'
+                                            ? 'badge-cyan-active'
+                                            : sub.badgeType === 'purple'
+                                              ? 'badge-purple-active'
+                                              : 'badge-cyan-active'
+                                    }`}>
+                                      {sub.badge}
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </nav>
+                </div>
+
+                {/* Sidebar Footer: Admin Profile Chip with Logout Button */}
+                <div className="p-3 sm:p-3.5 m-3 sm:m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white hidden md:block relative z-10 shadow-lg shadow-blue-950/20">
+                  <div className="flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white border border-white/25">
+                          {settings.adminName ? settings.adminName.charAt(0) : 'A'}
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse"></span>
                       </div>
-                    );
-                  })}
-                </nav>
-              </div>
-
-              {/* Sidebar Footer */}
-              <div className="p-4 m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white shrink-0">
-                    {settings.adminName ? settings.adminName.charAt(0) : 'A'}
-                  </div>
-                  <div className="truncate flex-1">
-                    <p className="text-sm font-black text-white truncate">{settings.adminName || 'Admin TU'}</p>
-                    <p className="text-xs text-blue-100 font-semibold truncate">Tahun Ajaran {settings.academicYear || 'Aktif'}</p>
+                      <div className="truncate flex-1">
+                        <p className="text-sm font-black text-white truncate">{settings.adminName || 'Admin TU'}</p>
+                        <p className="text-xs text-blue-100/80 font-semibold truncate">Tahun Ajaran {settings.academicYear || 'Aktif'}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleUserLogout}
+                      title="Keluar Akun Admin"
+                      className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/90 hover:text-white transition-all shadow-sm shrink-0"
+                    >
+                      <Icon name="log-out" size={16} />
+                    </button>
                   </div>
                 </div>
-              </div>
-            </aside>
+              </aside>
 
-            {/* MAIN WHITE CONTENT CARD */}
-            <main className="flex-1 bg-white flex flex-col min-w-0 min-h-0 overflow-y-auto">
+            {/* MAIN AESTHETIC CONTENT CARD */}
+            <main className="flex-1 bg-[#f0f4f9] bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
               {/* Header Top Bar */}
-              <header className="px-6 md:px-10 pt-7 pb-5 border-b border-slate-100 flex flex-col gap-4 bg-white/95 backdrop-blur-md sticky top-0 z-10">
+              <header className="px-6 md:px-10 pt-7 pb-5 border-b border-slate-200/80 flex flex-col gap-4 bg-white/90 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3">
@@ -8706,6 +9588,90 @@ function ParentDashboardView({
                   </div>
                 </div>
               </header>
+
+              {/* Mobile Sub-Navigation Pills for Admin Multi-View Sections */}
+              {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && (
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0">
+                  <button
+                    onClick={() => setCurrentView('transaksi')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'transaksi' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="credit-card" size={13} />
+                    <span>Catat Bayar</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('tunggakan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'tunggakan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="alert-circle" size={13} className={currentView === 'tunggakan' ? 'text-amber-200' : 'text-amber-500'} />
+                    <span>Tunggakan</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('laporan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'laporan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="file-text" size={13} />
+                    <span>Laporan PDF</span>
+                  </button>
+                </div>
+              )}
+
+              {['siswa', 'catatan'].includes(currentView) && (
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0">
+                  <button
+                    onClick={() => setCurrentView('siswa')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'siswa' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="users" size={13} />
+                    <span>Data Murid ({students.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('catatan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'catatan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="file-edit" size={13} />
+                    <span>Catatan TU</span>
+                  </button>
+                </div>
+              )}
+
+              {['pengumuman', 'pengaduan'].includes(currentView) && (
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0">
+                  <button
+                    onClick={() => setCurrentView('pengumuman')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'pengumuman' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="newspaper" size={13} />
+                    <span>Pengumuman</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('pengaduan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'pengaduan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="message-square" size={13} />
+                    <span>Pengaduan Wali</span>
+                    {complaints.filter(c => isComplaintPending(c)).length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                        {complaints.filter(c => isComplaintPending(c)).length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
 
               <div key={currentView} className="p-6 md:p-10 space-y-8 flex-1 animate-tab-switch">
             {currentView === 'dashboard' && (
@@ -8803,6 +9769,47 @@ function ParentDashboardView({
               </div>
             </main>
           </div>
+
+          {/* MOBILE BOTTOM NAVIGATION BAR - Admin */}
+          <nav className="mobile-bottom-nav admin-variant" role="navigation" aria-label="Admin Mobile Navigation">
+            {[
+              { id: 'dashboard', label: 'Dasbor', icon: 'layout-grid', view: 'dashboard', badge: 0 },
+              { id: 'kesiswaan', label: 'Siswa', icon: 'users', view: 'siswa', badge: students.length, badgeType: 'info' },
+              { id: 'keuangan', label: 'Keuangan', icon: 'credit-card', view: 'transaksi', badge: transactions.filter(t => !t.isRead).length, badgeType: 'danger' },
+              { id: 'komunikasi', label: 'Pesan', icon: 'message-square', view: 'pengumuman', badge: complaints.filter(c => isComplaintPending(c)).length, badgeType: 'danger' },
+              { id: 'pengaturan', label: 'Setting', icon: 'settings', view: 'pengaturan', badge: 0 }
+            ].map(tab => {
+              const viewGroups = {
+                dashboard: ['dashboard'],
+                kesiswaan: ['siswa', 'catatan'],
+                keuangan: ['transaksi', 'tunggakan', 'laporan'],
+                komunikasi: ['pengumuman', 'pengaduan'],
+                pengaturan: ['pengaturan']
+              };
+              const isActive = viewGroups[tab.id]?.includes(currentView);
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setCurrentView(tab.view);
+                    setAdminExpandedGroup(tab.id);
+                  }}
+                  className={`mobile-bottom-nav-item ${isActive ? 'active' : ''}`}
+                  aria-label={tab.label}
+                  aria-current={isActive ? 'page' : undefined}
+                >
+                  <span className="mobile-bottom-nav-icon">
+                    <Icon name={tab.icon} size={22} />
+                    {tab.badge > 0 && (
+                      <span className={`mobile-bottom-nav-badge ${tab.badgeType || 'danger'}`}>{tab.badge > 99 ? '99+' : tab.badge}</span>
+                    )}
+                  </span>
+                  <span className="mobile-bottom-nav-label">{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
         </div>
 
         {isRefreshing && <RefreshLoadingOverlay />}

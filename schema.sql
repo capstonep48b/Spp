@@ -83,6 +83,9 @@ CREATE TABLE IF NOT EXISTS public.students (
     tarif NUMERIC(12,2) NOT NULL DEFAULT 0,
     wali VARCHAR(255),
     telepon VARCHAR(50),
+    -- Password Akun Login Wali Murid:
+    -- Default by sistem: Format standar 'Sb' + NIS (misal: Sb1001).
+    -- Jika direset ke default, password lama dibatalkan dan user masuk dengan password default.
     password VARCHAR(255) DEFAULT NULL,
     photo_url TEXT DEFAULT '',
     status VARCHAR(50) DEFAULT 'Aktif',
@@ -104,7 +107,10 @@ ALTER TABLE public.students ADD COLUMN IF NOT EXISTS agama VARCHAR(50) DEFAULT '
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS alamat TEXT DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS rt VARCHAR(10) DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS rw VARCHAR(10) DEFAULT '';
+-- Kolom password akun wali murid (Default by sistem berupa 'Sb' + NIS)
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS password VARCHAR(255) DEFAULT NULL;
+-- Opsional migrasi: Isi password siswa lama yang masih NULL dengan kombinasi default 'Sb' + NIS
+UPDATE public.students SET password = 'Sb' || nis WHERE password IS NULL OR password = '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS photo_url TEXT DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS telepon VARCHAR(50) DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Aktif';

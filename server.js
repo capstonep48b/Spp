@@ -44,6 +44,13 @@ const server = http.createServer((req, res) => {
   }
 
   if (urlPath === '/env.js') {
+    const envFilePath = path.join(__dirname, 'env.js');
+    if (fs.existsSync(envFilePath)) {
+      const content = fs.readFileSync(envFilePath, 'utf8');
+      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+      return res.end(content);
+    }
+    
     let envData = {};
     try {
       const envFile = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
@@ -52,9 +59,40 @@ const server = http.createServer((req, res) => {
         if (key && val) envData[key.trim()] = val.join('=').trim();
       });
     } catch (e) {}
-    res.writeHead(200, { 'Content-Type': 'application/javascript' });
-    return res.end(`window.ENV = ${JSON.stringify(envData)};`);
+
+    const safeEnv = {};
+    for (const [k, v] of Object.entries(envData)) {
+      if (!/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD)/i.test(k)) {
+        safeEnv[k] = v;
+      }
+    }
+
+    const dynamicCode = `class EnvironmentConfig {
+  #config = {};
+  constructor(raw = {}) {
+    this.#config = Object.freeze(raw);
+    Object.freeze(this);
   }
+  get(k, d = '') { return this.#config[k] !== undefined ? this.#config[k] : d; }
+  has(k) { return Boolean(this.#config[k]); }
+  get supabaseUrl() { return this.get('SUPABASE_URL'); }
+  get supabaseKey() { return this.get('SUPABASE_KEY') || this.get('SUPABASE_ANON_KEY'); }
+  get midtransClientKey() { return this.get('MIDTRANS_CLIENT_KEY'); }
+  toObject() { return { ...this.#config }; }
+}
+(function() {
+  const _inst = new EnvironmentConfig(${JSON.stringify(safeEnv, null, 2)});
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, 'EnvironmentConfig', { value: EnvironmentConfig, writable: false, configurable: false });
+    Object.defineProperty(window, 'AppEnv', { value: _inst, writable: false, configurable: false, enumerable: true });
+    Object.defineProperty(window, 'ENV', { get: () => _inst.toObject(), configurable: false, enumerable: true });
+  }
+})();`;
+
+    res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+    return res.end(dynamicCode);
+  }
+
 
   let safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, '');
   if (safePath === '/' || safePath === '\\') safePath = '/index.html';

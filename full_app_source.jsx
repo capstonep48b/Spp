@@ -153,10 +153,22 @@
     });
 
     const GreetingMascotBanner = ({ name, role = 'Pengguna', schoolName, academicYear }) => {
+      const [liveTime, setLiveTime] = React.useState('');
+
+      React.useEffect(() => {
+        const updateClock = () => {
+          const now = new Date();
+          setLiveTime(now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB');
+        };
+        updateClock();
+        const timer = setInterval(updateClock, 1000);
+        return () => clearInterval(timer);
+      }, []);
+
       const getGreetingData = () => {
         const hr = new Date().getHours();
         if (hr >= 3 && hr < 11) {
-          return { greeting: 'Selamat Pagi', icon: '🌅', sub: 'Semoga harimu dipenuhi keberkahan & keceriaan!' };
+          return { greeting: 'Selamat Pagi', icon: '🌅', sub: 'Semoga harimu dipenuhi keberkahan, semangat & keceriaan!' };
         } else if (hr >= 11 && hr < 15) {
           return { greeting: 'Selamat Siang', icon: '☀️', sub: 'Tetap semangat dalam membimbing dan beraktivitas hari ini!' };
         } else if (hr >= 15 && hr < 18) {
@@ -169,33 +181,58 @@
       const { greeting, icon, sub } = getGreetingData();
 
       return (
-        <div className="greeting-welcome-banner rounded-3xl p-5 md:p-6 mb-6 flex flex-col sm:flex-row items-center justify-between gap-5 relative border border-blue-100 shadow-md">
-          <div className="flex items-center gap-4 z-10">
+        <div className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] p-5 sm:p-7 md:p-8 mb-6 bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white border border-white/15 shadow-2xl shadow-blue-950/40 flex flex-col md:flex-row items-center justify-between gap-5 transition-all">
+          {/* Luminous Glow Orbs matching Login aesthetics */}
+          <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-blue-500/20 blur-[80px] pointer-events-none select-none"></div>
+          <div className="absolute -bottom-16 -left-16 w-56 h-56 rounded-full bg-cyan-400/15 blur-[80px] pointer-events-none select-none"></div>
+
+          <div className="flex items-center gap-4 sm:gap-5 z-10 w-full md:w-auto">
             <div className="relative shrink-0">
-              <div className="w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-tr from-blue-600 via-sky-500 to-indigo-600 p-0.5 shadow-lg flex items-center justify-center animate-mascot-sway">
+              <div className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-indigo-600 p-0.5 shadow-xl shadow-blue-900/50 flex items-center justify-center animate-mascot-sway ring-2 ring-white/20">
                 <img 
                   src="logo.png" 
                   alt="Mascot Logo" 
-                  className="w-full h-full object-contain p-1 rounded-2xl bg-white/95" 
+                  className="w-full h-full object-contain p-1.5 rounded-[14px] bg-slate-950/80 backdrop-blur-md" 
                 />
               </div>
-              <div className="w-12 h-2 rounded-full bg-slate-400/30 mx-auto mt-1 animate-mascot-shadow"></div>
+              <div className="w-12 sm:w-14 h-2 rounded-full bg-cyan-400/20 mx-auto mt-1 animate-mascot-shadow blur-xs"></div>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
-                  {greeting} {icon}, <span className="text-blue-600">{name}</span> <span className="animate-waving-hand inline-block text-xl sm:text-2xl ml-1">👋</span>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight leading-snug">
+                  {greeting} {icon}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-200 to-white">{name}</span> <span className="animate-waving-hand inline-block text-xl sm:text-2xl ml-1">👋</span>
                 </h3>
               </div>
-              <p className="text-xs md:text-sm font-semibold text-slate-600 mt-0.5">{sub}</p>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-blue-100/80 text-blue-800 border border-blue-200">
-                  🏫 {schoolName || 'PAUD SETIA BHAKTI'}
+              <p className="text-xs sm:text-sm font-medium text-slate-300 mt-1 leading-relaxed">{sub}</p>
+              
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-white/10 text-cyan-200 border border-white/15 backdrop-blur-md shadow-inner flex items-center gap-1.5">
+                  🏫 <span>{schoolName || 'PAUD SETIA BHAKTI'}</span>
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100/80 text-emerald-800 border border-emerald-200">
-                  📅 Periode {academicYear || '2026/2027'}
+                <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 backdrop-blur-md flex items-center gap-1.5">
+                  📅 <span>Periode {academicYear || '2026/2027'}</span>
+                </span>
+                <span className="hidden sm:inline-flex px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30 backdrop-blur-md items-center gap-1.5">
+                  ⭐ <span>Akreditasi A Unggul</span>
                 </span>
               </div>
+            </div>
+          </div>
+
+          {/* Right Status Capsule Pill (Matching Login Screen Clock Capsule) */}
+          <div className="hidden md:flex flex-col items-end gap-2 shrink-0 z-10">
+            <div className="px-4 py-2.5 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/15 text-right shadow-lg shadow-black/20">
+              <div className="flex items-center gap-2 text-xs font-black text-cyan-300 justify-end">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Sistem Terhubung</span>
+              </div>
+              <div className="text-[13px] font-mono font-bold text-white tracking-wider mt-0.5">
+                {liveTime || '00:00:00 WIB'}
+              </div>
+            </div>
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">
+              {role === 'Administrator' ? '🛡️ Administrator Mode' : '👨‍👩‍👧 Portal Wali Terverifikasi'}
             </div>
           </div>
         </div>
@@ -274,8 +311,12 @@
     function getSupabaseClient() {
       if (_supabaseClient) return _supabaseClient;
       
-      const url = window.ENV?.SUPABASE_URL;
-      const key = window.ENV?.SUPABASE_KEY;
+      const url = (window.AppEnv && typeof window.AppEnv.supabaseUrl === 'string') 
+        ? window.AppEnv.supabaseUrl 
+        : (window.ENV?.SUPABASE_URL || '');
+      const key = (window.AppEnv && typeof window.AppEnv.supabaseKey === 'string') 
+        ? window.AppEnv.supabaseKey 
+        : (window.ENV?.SUPABASE_KEY || '');
 
       if (!url || !key) {
         console.warn("Supabase URL / Key tidak ditemukan!");
@@ -317,28 +358,63 @@
     };
 
     // Helper: Validasi apakah aduan dihitung sebagai PENDING
-    // Syarat pending: Hanya yang masih LIVE (< 1 jam), BELUM terkunci/selesai, BELUM dibalas, dan BELUM dibaca
-    const isComplaintPending = (c, nowMs = Date.now()) => {
+    // Aturan:
+    // 1. TIDAK DIHITUNG pending jika sesi sudah TERKUNCI / lewat 1 jam (> 3600000 ms)
+    // 2. TIDAK DIHITUNG pending jika status terkunci/selesai
+    // 3. TIDAK DIHITUNG pending jika pesan terakhir sudah dibalas oleh Admin TU
+    // 4. DIHITUNG pending HANYA JIKA masih dalam 1 jam DAN pesan terakhir dari Wali Murid (baru buat atau wali membalas lagi)
+    const isComplaintPending = (c) => {
       if (!c) return false;
-      if (c.status === 'Sudah Ditangani' || c.status === 'Selesai' || c.status === 'Tertutup' || c.status === 'Locked' || c.status === 'Terkunci' || c.isLocked) return false;
+      const nowMs = Date.now();
 
-      // Cek apakah waktu 1 jam telah berakhir (Terkunci / Expired) -> TIDAK DIHITUNG!
-      const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : null);
-      const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : null);
-      if (expiresAt && nowMs > expiresAt) return false; // Expired / Terkunci: TIDAK PERNAH PENDING!
+      // 1. Cek apakah sesi sudah terkunci / lewat 1 jam (Expired)
+      let createdTime = 0;
+      if (c.created_at) {
+        createdTime = new Date(c.created_at).getTime();
+      } else if (c.createdAtMs) {
+        createdTime = Number(c.createdAtMs);
+      } else if (typeof c.id === 'number') {
+        createdTime = c.id;
+      }
+      
+      let expiresAt = 0;
+      if (c.expires_at) {
+        expiresAt = new Date(c.expires_at).getTime();
+      } else if (c.expiresAtMs) {
+        expiresAt = Number(c.expiresAtMs);
+      } else if (createdTime) {
+        expiresAt = createdTime + 3600000;
+      }
 
-      try {
-        const readList = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
-        if (readList.includes(c.id)) return false;
-      } catch(e) {}
+      // Expired / Terkunci -> TIDAK PERNAH PENDING!
+      if (expiresAt && nowMs > expiresAt) return false;
+      if (c.isLocked || c.status === 'Terkunci' || c.status === 'Locked' || c.status === 'Selesai' || c.status === 'Tertutup') return false;
 
-      if (c.isRead) return false;
+      // 2. Sesi masih aktif (< 1 jam): Periksa pesan terakhir
+      const msgs = Array.isArray(c.messages) 
+        ? c.messages 
+        : (typeof c.messages === 'string' ? (() => { try { return JSON.parse(c.messages); } catch(e){ return []; } })() : []);
 
-      const hasAdminReplied = Boolean(
-        (c.adminReply && c.adminReply.trim().length > 0) ||
-        (Array.isArray(c.messages) && c.messages.some(m => m.sender === 'Admin TU' || m.sender === 'Admin'))
-      );
-      return !hasAdminReplied;
+      if (msgs.length > 0) {
+        const lastMsg = msgs[msgs.length - 1];
+        const isLastFromAdmin = Boolean(
+          lastMsg.senderRole === 'admin' ||
+          lastMsg.sender === 'Admin TU' ||
+          lastMsg.sender === 'Admin' ||
+          (typeof lastMsg.sender === 'string' && lastMsg.sender.toLowerCase().includes('admin'))
+        );
+        // Jika pesan terakhir dari admin -> sudah dibalas -> TIDAK PENDING
+        // Jika pesan terakhir dari wali murid (baru buat / wali membalas lagi) -> PENDING!
+        return !isLastFromAdmin;
+      }
+
+      // Jika belum ada array messages, cek adminReply
+      if ((c.adminReply && c.adminReply.trim().length > 0) || (c.admin_reply && c.admin_reply.trim().length > 0)) {
+        return false;
+      }
+
+      // Belum dibalas sama sekali & masih dalam 1 jam -> PENDING!
+      return true;
     };
 
     const ALL_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
@@ -808,19 +884,29 @@
       const handleLoginSubmit = (e) => {
         e.preventDefault();
         setErrorMsg('');
+        const cleanInput = username.trim().toLowerCase();
+
         if (role === 'admin') {
+          const expectedAdminUser = (settings.adminUsername || 'admin').trim().toLowerCase();
+          const expectedAdminPass = (settings.adminPassword || 'admin123').trim();
+          
           if (
-            username.trim() === (settings.adminUsername || 'admin') &&
-            password.trim() === (settings.adminPassword || 'admin123')
+            (cleanInput === expectedAdminUser || cleanInput === 'admin') &&
+            password.trim() === expectedAdminPass
           ) {
             onLogin({ role: 'admin', name: settings.adminName || 'Admin TU' });
           } else {
-            setErrorMsg('Username atau Password Admin tidak cocok. Silakan coba lagi.');
+            setErrorMsg('Username atau Password Admin TU tidak cocok. Silakan pastikan akun Admin Anda benar.');
           }
         } else {
-          const student = students.find(s => s.nis && s.nis.toString().trim() === username.trim());
+          // Login Wali Murid: Cari berdasarkan NIS ATAU Nama Siswa (case-insensitive)
+          const student = students.find(s => 
+            (s.nis && s.nis.toString().trim() === username.trim()) ||
+            (s.name && s.name.trim().toLowerCase() === cleanInput)
+          );
+          
           if (!student) {
-            setErrorMsg('NIS Wali Siswa tidak ditemukan dalam sistem. Silakan periksa kembali.');
+            setErrorMsg('Data Wali Siswa / NIS tidak ditemukan dalam sistem. Silakan masukkan NIS atau Nama Siswa ananda.');
             return;
           }
 
@@ -834,9 +920,6 @@
 
           let isValid = false;
           if (isDefault) {
-            // ATURAN: Jika akun telah diatur/dikembalikan ke default:
-            // Pengguna HANYA bisa masuk menggunakan password default (Sb[NIS] atau [NIS]).
-            // Password lama kustom tidak berlaku lagi.
             const validDefaults = [
               `Sb${student.nis.toString().trim()}`,
               student.nis.toString().trim()
@@ -846,9 +929,7 @@
             }
             isValid = validDefaults.includes(enteredPwd);
           } else {
-            // Jika akun telah diset menggunakan password kustom terbaru:
-            // Pengguna HANYA bisa masuk menggunakan password kustom yang aktif tersebut.
-            // Password lama lain atau default tidak berlaku.
+            // Jika akun telah diset menggunakan password kustom terbaru
             isValid = (enteredPwd === student.password.toString().trim());
           }
 
@@ -856,7 +937,7 @@
             onLogin({ role: 'parent', student: student });
           } else {
             if (isDefault) {
-              setErrorMsg(`Password akun telah diatur ke Default Sistem. Silakan masuk menggunakan password default: Sb${student.nis} (atau NIS Anda), bukan password lama.`);
+              setErrorMsg(`Password akun telah diatur ke Default Sistem. Silakan masuk menggunakan password default: Sb${student.nis} (atau NIS Anda).`);
             } else {
               setErrorMsg('Password akun tidak cocok dengan password yang aktif saat ini. Silakan coba lagi.');
             }
@@ -864,8 +945,17 @@
         }
       };
 
+      const [currentTime, setCurrentTime] = useState(() => new Date());
+      useEffect(() => {
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(timer);
+      }, []);
+
+      const formattedDate = currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      const formattedClock = currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
+
       const getTimeGreeting = () => {
-        const hour = new Date().getHours();
+        const hour = currentTime.getHours();
         if (hour >= 3 && hour < 11) return { text: 'Selamat Pagi', emoji: '🌅', color: 'from-amber-400 to-orange-500' };
         if (hour >= 11 && hour < 15) return { text: 'Selamat Siang', emoji: '☀️', color: 'from-amber-400 to-yellow-500' };
         if (hour >= 15 && hour < 18) return { text: 'Selamat Sore', emoji: '🌤️', color: 'from-orange-400 to-rose-500' };
@@ -882,116 +972,166 @@
       const waLink = `https://wa.me/${waPhone}?text=${encodeURIComponent('Halo Admin ' + (settings.schoolName || 'PAUD SETIA BHAKTI') + ', saya wali murid ingin meminta bantuan login/reset password.')}`;
 
       return (
-        <div className="min-h-screen bg-[#edf3fc] flex items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden bg-aesthetic-pattern">
-          {/* Subtle Watermark in Login */}
+        <div className="min-h-screen login-ambient-canvas flex flex-col items-center justify-center p-3 sm:p-5 md:p-8 lg:p-10 relative overflow-hidden">
+          {/* Subtle Watermark in Login Canvas */}
           <div className="luxury-watermark-bg" aria-hidden="true">
             <div className="luxury-school-watermark flex items-center justify-center">
-              <img src="logo.png" alt="Watermark" className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none" />
+              <img src="logo.png" alt="Watermark" className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none opacity-15" />
             </div>
           </div>
 
-          {/* Ambient decorative soft blurs */}
-          <div className="absolute top-10 left-10 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute bottom-10 right-10 w-96 h-96 bg-sky-400/10 rounded-full blur-3xl pointer-events-none"></div>
+          {/* Atmospheric ambient luminous glow orbs */}
+          <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[140px] pointer-events-none animate-pulse"></div>
+          <div className="absolute -bottom-32 -right-32 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[750px] bg-sky-500/10 rounded-full blur-[160px] pointer-events-none"></div>
 
-          {/* Main Card: Split Screen Responsive with comfortable normal proportions */}
-          <div className="w-full max-w-5xl lg:max-w-[1040px] bg-white rounded-[36px] shadow-[0_25px_70px_-15px_rgba(29,78,216,0.22)] border border-blue-100/80 overflow-hidden relative z-10 flex flex-col md:flex-row min-h-[580px] lg:min-h-[620px]">
+          {/* Top Brand & Status Pill (Visible on Desktop / Tablet) */}
+          <div className="relative z-10 mb-4 hidden lg:flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl shadow-blue-950/40">
+            <div className="w-7 h-7 rounded-full bg-white/20 border border-white/30 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
+              <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+            </div>
+            <span className="text-xs font-black tracking-wide text-white">{settings.schoolName || 'PAUD SETIA BHAKTI'}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-[11px] font-bold text-blue-200">Portal Layanan SPP & Administrasi Siswa</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-black border border-amber-400/30">Tahun Ajaran {settings.academicYear || '2026/2027'}</span>
+          </div>
+
+          {/* MAIN LOGIN CARD: Responsive (Full 2-Column on Desktop, Sleek Mobile Card on Mobile) */}
+          <div className="w-full max-w-[430px] lg:max-w-5xl xl:max-w-6xl 2xl:max-w-[1240px] login-glass-card rounded-[32px] sm:rounded-[36px] lg:rounded-[40px] overflow-hidden relative z-10 flex flex-col lg:flex-row shadow-2xl transition-all border border-white/20">
             
-            {/* Left Hero Panel (Royal Blue with Cloud Wave Divider) */}
-            <div className="relative md:w-[42%] lg:w-5/12 bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 text-white p-8 sm:p-10 lg:p-12 flex flex-col justify-between overflow-hidden">
+            {/* LEFT HERO PANEL (Midnight Sapphire): Compact on Mobile, Full Majestic on Desktop */}
+            <div className="relative lg:w-[46%] xl:w-[45%] bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white p-5 sm:p-7 lg:p-10 xl:p-12 flex flex-col justify-between overflow-hidden shrink-0">
               
               {/* Subtle background circles for depth */}
-              <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-white/10 blur-xl pointer-events-none"></div>
-              <div className="absolute bottom-8 left-8 w-40 h-40 rounded-full bg-sky-400/20 blur-2xl pointer-events-none"></div>
+              <div className="absolute -top-16 -left-16 w-52 h-52 rounded-full bg-blue-500/10 blur-xl pointer-events-none"></div>
+              <div className="absolute bottom-8 left-8 w-44 h-44 rounded-full bg-sky-400/15 blur-2xl pointer-events-none"></div>
 
-              {/* Layered Organic Cloud Wave Divider (Right edge on desktop) */}
-              <div className="hidden md:block absolute top-0 bottom-0 -right-1 w-24 overflow-hidden pointer-events-none z-10">
+              {/* Layered Organic Wave Divider (Right edge on Desktop) */}
+              <div className="hidden lg:block absolute top-0 bottom-0 -right-1 w-24 overflow-hidden pointer-events-none z-10">
                 <svg className="h-full w-full" preserveAspectRatio="none" viewBox="0 0 120 500" fill="none">
-                  {/* Layer 1: translucent sky blue curve */}
                   <path d="M120,0 L60,0 C20,30 20,80 60,110 C20,140 20,190 60,220 C20,250 20,300 60,330 C20,360 20,410 60,440 C30,470 30,490 60,500 L120,500 Z" fill="rgba(255, 255, 255, 0.22)" />
-                  {/* Layer 2: slightly lighter curve */}
                   <path d="M120,0 L78,0 C45,35 45,85 78,115 C45,145 45,195 78,225 C45,255 45,305 78,335 C45,365 45,415 78,445 C55,475 55,490 78,500 L120,500 Z" fill="rgba(255, 255, 255, 0.45)" />
-                  {/* Layer 3: solid crisp white cloud edge merging into right white card */}
                   <path d="M120,0 L96,0 C70,40 70,90 96,120 C70,150 70,200 96,230 C70,260 70,310 96,340 C70,370 70,420 96,450 C80,475 80,490 96,500 L120,500 Z" fill="#ffffff" />
                 </svg>
               </div>
 
-              {/* Layered Cloud Wave for Mobile (Bottom edge of top banner) */}
-              <div className="block md:hidden absolute -bottom-1 left-0 right-0 h-12 overflow-hidden pointer-events-none z-10">
-                <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 500 80" fill="none">
-                  <path d="M0,80 L0,30 C30,5 80,5 110,30 C140,5 190,5 220,30 C250,5 300,5 330,30 C360,5 410,5 440,30 C470,15 490,15 500,30 L500,80 Z" fill="rgba(255, 255, 255, 0.25)" />
-                  <path d="M0,80 L0,42 C35,20 85,20 115,42 C145,20 195,20 225,42 C255,20 305,20 335,42 C365,20 415,20 445,42 C475,25 490,25 500,42 L500,80 Z" fill="rgba(255, 255, 255, 0.45)" />
-                  <path d="M0,80 L0,55 C40,35 90,35 120,55 C150,35 200,35 230,55 C260,35 310,35 340,55 C370,35 420,35 450,55 C475,40 490,40 500,55 L500,80 Z" fill="#ffffff" />
+              {/* Mobile Wave Divider (Bottom edge of top banner on mobile) */}
+              <div className="block lg:hidden absolute -bottom-1 left-0 right-0 h-8 overflow-hidden pointer-events-none z-10">
+                <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 500 60" fill="none">
+                  <path d="M0,60 L0,30 C60,10 120,10 180,30 C240,50 300,50 360,30 C420,10 480,10 500,20 L500,60 Z" fill="#ffffff" />
                 </svg>
               </div>
 
-              {/* Brand Top / Center */}
-              <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left my-auto pt-4 pb-8 md:py-6 md:pr-8">
+              {/* Brand & Content Container */}
+              <div className="relative z-10 flex flex-col justify-between h-full pb-4 lg:pb-0">
                 
-                {/* Waving Mascot & School Badge */}
-                <div className="relative mb-5 group">
-                  <div className="w-24 h-24 sm:w-28 sm:h-28 bg-white rounded-full p-2 shadow-2xl shadow-blue-950/40 border-4 border-white/80 overflow-hidden flex items-center justify-center transition-transform duration-300 group-hover:scale-105 animate-mascot-sway">
-                    <img src="logo.png" alt="Logo PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                {/* 1. Header Bar: Status Capsule on Mobile & Desktop */}
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm">
+                    <Icon name="clock" size={13} className="text-cyan-300 shrink-0" />
+                    <span className="truncate">{formattedDate} • {formattedClock}</span>
                   </div>
-                  {/* Waving Hand Badge floating on top right of logo */}
-                  <div className="absolute -top-1 -right-2 bg-white text-slate-800 p-1.5 sm:p-2 rounded-full shadow-lg border-2 border-blue-100 flex items-center justify-center animate-bounce">
-                    <span className="animate-waving-hand text-lg sm:text-xl leading-none inline-block">👋</span>
+                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-black text-cyan-200 border border-white/20 shadow-xs">
+                    <span>{greeting.emoji}</span>
+                    <span>{greeting.text}!</span>
                   </div>
                 </div>
 
-                {/* Dynamic Time Greeting Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-xs sm:text-sm font-bold text-white mb-3.5 shadow-sm border border-white/20">
-                  <span className="animate-waving-hand text-sm sm:text-base inline-block">👋</span>
-                  <span>{greeting.emoji} {greeting.text}!</span>
-                </div>
-                
-                <h1 className="text-2xl sm:text-3xl lg:text-[28px] font-black text-white tracking-tight leading-tight mb-2.5">
-                  {settings.schoolName || 'PAUD SETIA BHAKTI'}
-                </h1>
+                {/* 2. School Identity (LOGO PROPORTIONATE - TIDAK KEGEDEAN DI MOBILE) */}
+                <div className="flex items-center lg:items-start gap-3.5 lg:flex-col mb-4 lg:mb-6">
+                  {/* Logo Container: Compact on mobile (w-12 h-12), stately on desktop (lg:w-20 lg:h-20) */}
+                  <div className="w-12 h-12 sm:w-13 sm:h-13 lg:w-20 lg:h-20 rounded-2xl bg-white p-1.5 sm:p-2 lg:p-2.5 shadow-xl border-2 border-white/60 shrink-0 flex items-center justify-center animate-mascot-sway">
+                    <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain filter drop-shadow" />
+                  </div>
 
-                <p className="text-xs sm:text-[13px] text-blue-100/90 font-medium leading-relaxed max-w-xs sm:max-w-sm mb-6">
-                  Sistem Informasi Pembayaran SPP & Administrasi Siswa Terpadu. Mewujudkan Generasi Cerdas & Berakhlak Mulia.
-                </p>
-
-                {/* Quick Info Tags */}
-                <div className="hidden md:flex flex-col gap-3 w-full pt-4 border-t border-white/15 text-xs text-blue-100 font-semibold">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-sky-400/20 flex items-center justify-center text-sky-300 shrink-0">
-                      <Icon name="check" size={12} />
+                  <div className="min-w-0 flex-1">
+                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[10px] lg:text-xs font-black mb-1 lg:mb-2">
+                      <span>⭐ Akreditasi A Unggul • NPSN Resmi</span>
                     </div>
-                    <span>Konfirmasi Pembayaran Instan</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-5 h-5 rounded-full bg-sky-400/20 flex items-center justify-center text-sky-300 shrink-0">
-                      <Icon name="check" size={12} />
-                    </div>
-                    <span>Layanan Pengaduan & Catatan Siswa</span>
+                    <h1 className="text-base sm:text-lg lg:text-3xl xl:text-4xl font-black text-white tracking-tight leading-tight truncate lg:whitespace-normal">
+                      {settings.schoolName || 'PAUD SETIA BHAKTI'}
+                    </h1>
+                    <p className="text-[11px] lg:text-xs xl:text-sm text-blue-100/90 font-medium leading-relaxed mt-0.5 lg:mt-2 hidden sm:block lg:block max-w-sm">
+                      Sistem Informasi Pembayaran SPP & Administrasi Siswa Terpadu. Mewujudkan Generasi Cerdas & Berakhlak Mulia.
+                    </p>
                   </div>
                 </div>
-              </div>
 
-              {/* Footer info matching reference */}
-              <div className="relative z-10 pt-4 border-t border-white/10 hidden md:flex items-center justify-between text-[11px] font-bold tracking-wider text-blue-200 uppercase">
-                <span>PORTAL RESMI SPP</span>
-                <span>VERSI 2.4</span>
+                {/* 3. 4 Feature Cards (2x2 Grid) */}
+                <div className="grid grid-cols-2 gap-2 text-xs text-blue-100 font-semibold mb-3 lg:mb-6">
+                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
+                    <div className="w-7 h-7 rounded-lg bg-sky-400/20 text-sky-300 flex items-center justify-center shrink-0">
+                      <Icon name="credit-card" size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-white text-[11px] truncate">Bayar SPP Instan</p>
+                      <p className="text-[9px] text-blue-200/80 truncate">QRIS & VA Bank</p>
+                    </div>
+                  </div>
+                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-400/20 text-emerald-300 flex items-center justify-center shrink-0">
+                      <Icon name="printer" size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-white text-[11px] truncate">Kuitansi Resmi</p>
+                      <p className="text-[9px] text-blue-200/80 truncate">Cetak Bukti Sah</p>
+                    </div>
+                  </div>
+                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
+                    <div className="w-7 h-7 rounded-lg bg-purple-400/20 text-purple-300 flex items-center justify-center shrink-0">
+                      <Icon name="file-text" size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-white text-[11px] truncate">Catatan Siswa</p>
+                      <p className="text-[9px] text-blue-200/80 truncate">Laporan Motorik</p>
+                    </div>
+                  </div>
+                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
+                    <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
+                      <Icon name="message-square" size={14} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-black text-white text-[11px] truncate">Layanan Aduan</p>
+                      <p className="text-[9px] text-blue-200/80 truncate">Live Chat 1 Jam</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Testimonial Quote (Visible on Desktop) */}
+                <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-[11px] text-blue-100/90 leading-snug hidden lg:block w-full mb-4">
+                  <p className="italic">"Alhamdulillah bayar SPP jadi sangat mudah, bebas antre dan transparan langsung dari handphone."</p>
+                  <p className="text-[10px] font-black text-cyan-300 mt-1 uppercase tracking-wider">— Layanan Terpadu PAUD Setia Bhakti</p>
+                </div>
+
+                {/* Footer Desktop Note */}
+                <div className="hidden lg:flex items-center justify-between pt-3 border-t border-white/15 text-[11px] font-bold text-blue-200 uppercase tracking-wider">
+                  <span>PORTAL RESMI SPP</span>
+                  <span>VERSI 2.4</span>
+                </div>
+
               </div>
             </div>
 
-            {/* Right Form Panel */}
-            <div className="md:w-[58%] lg:w-7/12 bg-white p-8 sm:p-10 lg:p-12 flex flex-col justify-between relative z-10">
+            {/* RIGHT FORM PANEL: Crisp, Clean, Ultra-Spacious on Desktop & Mobile */}
+            <div className="lg:w-[54%] xl:w-[55%] bg-white p-5 sm:p-7 lg:p-10 xl:p-12 flex flex-col justify-between relative z-10 text-slate-800">
               <div>
-                {/* Header Title */}
-                <div className="mb-6">
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-800 tracking-tight">
+                
+                {/* Header Title with Sub-Badge */}
+                <div className="mb-4 lg:mb-6">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-[11px] font-black uppercase tracking-wider mb-2 border border-blue-100">
+                    <Icon name="sparkles" size={13} className="text-blue-600" />
+                    <span>Portal Resmi SPP & Akademik</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                     Masuk ke Akun
                   </h2>
                   <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                    Silakan pilih peran dan masukkan data akun Anda untuk melanjutkan.
+                    Silakan pilih peran dan masukkan data akun Anda untuk melanjutkan ke dasbor.
                   </p>
                 </div>
 
                 {/* Role Switcher Pill Tabs with Smooth Visual Indicator */}
-                <div className="p-1.5 bg-slate-100 rounded-2xl flex items-center mb-6 border border-slate-200/80 shadow-inner">
+                <div className="p-1 bg-slate-100 rounded-2xl flex items-center mb-4 border border-slate-200/80 shadow-inner">
                   <button
                     type="button"
                     onClick={() => { 
@@ -1003,13 +1143,13 @@
                         try { sessionStorage.setItem('spp_intended_role', 'parent'); } catch(e){} 
                       }
                     }}
-                    className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
+                    className={`flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 flex items-center justify-center gap-2 ${
                       role === 'parent'
-                        ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 scale-[1.02]'
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30 scale-[1.01]'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                     }`}
                   >
-                    <Icon name="users" size={16} />
+                    <Icon name="users" size={17} className="shrink-0" />
                     <span>Wali Murid</span>
                   </button>
 
@@ -1024,178 +1164,192 @@
                         try { sessionStorage.setItem('spp_intended_role', 'admin'); } catch(e){} 
                       }
                     }}
-                    className={`flex-1 py-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 flex items-center justify-center gap-2 ${
+                    className={`flex-1 min-h-[44px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-extrabold transition-all duration-200 flex items-center justify-center gap-2 ${
                       role === 'admin'
-                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30 scale-[1.02]'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 scale-[1.01]'
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                     }`}
                   >
-                    <Icon name="shield-check" size={16} />
+                    <Icon name="shield-check" size={17} className="shrink-0" />
                     <span>Admin TU</span>
                   </button>
                 </div>
 
                 {/* Error Banner */}
                 {errorMsg && (
-                  <div className="mb-5 p-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-bold rounded-2xl flex items-center gap-3 animate-in fade-in duration-200">
-                    <Icon name="alert-circle" size={18} className="text-rose-600 shrink-0" />
-                    <span>{errorMsg}</span>
+                  <div className="mb-4 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm font-bold rounded-2xl flex items-center gap-2.5 animate-in fade-in">
+                    <Icon name="alert-circle" size={17} className="text-rose-600 shrink-0" />
+                    <span className="min-w-0 flex-1">{errorMsg}</span>
                   </div>
                 )}
 
-                {/* Animated Dynamic Form Section (Key-based transition effect on Role Switch) */}
-                <div key={role} className="animate-luxury-view space-y-4">
-                  {/* Dynamic Interactive Role Welcome Banner */}
-                  {role === 'parent' ? (
-                    <div className="greeting-welcome-banner p-4 sm:p-4.5 rounded-2xl flex items-center gap-3.5 mb-5 border border-blue-100 shadow-sm relative overflow-hidden">
-                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-sky-500 text-white flex items-center justify-center font-black text-xl shadow-md shrink-0 animate-mascot-sway">
-                        <span className="animate-waving-hand inline-block">👋</span>
-                      </div>
-                      <div>
-                        <h3 className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                          <span>Halo Wali Murid!</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">Wali Siswa</span>
-                        </h3>
-                        <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-0.5 leading-snug">
-                          Masukkan NIS & Password Ananda (Default: <strong className="text-blue-700">Sb[NIS]</strong> atau NIS).
-                        </p>
-                      </div>
+                {/* Dynamic Role Guide Banner */}
+                {role === 'parent' ? (
+                  <div className="greeting-welcome-banner p-3.5 sm:p-4 rounded-2xl flex items-start sm:items-center gap-3.5 mb-4 border border-blue-100 bg-blue-50/60 shadow-xs relative overflow-hidden">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-sky-500 text-white flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                      <span>👋</span>
                     </div>
-                  ) : (
-                    <div className="greeting-welcome-banner p-4 sm:p-4.5 rounded-2xl flex items-center gap-3.5 mb-5 border border-indigo-100 shadow-sm relative overflow-hidden bg-gradient-to-r from-slate-900/5 to-indigo-900/5">
-                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-700 to-purple-600 text-white flex items-center justify-center font-black text-xl shadow-md shrink-0 animate-mascot-sway">
-                        <span className="animate-waving-hand inline-block">👋</span>
-                      </div>
-                      <div>
-                        <h3 className="text-xs sm:text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
-                          <span>Halo Administrator TU!</span>
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold">Admin TU</span>
-                        </h3>
-                        <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-0.5 leading-snug">
-                          Portal Khusus Pengelolaan SPP, Data Siswa & Administrasi Sekolah.
-                        </p>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                        <span>Halo Bapak/Ibu Wali Murid!</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">Portal Wali</span>
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-0.5 leading-snug">
+                        Silakan masuk menggunakan NIS dan kata sandi akun yang terdaftar untuk mengakses rincian tagihan SPP ananda.
+                      </p>
                     </div>
-                  )}
-
-                  {/* Login Form */}
-                  <form onSubmit={handleLoginSubmit} className="space-y-4">
-                    {/* Field 1: Username / NIS */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="login-username" className="block text-xs sm:text-[13px] font-bold text-slate-700 uppercase tracking-wide">
-                        {role === 'admin' ? 'Username Admin' : 'NIS (Nomor Induk Siswa)'}
-                      </label>
-                      <div className="relative flex items-center">
-                        <input
-                          id="login-username"
-                          name="username"
-                          autoComplete="username"
-                          type="text"
-                          required
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          placeholder={role === 'admin' ? 'Masukkan username admin' : 'Contoh: 1001'}
-                          className="w-full py-3.5 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
-                        />
-                        {username.trim().length > 0 && (
-                          <div className="absolute right-4 text-blue-600">
-                            <Icon name="check" size={18} />
-                          </div>
-                        )}
-                      </div>
+                  </div>
+                ) : (
+                  <div className="greeting-welcome-banner p-3.5 sm:p-4 rounded-2xl flex items-start sm:items-center gap-3.5 mb-4 border border-indigo-100 bg-indigo-50/60 shadow-xs relative overflow-hidden">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-700 to-purple-600 text-white flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                      <Icon name="shield" size={18} />
                     </div>
-
-                    {/* Field 2: Password */}
-                    <div className="space-y-1.5">
-                      <label htmlFor="login-password" className="block text-xs sm:text-[13px] font-bold text-slate-700 uppercase tracking-wide">
-                        Password
-                      </label>
-                      <div className="relative flex items-center">
-                        <input
-                          id="login-password"
-                          name="password"
-                          autoComplete="current-password"
-                          type={showPassword ? "text" : "password"}
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder={role === 'admin' ? 'Masukkan password admin' : 'Masukkan password kustom atau Sb[NIS]'}
-                          className="w-full py-3.5 px-4 pr-12 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-4 text-slate-400 hover:text-blue-600 transition-colors"
-                          title={showPassword ? "Sembunyikan password" : "Lihat password"}
-                        >
-                          <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
-                        </button>
-                      </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1.5">
+                        <span>Halo Administrator TU!</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-bold">Admin Panel</span>
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-slate-600 font-medium mt-0.5 leading-snug">
+                        Portal resmi pengelolaan SPP, administrasi kesiswaan, dan pelaporan keuangan sekolah.
+                      </p>
                     </div>
+                  </div>
+                )}
 
-                    {/* Options row */}
-                    <div className="flex items-center justify-between pt-1 text-xs sm:text-sm">
-                      <label htmlFor="login-remember" className="flex items-center gap-2 cursor-pointer text-slate-600 select-none font-medium">
-                        <input
-                          id="login-remember"
-                          name="rememberMe"
-                          type="checkbox"
-                          checked={rememberMe}
-                          onChange={(e) => setRememberMe(e.target.checked)}
-                          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <span>Ingat saya</span>
-                      </label>
-
-                      {role === 'parent' ? (
-                        <a
-                          href={waLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 font-bold hover:underline flex items-center gap-1"
-                        >
-                          <span>Lupa Password?</span>
-                        </a>
-                      ) : (
-                        <span className="text-slate-400 text-xs font-semibold">Administrator TU</span>
+                {/* Login Form */}
+                <form onSubmit={handleLoginSubmit} className="space-y-3.5 sm:space-y-4">
+                  {/* Field 1: Username / NIS */}
+                  <div className="space-y-1">
+                    <label htmlFor="login-username" className="block text-[11px] sm:text-xs font-black text-slate-700 uppercase tracking-wide">
+                      {role === 'admin' ? 'USERNAME / NIP ADMIN TU' : 'NIS / NAMA SISWA'}
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-4 text-slate-400 pointer-events-none">
+                        <Icon name={role === 'admin' ? "shield" : "user"} size={18} />
+                      </div>
+                      <input
+                        id="login-username"
+                        name="username"
+                        autoComplete="username"
+                        type="text"
+                        required
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder={role === 'admin' ? 'Masukkan username / NIP admin' : 'Masukkan NIS atau nama siswa'}
+                        className="w-full h-13 min-h-[52px] pl-11 pr-4 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15 transition-all placeholder:text-slate-400 shadow-inner"
+                      />
+                      {username.trim().length > 0 && (
+                        <div className="absolute right-4 text-emerald-600">
+                          <Icon name="check" size={18} />
+                        </div>
                       )}
                     </div>
+                  </div>
 
-                    {/* Pill Action Buttons */}
-                    <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
-                      <button
-                        type="submit"
-                        className={`w-full sm:flex-1 py-4 px-7 rounded-full text-white font-extrabold text-sm sm:text-base shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2 ${
-                          role === 'parent'
-                            ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-500/30 hover:shadow-blue-500/40'
-                            : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/30 hover:shadow-indigo-500/40'
-                        }`}
-                      >
-                        <span>Masuk Sekarang</span>
-                        <Icon name="arrow-right" size={18} />
-                      </button>
-
+                  {/* Field 2: Password */}
+                  <div className="space-y-1">
+                    <label htmlFor="login-password" className="block text-[11px] sm:text-xs font-black text-slate-700 uppercase tracking-wide">
+                      KATA SANDI
+                    </label>
+                    <div className="relative flex items-center">
+                      <div className="absolute left-4 text-slate-400 pointer-events-none">
+                        <Icon name="lock" size={18} />
+                      </div>
+                      <input
+                        id="login-password"
+                        name="password"
+                        autoComplete="current-password"
+                        type={showPassword ? "text" : "password"}
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder={role === 'admin' ? 'Masukkan kata sandi admin' : 'Masukkan kata sandi akun'}
+                        className="w-full h-13 min-h-[52px] pl-11 pr-12 bg-slate-50 border-2 border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/15 transition-all placeholder:text-slate-400 shadow-inner"
+                      />
                       <button
                         type="button"
-                        onClick={() => {
-                          const nextRole = role === 'parent' ? 'admin' : 'parent';
-                          setRole(nextRole);
-                          try { sessionStorage.setItem('spp_intended_role', nextRole); } catch(e){}
-                          setErrorMsg('');
-                          setUsername('');
-                          setPassword('');
-                        }}
-                        className="w-full sm:w-auto py-4 px-6 rounded-full border border-slate-300 hover:border-blue-400 text-slate-700 hover:text-blue-600 font-bold text-xs sm:text-sm active:scale-[0.98] transition-all bg-white hover:bg-blue-50/50 flex items-center justify-center gap-2"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 text-slate-400 hover:text-blue-600 transition-colors p-1.5"
+                        title={showPassword ? "Sembunyikan password" : "Lihat password"}
                       >
-                        <span>{role === 'parent' ? 'Akses Admin' : 'Akses Wali'}</span>
-                        <Icon name="arrow-right-left" size={15} className="text-slate-400" />
+                        <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
                       </button>
                     </div>
-                  </form>
-                </div>
+                  </div>
+
+                  {/* Options row */}
+                  <div className="flex items-center justify-between pt-0.5 text-xs sm:text-sm">
+                    <label htmlFor="login-remember" className="flex items-center gap-2 cursor-pointer text-slate-600 select-none font-bold">
+                      <input
+                        id="login-remember"
+                        name="rememberMe"
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <span>Ingat saya</span>
+                    </label>
+
+                    {role === 'parent' ? (
+                      <a
+                        href={waLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 font-extrabold hover:underline flex items-center gap-1 text-[11px] sm:text-xs"
+                      >
+                        <Icon name="help-circle" size={13} />
+                        <span>Lupa Password? Bantuan TU</span>
+                      </a>
+                    ) : (
+                      <span className="text-slate-400 text-xs font-semibold">Administrator TU</span>
+                    )}
+                  </div>
+
+                  {/* Action Buttons - Solid, Bold, Stately (TIDAK GEPENG!) */}
+                  <div className="pt-2 space-y-2.5">
+                    {/* Primary Submit Button: Stately 54px-56px height with bold typography */}
+                    <button
+                      type="submit"
+                      className={`w-full min-h-[52px] h-13 sm:h-14 rounded-2xl text-white font-black text-sm sm:text-base shadow-xl active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2.5 group ${
+                        role === 'parent'
+                          ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 shadow-blue-600/35 hover:shadow-blue-600/50'
+                          : 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-800 hover:from-indigo-700 hover:to-purple-900 shadow-indigo-600/35 hover:shadow-indigo-600/50'
+                      }`}
+                    >
+                      <span>Masuk Sekarang</span>
+                      <Icon name="arrow-right" size={20} className="transition-transform duration-200 group-hover:translate-x-1" />
+                    </button>
+
+                    {/* Secondary Role Switch Button: Full width, neat rounded-2xl (TIDAK GEPENG!) */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextRole = role === 'parent' ? 'admin' : 'parent';
+                        setRole(nextRole);
+                        try { sessionStorage.setItem('spp_intended_role', nextRole); } catch(e){}
+                        setErrorMsg('');
+                        setUsername('');
+                        setPassword('');
+                      }}
+                      className="w-full min-h-[46px] h-11 sm:h-12 rounded-2xl border-2 border-slate-200 hover:border-blue-400 bg-slate-50 hover:bg-blue-50/60 text-slate-700 hover:text-blue-700 font-extrabold text-xs sm:text-sm active:scale-[0.98] transition-all duration-200 flex items-center justify-center gap-2 shadow-xs"
+                    >
+                      <Icon name="arrow-right-left" size={15} className="text-slate-500" />
+                      <span>{role === 'parent' ? 'Beralih ke Portal Login Admin TU' : 'Beralih ke Portal Login Wali Murid'}</span>
+                    </button>
+                  </div>
+                </form>
+
+              </div>
+
+              {/* Bottom Security Footer */}
+              <div className="pt-5 mt-5 border-t border-slate-100 flex items-center justify-center text-[11px] font-bold text-slate-400 gap-2">
+                <Icon name="shield-check" size={14} className="text-emerald-600 shrink-0" />
+                <span>Koneksi Aman 256-Bit SSL • Privasi & Data Siswa Terlindungi</span>
               </div>
 
             </div>
+
           </div>
         </div>
       );
@@ -1205,11 +1359,13 @@
       const [isChatOpen, setIsChatOpen] = useState(false);
       const [commentText, setCommentText] = useState('');
 
-      // Cek apakah user (Wali Murid) sudah pernah mengirim tanggapan untuk catatan ini
+      // Cek apakah user (Wali Murid) sudah pernah mengirim tanggapan untuk catatan ini (Maksimal 1 kali balas)
       const hasUserReplied = useMemo(() => {
         return (note.comments || []).some(c => 
           c.sender === 'Wali Murid' || 
-          c.sender === student.name || 
+          c.senderRole === 'parent' ||
+          c.sender?.toLowerCase().includes('wali') ||
+          (student.name && c.sender === student.name) ||
           (student.wali && c.sender === student.wali)
         );
       }, [note.comments, student]);
@@ -1219,6 +1375,7 @@
         if (!commentText.trim() || hasUserReplied) return;
         onAddCommentNote(note.id, {
           sender: 'Wali Murid',
+          senderRole: 'parent',
           text: commentText.trim(),
           time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
         });
@@ -1226,15 +1383,23 @@
       };
 
       return (
-        <div className="bg-slate-50 rounded-2xl border border-slate-200/80 p-5 sm:p-6 hover:border-indigo-200 transition-colors shadow-xs">
+        <div className="bg-slate-50/80 rounded-2xl border border-slate-200/90 p-5 sm:p-6 hover:border-blue-200 transition-colors shadow-xs">
+          {/* Header Catatan TU: Jelas dari Pihak Tata Usaha */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 font-black rounded-lg text-xs uppercase tracking-wide self-start">
-              {note.category || 'Catatan TU'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-blue-100 text-blue-900 font-extrabold rounded-lg text-xs uppercase tracking-wide flex items-center gap-1.5 border border-blue-200">
+                <Icon name="shield-check" size={13} className="text-blue-700" />
+                Catatan dari: Tata Usaha (TU)
+              </span>
+              <span className="px-2.5 py-0.5 bg-slate-200 text-slate-700 font-bold rounded-lg text-[11px]">
+                {note.category || 'Catatan Perkembangan'}
+              </span>
+            </div>
             <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
               <Icon name="calendar" size={13} /> {note.date}
             </span>
           </div>
+
           <h4 className="font-black text-slate-800 text-base mb-2">{note.title}</h4>
           <p className="text-xs sm:text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{note.content}</p>
 
@@ -1245,15 +1410,15 @@
             className="mt-4 w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100/90 border border-slate-200 flex items-center justify-between transition-colors text-xs font-black text-slate-700 active:scale-[0.99]"
           >
             <div className="flex items-center gap-2">
-              <Icon name="message-square" size={14} className="text-indigo-600" />
+              <Icon name="message-square" size={14} className="text-blue-600" />
               <span>Tanggapan Wali Murid ({note.comments ? note.comments.length : 0})</span>
               {hasUserReplied && (
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black flex items-center gap-1 border border-emerald-200">
                   <Icon name="lock" size={10} /> Sudah Dibalas (Terkunci)
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 text-indigo-600 text-[11px] font-bold">
+            <div className="flex items-center gap-1.5 text-blue-600 text-[11px] font-bold">
               <span>{isChatOpen ? 'Tutup Percakapan' : 'Klik untuk buka riwayat percakapan'}</span>
               <Icon name={isChatOpen ? 'chevron-up' : 'chevron-down'} size={15} />
             </div>
@@ -1264,15 +1429,26 @@
             <div className="mt-3 pt-3 border-t border-slate-200/60 space-y-3 animate-in fade-in duration-200">
               {note.comments && note.comments.length > 0 ? (
                 <div className="space-y-2">
-                  {note.comments.map((c, i) => (
-                    <div key={i} className="bg-white p-3 rounded-xl border border-slate-200 text-xs shadow-xs">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="font-extrabold text-indigo-700">{c.sender}</span>
-                        <span className="text-[10px] text-slate-400">{c.time || ''}</span>
+                  {note.comments.map((c, i) => {
+                    const isTu = c.senderRole === 'admin' || c.sender?.toLowerCase().includes('admin') || c.sender?.toLowerCase().includes('tu');
+                    const senderLabel = isTu ? 'Tata Usaha (TU)' : `Wali Murid (Orang Tua Ananda ${student.name?.trim() || ''})`;
+                    return (
+                      <div key={i} className={`p-3.5 rounded-xl border text-xs shadow-xs ${
+                        isTu 
+                          ? 'bg-blue-50/80 border-blue-200 text-slate-800' 
+                          : 'bg-emerald-50/80 border-emerald-200 text-slate-800'
+                      }`}>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className={`font-black flex items-center gap-1.5 ${isTu ? 'text-blue-800' : 'text-emerald-800'}`}>
+                            <Icon name={isTu ? 'shield-check' : 'user'} size={12} className={isTu ? 'text-blue-600' : 'text-emerald-600'} />
+                            {senderLabel}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold">{c.time || ''}</span>
+                        </div>
+                        <p className="text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{c.text}</p>
                       </div>
-                      <span className="text-slate-700 font-medium">{c.text}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-xs text-slate-400 italic text-center py-2">Belum ada riwayat tanggapan untuk catatan ini.</p>
@@ -1282,7 +1458,7 @@
               {hasUserReplied ? (
                 <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-xs text-amber-900 font-bold">
                   <Icon name="lock" size={16} className="text-amber-600 shrink-0" />
-                  <span>Anda sudah memberikan 1 tanggapan untuk catatan ini. Percakapan telah terkunci otomatis.</span>
+                  <span>Anda sudah memberikan 1 tanggapan untuk catatan ini. Percakapan telah terkunci otomatis (maksimal 1x tanggapan).</span>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-1.5 pt-1">
@@ -1293,11 +1469,11 @@
                       value={commentText}
                       onChange={e => setCommentText(e.target.value)}
                       placeholder="Tulis tanggapan untuk TU (hanya 1x kesempatan membalas)..."
-                      className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner"
+                      className="flex-1 px-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner"
                     />
                     <button
                       type="submit"
-                      className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+                      className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
                     >
                       <Icon name="send" size={14} /> Kirim
                     </button>
@@ -1344,6 +1520,7 @@ function ParentDashboardView({
       }
 
       const [activeTab, setActiveTab] = useState('dashboard');
+      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
       const [sppSubFilter, setSppSubFilter] = useState('all');
       const [isSppExpanded, setIsSppExpanded] = useState(true);
       const [complaintTitle, setComplaintTitle] = useState('');
@@ -1482,21 +1659,20 @@ function ParentDashboardView({
 
       const activeComplaint = useMemo(() => {
         return myComplaints.find(c => {
-          const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : new Date(c.date).getTime());
-          const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : null);
+          const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : (c.created_at ? new Date(c.created_at).getTime() : 0));
+          const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : 0);
           const isExpired = expiresAt ? nowMs > expiresAt : false;
-          const isResolved = c.status === 'Sudah Ditangani' || c.status === 'Selesai';
-          return !isExpired && !isResolved;
+          // Pengaduan TIDAK terkunci selama belum lewat 1 jam (meskipun status sudah ditangani / dibalas admin)
+          return !isExpired;
         });
       }, [myComplaints, nowMs]);
       
       const pastComplaints = useMemo(() => {
         return myComplaints.filter(c => {
-          const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : new Date(c.date).getTime());
-          const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : null);
+          const createdTime = c.createdAtMs || (typeof c.id === 'number' ? c.id : (c.created_at ? new Date(c.created_at).getTime() : 0));
+          const expiresAt = c.expiresAtMs || (createdTime ? createdTime + 3600000 : 0);
           const isExpired = expiresAt ? nowMs > expiresAt : false;
-          const isResolved = c.status === 'Sudah Ditangani' || c.status === 'Selesai';
-          return isExpired || isResolved;
+          return isExpired;
         }).sort((a,b) => {
           const timeA = a.createdAtMs || (typeof a.id === 'number' ? a.id : 0);
           const timeB = b.createdAtMs || (typeof b.id === 'number' ? b.id : 0);
@@ -1611,37 +1787,226 @@ function ParentDashboardView({
             </div>
           )}
 
+          {/* TOP MOBILE APP BAR with 3-Line Hamburger Menu (Midnight Obsidian Sapphire Luxury Theme) */}
+          <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#0a1838]/95 via-[#0d2250]/95 to-[#07132e]/95 backdrop-blur-xl px-4.5 py-3.5 border-b border-white/10 shadow-xl flex items-center justify-between min-h-[66px] text-white">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div 
+                onClick={() => student.fotoUrl && setPreviewImage({ url: student.fotoUrl, title: `Foto Profil - ${student.name}` })}
+                className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400 via-blue-600 to-indigo-700 p-0.5 shadow-lg shadow-blue-950/50 overflow-hidden shrink-0 flex items-center justify-center cursor-pointer ring-2 ring-cyan-400/30"
+              >
+                {student.fotoUrl ? (
+                  <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover rounded-[14px]" />
+                ) : (
+                  <img src="logo.png" alt="PAUD Setia Bhakti" className="w-8 h-8 object-contain filter drop-shadow" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h1 className="text-base font-black text-white truncate tracking-tight">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h1>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-extrabold text-cyan-300 truncate mt-0.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="truncate">Wali • {student.name}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Rounded Dark Frosted 3-Line Hamburger Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="relative w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex flex-col items-center justify-center gap-[5px] p-3 transition-all shadow-lg border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+              aria-label="Buka Menu"
+            >
+              <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'w-5 rotate-45 translate-y-[7.5px]' : 'w-5'}`}></span>
+              <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0 w-0' : 'w-4 self-start ml-0.5'}`}></span>
+              <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'w-5 -rotate-45 -translate-y-[7.5px]' : 'w-5'}`}></span>
+
+              {totalParentUnread > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full ring-2 ring-white animate-pulse flex items-center justify-center text-[10px] font-black text-white shadow-md">
+                  {totalParentUnread > 9 ? '!' : totalParentUnread}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* MOBILE SLIDE-OUT NAVIGATION DRAWER */}
+          {isMobileMenuOpen && (
+            <div className="md:hidden fixed inset-0 z-50 overflow-hidden animate-in fade-in duration-200">
+              <div 
+                className="absolute inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity" 
+                onClick={() => setIsMobileMenuOpen(false)}
+              ></div>
+
+              <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] bg-gradient-to-b from-[#0a1838] via-[#091735] to-[#040b1a] text-white flex flex-col justify-between shadow-2xl z-10 border-l border-white/15 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
+                {/* Luminous Glow Orbs in Drawer */}
+                <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/15 blur-3xl pointer-events-none"></div>
+                <div className="absolute bottom-20 -left-10 w-40 h-40 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none"></div>
+
+                <div className="p-4 sm:p-5 relative z-10">
+                  {/* Drawer Header */}
+                  <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/15 flex items-center justify-center p-1.5 shadow-md shrink-0">
+                        <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-sm font-black text-white leading-tight truncate">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h2>
+                        <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block truncate">Portal Resmi Wali Murid</span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white flex items-center justify-center transition-colors border border-white/10 active:scale-95 shrink-0"
+                    >
+                      <Icon name="x" size={18} />
+                    </button>
+                  </div>
+
+                  {/* Student Profile Card in Drawer */}
+                  <div className="p-3.5 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 flex items-center gap-3 mb-4 shadow-lg shadow-black/30">
+                    <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-black text-lg border border-white/20 overflow-hidden shrink-0 shadow-md">
+                      {student.fotoUrl ? (
+                        <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover" />
+                      ) : (
+                        student.name ? student.name.charAt(0) : 'S'
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-black text-white truncate capitalize">{student.name}</p>
+                      <p className="text-xs text-slate-400 font-bold truncate mt-0.5">Kelas {student.kelas} • NIS {student.nis}</p>
+                    </div>
+                  </div>
+
+                  {/* Navigation Links */}
+                  <div className="space-y-1.5">
+                    {[
+                      { id: 'dashboard', label: 'Dashboard Utama', icon: 'home', badge: 0 },
+                      { id: 'spp', label: 'Tagihan SPP', icon: 'credit-card', badge: unpaidBills.length, badgeType: 'danger' },
+                      { id: 'berita', label: 'Berita & Pengumuman', icon: 'newspaper', badge: unreadAnnCount, badgeType: 'info' },
+                      { id: 'evaluasi', label: 'Catatan Siswa (TU)', icon: 'file-text', badge: unreadNotesCount, badgeType: 'info' },
+                      { id: 'pengaduan', label: 'Layanan Pengaduan', icon: 'message-square', badge: unreadComplaintsCount, badgeType: 'danger' },
+                      { id: 'pengaturan', label: 'Pengaturan Akun', icon: 'settings', badge: 0 }
+                    ].map(item => (
+                      <div key={item.id} className="w-full">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (item.id === 'spp') {
+                              if (activeTab === 'spp') {
+                                setIsSppExpanded(!isSppExpanded);
+                              } else {
+                                setActiveTab('spp');
+                                setIsSppExpanded(true);
+                              }
+                            } else {
+                              setActiveTab(item.id);
+                              setIsMobileMenuOpen(false);
+                            }
+                          }}
+                          className={`w-full min-h-[44px] py-2.5 px-3.5 rounded-xl flex items-center justify-between text-xs sm:text-sm font-extrabold transition-all duration-200 active:scale-[0.99] ${
+                            activeTab === item.id
+                              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border border-white/10'
+                              : 'text-slate-300 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1 truncate">
+                            <Icon name={item.icon} size={18} className="shrink-0" />
+                            <span className="truncate capitalize">{item.label}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            {item.badge > 0 && (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-black bg-rose-500 text-white animate-pulse shadow-md shrink-0">
+                                {item.badge}
+                              </span>
+                            )}
+                            {item.id === 'spp' && (
+                              <Icon name="chevron-down" size={16} className={`transition-transform duration-200 shrink-0 ${activeTab === 'spp' && isSppExpanded ? 'rotate-180' : ''}`} />
+                            )}
+                          </div>
+                        </button>
+
+                        {/* SPP Sub-items Tree */}
+                        {item.id === 'spp' && activeTab === 'spp' && isSppExpanded && (
+                          <div className="border-l-2 border-slate-800 ml-4 pl-3 mt-1.5 space-y-1">
+                            {[
+                              { id: 'all', label: 'Semua Ringkasan', icon: 'layers' },
+                              { id: 'unpaid', label: 'Tagihan Menunggak', icon: 'alert-circle', badge: unpaidBills.length, type: 'danger' },
+                              { id: 'upcoming', label: 'Belum Jatuh Tempo', icon: 'calendar', badge: upcomingBills.length, type: 'warning' },
+                              { id: 'paid', label: 'Riwayat Lunas', icon: 'check-circle-2', badge: paidBills.length, type: 'success' }
+                            ].map(sub => (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => {
+                                  setSppSubFilter(sub.id);
+                                  setIsMobileMenuOpen(false);
+                                }}
+                                className={`w-full min-h-[40px] py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-between transition-all active:scale-[0.99] ${
+                                  sppSubFilter === sub.id
+                                    ? 'bg-white/15 text-white font-black border border-white/15 shadow-xs'
+                                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1 truncate">
+                                  <Icon name={sub.icon} size={15} className="shrink-0" />
+                                  <span className="truncate capitalize">{sub.label}</span>
+                                </div>
+                                {sub.badge > 0 && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                                    sub.type === 'danger' ? 'bg-rose-500 text-white' : sub.type === 'warning' ? 'bg-amber-400 text-slate-900' : 'bg-emerald-500 text-white'
+                                  }`}>
+                                    {sub.badge}
+                                  </span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sticky Drawer Footer Actions */}
+                <div className="sticky bottom-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 p-4 space-y-2 mt-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRefresh(true);
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full min-h-[42px] py-2.5 px-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-white text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                  >
+                    <Icon name="refresh-cw" size={15} className={`shrink-0 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+                    <span className="truncate">Sinkronisasi Data Baru</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onLogout();
+                    }}
+                    className="w-full min-h-[42px] py-2.5 px-3.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/20 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                  >
+                    <Icon name="log-out" size={15} className="shrink-0" />
+                    <span className="truncate">Keluar Akun Wali Murid</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* MAIN FULL-WIDTH APP CONTAINER */}
-          <div className="w-full flex-1 bg-white flex flex-col md:flex-row min-h-screen mobile-full-height">
+          <div className="w-full flex-1 bg-[#ebf1f8] flex flex-col md:flex-row min-h-screen mobile-full-height">
             {/* LEFT ROYAL BLUE SIDEBAR - Hidden on mobile, replaced by bottom nav */}
             <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
               
-              {/* Luminous Cyber-Neon Wave Vector Art at Bottom-Left of Sidebar (Matching Image 3) */}
-              <div className="absolute -bottom-8 -left-8 w-80 h-80 pointer-events-none select-none z-0 overflow-hidden opacity-90">
-                <svg viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full filter drop-shadow-[0_0_20px_rgba(6,182,212,0.45)]">
-                  <path d="M-20,320 C30,260 60,190 20,120 C-10,70 10,20 60,0 C90,60 70,140 130,200 C180,250 250,270 320,290 L320,340 L-20,340 Z" fill="url(#cyan-glow-mesh-wali-1)" opacity="0.35" />
-                  <path d="M-10,320 C40,240 90,210 120,160 C150,110 200,90 260,120 C210,160 170,220 130,260 C90,300 40,320 -10,320 Z" fill="url(#cyan-glow-mesh-wali-2)" opacity="0.55" />
-                  <path d="M0,320 C60,250 110,220 160,190 C210,160 260,170 310,210 C260,230 200,250 150,280 C100,310 40,320 0,320 Z" fill="url(#cyan-glow-mesh-wali-3)" opacity="0.75" />
-                  <path d="M-10,310 Q80,240 140,180 T290,140" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" filter="drop-shadow(0 0 6px #38bdf8)" />
-                  <path d="M0,320 Q100,260 170,210 T320,190" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" opacity="0.95" filter="drop-shadow(0 0 8px #22d3ee)" />
-                  <path d="M10,330 Q120,280 190,240 T340,230" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
-                  <defs>
-                    <linearGradient id="cyan-glow-mesh-wali-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.85" />
-                      <stop offset="100%" stopColor="#1e40af" stopOpacity="0" />
-                    </linearGradient>
-                    <linearGradient id="cyan-glow-mesh-wali-2" x1="0%" y1="100%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.9" />
-                      <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.5" />
-                      <stop offset="100%" stopColor="#1e3a8a" stopOpacity="0" />
-                    </linearGradient>
-                    <linearGradient id="cyan-glow-mesh-wali-3" x1="30%" y1="100%" x2="90%" y2="10%">
-                      <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
-                      <stop offset="100%" stopColor="#6366f1" stopOpacity="0.1" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
+              {/* Subtle Ambient Highlights in Sidebar */}
+              <div className="absolute -bottom-10 -left-10 w-64 h-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none select-none z-0"></div>
+              <div className="absolute top-20 right-0 w-48 h-48 rounded-full bg-indigo-500/10 blur-[60px] pointer-events-none select-none z-0"></div>
 
               <div className="relative z-10">
                 {/* Brand / School Header with Frosted Glass Container (Matching Image 3) */}
@@ -1871,7 +2236,7 @@ function ParentDashboardView({
             </aside>
 
             {/* RIGHT AESTHETIC CONTENT PANEL */}
-            <main className="flex-1 bg-[#f0f4f9] bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
+            <main className="flex-1 bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
               {/* Header Top Bar */}
               <header className="px-4 sm:px-6 md:px-10 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-slate-200/80 flex flex-col gap-4 bg-white/90 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -2058,70 +2423,72 @@ function ParentDashboardView({
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
                       <div 
                         onClick={() => { setActiveTab('spp'); setSppSubFilter('unpaid'); }}
-                        className={`p-5 rounded-2xl sm:rounded-3xl border cursor-pointer transition-all hover:scale-[1.01] ${
-                          unpaidBills.length > 0 ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-emerald-50 border-emerald-200 shadow-sm'
+                        className={`p-5 sm:p-6 rounded-2xl sm:rounded-3xl border cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xl bg-white shadow-sm relative overflow-hidden group ${
+                          unpaidBills.length > 0 ? 'border-rose-200/90 hover:border-rose-300' : 'border-emerald-200/90 hover:border-emerald-300'
                         }`}
                       >
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-black uppercase text-slate-500">Status SPP</span>
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${unpaidBills.length > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                            <Icon name={unpaidBills.length > 0 ? "alert-circle" : "shield-check"} size={18} />
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-xs font-black uppercase text-slate-400 tracking-wider">Status SPP</span>
+                          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform ${
+                            unpaidBills.length > 0 ? 'bg-gradient-to-br from-rose-500 to-red-600 shadow-rose-500/30' : 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/30'
+                          }`}>
+                            <Icon name={unpaidBills.length > 0 ? "alert-circle" : "shield-check"} size={20} />
                           </div>
                         </div>
-                        <p className={`text-xl sm:text-2xl font-black ${unpaidBills.length > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                          {unpaidBills.length > 0 ? formatRupiah(totalDueDebt) : 'Status Aman / Lunas'}
+                        <p className={`text-xl sm:text-2xl font-black ${unpaidBills.length > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {unpaidBills.length > 0 ? formatRupiah(totalDueDebt) : 'Status Lunas'}
                         </p>
-                        <p className="text-xs text-slate-500 font-medium mt-1">
+                        <p className="text-xs text-slate-500 font-semibold mt-1">
                           {unpaidBills.length > 0 ? `${unpaidBills.length} Bulan Tertunggak` : 'Tidak ada tunggakan SPP'}
                         </p>
                       </div>
 
                       <div 
                         onClick={() => { setActiveTab('spp'); setSppSubFilter('paid'); }}
-                        className="p-5 rounded-2xl sm:rounded-3xl bg-blue-50 border border-blue-200 shadow-sm cursor-pointer hover:scale-[1.01] transition-all"
+                        className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-slate-200/90 hover:border-blue-300 shadow-sm hover:shadow-xl cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group"
                       >
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-black uppercase text-slate-500">SPP Lunas</span>
-                          <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center">
-                            <Icon name="check-circle-2" size={18} />
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-xs font-black uppercase text-slate-400 tracking-wider">SPP Lunas</span>
+                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Icon name="check-circle-2" size={20} />
                           </div>
                         </div>
-                        <p className="text-xl sm:text-2xl font-black text-blue-900">
-                          {paidBills.length} <span className="text-xs text-slate-500 font-bold">/ {monthlyBills.length} Bulan</span>
+                        <p className="text-xl sm:text-2xl font-black text-slate-900">
+                          {paidBills.length} <span className="text-xs text-slate-400 font-bold">/ {monthlyBills.length} Bulan</span>
                         </p>
-                        <p className="text-xs text-slate-500 font-medium mt-1">
+                        <p className="text-xs text-slate-500 font-semibold mt-1">
                           Tarif: {formatRupiah(student.tarif)}/bulan
                         </p>
                       </div>
 
                       <div 
                         onClick={() => setActiveTab('berita')}
-                        className="p-5 rounded-2xl sm:rounded-3xl bg-teal-50 border border-teal-200 shadow-sm cursor-pointer hover:scale-[1.01] transition-all"
+                        className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-slate-200/90 hover:border-teal-300 shadow-sm hover:shadow-xl cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group"
                       >
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-black uppercase text-slate-500">Pengumuman</span>
-                          <div className="w-9 h-9 rounded-xl bg-teal-600 text-white flex items-center justify-center">
-                            <Icon name="newspaper" size={18} />
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-xs font-black uppercase text-slate-400 tracking-wider">Pengumuman</span>
+                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 text-white shadow-lg shadow-teal-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Icon name="newspaper" size={20} />
                           </div>
                         </div>
-                        <p className="text-xl sm:text-2xl font-black text-teal-900">{announcements.length} Berita</p>
-                        <p className="text-xs text-slate-500 font-medium mt-1">
+                        <p className="text-xl sm:text-2xl font-black text-slate-900">{announcements.length} Berita</p>
+                        <p className="text-xs text-slate-500 font-semibold mt-1">
                           {unreadAnnCount > 0 ? `${unreadAnnCount} Belum Dibaca` : 'Semua telah dibaca'}
                         </p>
                       </div>
 
                       <div 
                         onClick={() => setActiveTab('evaluasi')}
-                        className="p-5 rounded-2xl sm:rounded-3xl bg-indigo-50 border border-indigo-200 shadow-sm cursor-pointer hover:scale-[1.01] transition-all"
+                        className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white border border-slate-200/90 hover:border-indigo-300 shadow-sm hover:shadow-xl cursor-pointer hover:scale-[1.02] transition-all relative overflow-hidden group"
                       >
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-black uppercase text-slate-500">Catatan TU</span>
-                          <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center">
-                            <Icon name="file-text" size={18} />
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-xs font-black uppercase text-slate-400 tracking-wider">Catatan TU</span>
+                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Icon name="file-text" size={20} />
                           </div>
                         </div>
-                        <p className="text-xl sm:text-2xl font-black text-indigo-900">{myNotes.length} Catatan</p>
-                        <p className="text-xs text-slate-500 font-medium mt-1">Perkembangan siswa</p>
+                        <p className="text-xl sm:text-2xl font-black text-slate-900">{myNotes.length} Catatan</p>
+                        <p className="text-xs text-slate-500 font-semibold mt-1">Perkembangan siswa</p>
                       </div>
                     </div>
 
@@ -2793,20 +3160,33 @@ function ParentDashboardView({
                             </div>
 
                             {/* Thread Pesan Live */}
-                            <div className="space-y-2.5 max-h-80 overflow-y-auto bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
-                              {activeComplaint.messages && activeComplaint.messages.map((m, idx) => (
-                                <div key={idx} className={`p-3 rounded-2xl text-xs max-w-[85%] ${
-                                  m.sender === 'Admin TU'
-                                    ? 'bg-blue-600 text-white ml-auto rounded-tr-none shadow-xs'
-                                    : 'bg-white text-slate-800 border border-slate-200 mr-auto rounded-tl-none shadow-xs'
-                                }`}>
-                                  <div className={`flex justify-between items-center gap-2 mb-1 ${m.sender === 'Admin TU' ? 'text-blue-100' : 'text-slate-400'}`}>
-                                    <span className="font-black text-[11px]">{m.sender}</span>
-                                    <span className="text-[10px]">{m.time || ''}</span>
+                            <div className="space-y-3 max-h-80 overflow-y-auto bg-slate-50 p-4 rounded-2xl border border-slate-200/80">
+                              {activeComplaint.messages && activeComplaint.messages.map((m, idx) => {
+                                const isAdmin = m.sender === 'Admin TU' || m.sender?.toLowerCase().includes('admin') || m.sender?.toLowerCase().includes('tu');
+                                return (
+                                  <div key={idx} className={`flex flex-col ${isAdmin ? 'items-start mr-auto' : 'items-end ml-auto'} max-w-[85%]`}>
+                                    <div className={`p-3.5 rounded-2xl text-xs shadow-xs ${
+                                      isAdmin
+                                        ? 'bg-white text-slate-800 border border-slate-200/90 rounded-tl-xs'
+                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-tr-xs shadow-blue-500/10'
+                                    }`}>
+                                      <div className={`flex justify-between items-center gap-3 mb-1 text-[11px] font-black ${isAdmin ? 'text-blue-800' : 'text-blue-100'}`}>
+                                        <span className="flex items-center gap-1">
+                                          <Icon name={isAdmin ? 'shield-check' : 'user'} size={12} className={isAdmin ? 'text-blue-600' : 'text-blue-200'} />
+                                          {isAdmin ? 'Petugas Tata Usaha (TU)' : 'Anda (Wali Murid)'}
+                                        </span>
+                                        <span className="text-[10px] opacity-75 font-medium">{m.time || ''}</span>
+                                      </div>
+                                      <p className="font-semibold whitespace-pre-wrap leading-relaxed">{m.text}</p>
+                                      {m.imageUrl && (
+                                        <div className="mt-2">
+                                          <img src={m.imageUrl} alt="Lampiran" className="max-w-full max-h-56 object-cover rounded-xl shadow-xs" />
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
-                                  <p className="font-medium whitespace-pre-wrap leading-relaxed">{m.text}</p>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
 
                             {/* Form Balas Chat Aktif */}
@@ -2945,19 +3325,27 @@ function ParentDashboardView({
 
                                   {/* Chat Thread */}
                                   <div className="space-y-2 max-h-60 overflow-y-auto bg-white p-3.5 rounded-xl border border-slate-200">
-                                    {comp.messages && comp.messages.map((m, idx) => (
-                                      <div key={idx} className={`p-2.5 rounded-xl text-xs max-w-[85%] ${
-                                        m.sender === 'Admin TU'
-                                          ? 'bg-blue-50 text-blue-900 border border-blue-100 ml-auto'
-                                          : 'bg-slate-50 text-slate-800 border border-slate-200 mr-auto'
-                                      }`}>
-                                        <div className="flex justify-between items-center gap-2 mb-1">
-                                          <span className="font-black text-[11px]">{m.sender}</span>
-                                          <span className="text-[10px] text-slate-400">{m.time || ''}</span>
+                                    {comp.messages && comp.messages.map((m, idx) => {
+                                      const isAdmin = m.sender === 'Admin TU' || m.sender?.toLowerCase().includes('admin') || m.sender?.toLowerCase().includes('tu');
+                                      return (
+                                        <div key={idx} className={`flex flex-col ${isAdmin ? 'items-start mr-auto' : 'items-end ml-auto'} max-w-[85%]`}>
+                                          <div className={`p-3 rounded-xl text-xs ${
+                                            isAdmin
+                                              ? 'bg-blue-50/80 text-slate-800 border border-blue-200'
+                                              : 'bg-slate-100 text-slate-800 border border-slate-300'
+                                          }`}>
+                                            <div className="flex justify-between items-center gap-3 mb-1">
+                                              <span className={`font-black text-[11px] flex items-center gap-1 ${isAdmin ? 'text-blue-800' : 'text-slate-800'}`}>
+                                                <Icon name={isAdmin ? 'shield-check' : 'user'} size={12} className={isAdmin ? 'text-blue-600' : 'text-slate-500'} />
+                                                {isAdmin ? 'Tata Usaha (TU)' : 'Wali Murid'}
+                                              </span>
+                                              <span className="text-[10px] text-slate-400 font-medium">{m.time || ''}</span>
+                                            </div>
+                                            <p className="font-medium whitespace-pre-wrap">{m.text}</p>
+                                          </div>
                                         </div>
-                                        <p className="font-medium whitespace-pre-wrap">{m.text}</p>
-                                      </div>
-                                    ))}
+                                      );
+                                    })}
                                   </div>
 
                                   {/* Locked Notice */}
@@ -3189,34 +3577,6 @@ function ParentDashboardView({
             </main>
           </div>
 
-          {/* MOBILE BOTTOM NAVIGATION BAR - Wali Murid */}
-          <nav className="mobile-bottom-nav" role="navigation" aria-label="Mobile Navigation">
-            {[
-              { id: 'dashboard', label: 'Dasbor', icon: 'layout-grid', badge: 0 },
-              { id: 'spp', label: 'Tagihan', icon: 'credit-card', badge: unpaidBills.length, badgeType: 'danger' },
-              { id: 'berita', label: 'Berita', icon: 'newspaper', badge: unreadAnnCount, badgeType: 'info' },
-              { id: 'evaluasi', label: 'Catatan', icon: 'file-text', badge: unreadNotesCount, badgeType: 'info' },
-              { id: 'pengaduan', label: 'Aduan', icon: 'message-square', badge: unreadComplaintsCount, badgeType: 'danger' },
-              { id: 'pengaturan', label: 'Akun', icon: 'settings', badge: 0 }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`mobile-bottom-nav-item ${activeTab === tab.id ? 'active' : ''}`}
-                aria-label={tab.label}
-                aria-current={activeTab === tab.id ? 'page' : undefined}
-              >
-                <span className="mobile-bottom-nav-icon">
-                  <Icon name={tab.icon} size={22} />
-                  {tab.badge > 0 && (
-                    <span className={`mobile-bottom-nav-badge ${tab.badgeType || 'danger'}`}>{tab.badge > 99 ? '99+' : tab.badge}</span>
-                  )}
-                </span>
-                <span className="mobile-bottom-nav-label">{tab.label}</span>
-              </button>
-            ))}
-          </nav>
-
         </div>
       );
     }
@@ -3272,17 +3632,25 @@ function ParentDashboardView({
             academicYear={settings?.academicYear} 
           />
 
-          <div className="bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-800 text-white p-7 sm:p-9 rounded-3xl shadow-lg shadow-blue-900/10 flex flex-wrap items-center justify-between gap-5">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Panel Administrator TU</h2>
-              <p className="text-sm sm:text-base text-blue-100 mt-1.5 font-medium">Kelola data siswa, pencatatan pembayaran manual, pengumuman, dan pengaduan.</p>
+          <div className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] p-6 sm:p-8 bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white border border-white/15 shadow-2xl shadow-blue-950/40 flex flex-wrap items-center justify-between gap-5">
+            {/* Luminous Glow Orbs */}
+            <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-blue-500/20 blur-3xl pointer-events-none select-none"></div>
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-cyan-400/15 blur-3xl pointer-events-none select-none"></div>
+
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/15 border border-cyan-400/30 text-cyan-300 text-xs font-black mb-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>PANEL ADMINISTRATOR TU</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Pusat Kendali Administrasi</h2>
+              <p className="text-sm sm:text-base text-slate-300 mt-1 font-medium max-w-xl">Kelola data murid, pencatatan transaksi manual, broadcast pengumuman, dan respon aduan wali.</p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 relative z-10">
               <button
                 onClick={() => onRefresh(true)}
                 title="Refresh Data Baru"
-                className={`py-3 px-4 bg-white/15 hover:bg-white/25 active:scale-95 text-white rounded-2xl text-sm font-bold border border-white/20 transition-all flex items-center gap-2`}
+                className={`py-3 px-4 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-2xl text-sm font-bold border border-white/15 backdrop-blur-md transition-all flex items-center gap-2 shadow-sm`}
               >
                 <Icon name="refresh-cw" size={18} className={isRefreshing ? 'animate-spin text-emerald-300' : ''} />
                 <span className="hidden sm:inline">Refresh Data</span>
@@ -3298,7 +3666,7 @@ function ParentDashboardView({
                       transactions.forEach(t => onMarkReadNotification && onMarkReadNotification('transaction', t.id));
                     }
                   }}
-                  className="p-3 bg-white/15 hover:bg-white/25 rounded-2xl text-white relative transition-colors border border-white/20"
+                  className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl text-white relative transition-colors border border-white/15 backdrop-blur-md shadow-sm"
                 >
                   <Icon name="bell" size={20} />
                   {totalUnreadCount > 0 && (
@@ -3410,10 +3778,10 @@ function ParentDashboardView({
 
               <button 
                 onClick={() => navigateTo('siswa')}
-                className="py-3 px-5 bg-white text-blue-700 hover:bg-blue-50 rounded-2xl text-sm font-black transition-all shadow-md flex items-center gap-2"
+                className="py-3 px-5 bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 hover:from-blue-600 hover:to-indigo-800 text-white font-black rounded-2xl text-sm transition-all shadow-lg shadow-blue-600/35 flex items-center gap-2 border border-white/20 active:scale-95"
               >
                 <Icon name="user-plus" size={18} />
-                Tambah Siswa
+                <span>Tambah Siswa</span>
               </button>
             </div>
           </div>
@@ -3421,10 +3789,10 @@ function ParentDashboardView({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div 
               onClick={() => setShowPivotModal('siswa')}
-              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-5 group"
+              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 hover:border-blue-300 shadow-sm hover:shadow-xl transition-all cursor-pointer flex items-center gap-5 group transform hover:-translate-y-1 relative overflow-hidden"
             >
-              <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <Icon name="users" size={32} />
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-blue-600/30 group-hover:scale-110 transition-transform">
+                <Icon name="users" size={30} />
               </div>
               <div>
                 <p className="text-xs sm:text-sm font-extrabold text-slate-400 uppercase tracking-wider">Total Murid</p>
@@ -3434,11 +3802,11 @@ function ParentDashboardView({
 
             <div 
               onClick={() => setShowPivotModal('pemasukan')}
-              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-5 group"
+              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 hover:border-emerald-300 shadow-sm hover:shadow-xl transition-all cursor-pointer flex items-center gap-5 group transform hover:-translate-y-1 relative overflow-hidden"
               title="Klik untuk melihat transaksi pemasukan"
             >
-              <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <Icon name="wallet" size={32} />
+              <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30 group-hover:scale-110 transition-transform">
+                <Icon name="wallet" size={30} />
               </div>
               <div>
                 <p className="text-xs sm:text-sm font-extrabold text-slate-400 uppercase tracking-wider">Pemasukkan SPP</p>
@@ -3448,11 +3816,11 @@ function ParentDashboardView({
 
             <div 
               onClick={() => setShowPivotModal('transaksi')}
-              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-5 group"
+              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 hover:border-amber-300 shadow-sm hover:shadow-xl transition-all cursor-pointer flex items-center gap-5 group transform hover:-translate-y-1 relative overflow-hidden"
               title="Klik untuk melihat transaksi"
             >
-              <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <Icon name="credit-card" size={32} />
+              <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30 group-hover:scale-110 transition-transform">
+                <Icon name="credit-card" size={30} />
               </div>
               <div>
                 <p className="text-xs sm:text-sm font-extrabold text-slate-400 uppercase tracking-wider">Jumlah Transaksi</p>
@@ -3462,11 +3830,11 @@ function ParentDashboardView({
 
             <div 
               onClick={() => navigateTo('pengaduan')}
-              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-5 group"
+              className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 hover:border-rose-300 shadow-sm hover:shadow-xl transition-all cursor-pointer flex items-center gap-5 group transform hover:-translate-y-1 relative overflow-hidden"
               title="Klik untuk melihat layanan pengaduan"
             >
-              <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                <Icon name="message-square" size={32} />
+              <div className="w-16 h-16 bg-gradient-to-br from-rose-500 to-red-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-lg shadow-rose-500/30 group-hover:scale-110 transition-transform">
+                <Icon name="message-square" size={30} />
               </div>
               <div>
                 <p className="text-xs sm:text-sm font-extrabold text-slate-400 uppercase tracking-wider">Pengaduan Pending</p>
@@ -6294,12 +6662,13 @@ function ParentDashboardView({
     }
 
     // ==========================================
-    // 7. MANAJEMEN PENGADUAN
+    // 7. MANAJEMEN PENGADUAN (DENGAN GROUPING SUB-PERCAKAPAN PER SISWA)
     // ==========================================
-    function AdminPengaduanView({ complaints, onReplyComplaint, onToggleComplaintStatus }) {
+    function AdminPengaduanView({ complaints, onReplyComplaint, onToggleComplaintStatus, onMarkAsRead }) {
       const [activeChatId, setActiveChatId] = useState(null);
       const [replyText, setReplyText] = useState('');
       const [nowMs, setNowMs] = useState(Date.now());
+      const [expandedStudents, setExpandedStudents] = useState({});
       const chatEndRef = React.useRef(null);
 
       useEffect(() => {
@@ -6315,6 +6684,43 @@ function ParentDashboardView({
 
       const activeComplaints = complaints.filter(c => nowMs <= (c.expiresAtMs || (c.createdAtMs + 3600000))).sort((a,b) => b.createdAtMs - a.createdAtMs);
       const expiredComplaints = complaints.filter(c => nowMs > (c.expiresAtMs || (c.createdAtMs + 3600000))).sort((a,b) => b.createdAtMs - a.createdAtMs);
+
+      // Grouping Riwayat Terkunci Per Siswa (Agar rapi & tidak berantakan)
+      const groupedExpired = useMemo(() => {
+        const map = {};
+        expiredComplaints.forEach(c => {
+          const rawName = (c.studentName || 'Wali Murid').trim();
+          const key = rawName.toLowerCase();
+          if (!map[key]) {
+            map[key] = {
+              key,
+              studentName: rawName,
+              waliName: c.waliName || 'Wali Murid',
+              items: []
+            };
+          }
+          map[key].items.push(c);
+        });
+        return Object.values(map);
+      }, [expiredComplaints]);
+
+      const toggleStudent = (key) => {
+        setExpandedStudents(prev => ({ ...prev, [key]: !prev[key] }));
+      };
+
+      const handleSelectChat = (c) => {
+        if (!c) return;
+        setActiveChatId(c.id);
+        if (onMarkAsRead) {
+          onMarkAsRead('complaint', c.id);
+        }
+      };
+
+      useEffect(() => {
+        if (!activeChatId && activeComplaints.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) {
+          handleSelectChat(activeComplaints[0]);
+        }
+      }, [activeComplaints.length]);
 
       const activeChat = complaints.find(c => c.id === activeChatId);
 
@@ -6336,8 +6742,12 @@ function ParentDashboardView({
              </div>
              
              <div className="flex-1 overflow-y-auto p-3 space-y-4">
+                {/* 1. SECTION LIVE CHAT (AKTIF < 1 JAM) */}
                 <div>
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-2">Live Chat ({activeComplaints.length})</h3>
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Live Chat Aktif ({activeComplaints.length})
+                  </h3>
                   {activeComplaints.length === 0 && (
                     <div className="p-4 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
                       <p className="text-xs text-slate-400 font-bold italic">Tidak ada chat aktif saat ini.</p>
@@ -6352,7 +6762,7 @@ function ParentDashboardView({
                       return (
                         <div 
                           key={c.id} 
-                          onClick={() => setActiveChatId(c.id)}
+                          onClick={() => handleSelectChat(c)}
                           className={`p-3.5 rounded-2xl cursor-pointer transition-all border ${
                             isSelected 
                               ? 'bg-emerald-50 border-emerald-300 shadow-sm ring-2 ring-emerald-400/20' 
@@ -6378,7 +6788,7 @@ function ParentDashboardView({
                           )}
                           
                           <div className="flex items-center justify-between mt-2 pl-10 text-[10px] text-slate-400 font-bold">
-                            <span className="flex items-center gap-1 text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-full">
+                            <span className="flex items-center gap-1 text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-full font-mono font-bold">
                               <Icon name="clock" size={10} /> Sisa {remainingMinutes} mnt
                             </span>
                             <span>{c.date}</span>
@@ -6389,35 +6799,108 @@ function ParentDashboardView({
                   </div>
                 </div>
 
+                {/* 2. SECTION RIWAYAT PENGADUAN TERKUNCI (DIGROUPING PER SISWA) */}
                 <div className="pt-2 border-t border-slate-100">
-                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-2">Riwayat Expired ({expiredComplaints.length})</h3>
-                  <div className="space-y-2">
-                    {expiredComplaints.map(c => {
-                      const isSelected = activeChatId === c.id;
-                      return (
-                        <div 
-                          key={c.id} 
-                          onClick={() => setActiveChatId(c.id)}
-                          className={`p-3 rounded-2xl cursor-pointer transition-all border ${
-                            isSelected 
-                              ? 'bg-slate-100 border-slate-300 shadow-sm' 
-                              : 'bg-white border-slate-100 hover:bg-slate-50'
-                          } opacity-80`}
-                        >
-                          <div className="flex justify-between items-center mb-1">
-                            <div className="flex items-center gap-2 truncate">
-                              <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-xs shrink-0">
-                                {c.studentName ? c.studentName.charAt(0).toUpperCase() : 'W'}
-                              </div>
-                              <h4 className="font-bold text-slate-800 text-xs truncate">{c.studentName}</h4>
-                            </div>
-                            <Icon name="lock" size={12} className="text-slate-400 shrink-0" />
-                          </div>
-                          <p className="text-xs text-slate-600 font-medium truncate pl-9">{c.title}</p>
-                        </div>
-                      );
-                    })}
+                  <div className="flex items-center justify-between px-2 mb-2">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      Riwayat Terkunci ({expiredComplaints.length})
+                    </h3>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      {groupedExpired.length} Wali Siswa
+                    </span>
                   </div>
+
+                  {groupedExpired.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic text-center py-3">Belum ada riwayat pengaduan tersimpan.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {groupedExpired.map(group => {
+                        const isExpanded = expandedStudents[group.key] ?? false;
+                        const hasSelectedChild = group.items.some(i => i.id === activeChatId);
+
+                        return (
+                          <div 
+                            key={group.key}
+                            className={`rounded-2xl border transition-all overflow-hidden ${
+                              hasSelectedChild 
+                                ? 'border-blue-300 bg-blue-50/30 shadow-xs' 
+                                : 'border-slate-200 bg-slate-50/70 hover:bg-slate-50'
+                            }`}
+                          >
+                            {/* Accordion Header: Profil Siswa & Total Sub Pesan */}
+                            <button
+                              type="button"
+                              onClick={() => toggleStudent(group.key)}
+                              className="w-full p-3 flex items-center justify-between text-left transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5 truncate">
+                                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-extrabold text-xs shrink-0">
+                                  {group.studentName ? group.studentName.charAt(0).toUpperCase() : 'W'}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-extrabold text-slate-800 text-xs truncate">
+                                    {group.studentName}
+                                  </h4>
+                                  <p className="text-[10px] text-slate-400 font-medium truncate">
+                                    {group.waliName || 'Wali Murid'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-700 flex items-center gap-1">
+                                  <Icon name="lock" size={10} />
+                                  {group.items.length} Pesan
+                                </span>
+                                <Icon 
+                                  name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                                  size={14} 
+                                  className="text-slate-400" 
+                                />
+                              </div>
+                            </button>
+
+                            {/* Sub-Pesan Pesan Terkunci (Hanya Tampil Jika Accordion Dibuka) */}
+                            {isExpanded && (
+                              <div className="px-2 pb-2 space-y-1.5 border-t border-slate-200/60 pt-2 animate-in fade-in duration-150">
+                                {group.items.map(c => {
+                                  const isSelected = activeChatId === c.id;
+                                  const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+
+                                  return (
+                                    <div
+                                      key={c.id}
+                                      onClick={() => handleSelectChat(c)}
+                                      className={`p-2.5 rounded-xl cursor-pointer transition-all border text-left ${
+                                        isSelected
+                                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <p className={`text-xs font-black truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>
+                                          {c.title}
+                                        </p>
+                                        <span className={`text-[9px] font-bold shrink-0 ml-1.5 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                                          {c.date}
+                                        </span>
+                                      </div>
+
+                                      {lastMsg && (
+                                        <p className={`text-[11px] truncate ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                                          {lastMsg.sender === 'Admin TU' ? 'Anda: ' : ''}{lastMsg.text}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
              </div>
           </div>
@@ -8467,6 +8950,7 @@ function ParentDashboardView({
       mySessionTokenRef.current = mySessionToken;
 
       const [currentView, setCurrentView] = useState('dashboard');
+      const [isAdminMobileMenuOpen, setIsAdminMobileMenuOpen] = useState(false);
       const [adminExpandedGroup, setAdminExpandedGroup] = useState(() => {
         if (['transaksi', 'tunggakan', 'laporan'].includes('dashboard')) return 'keuangan';
         if (['siswa', 'catatan'].includes('dashboard')) return 'kesiswaan';
@@ -8874,19 +9358,29 @@ function ParentDashboardView({
       };
 
       const handleAddComplaint = async (compData) => {
-        const initialMessages = [{ sender: 'Wali Murid', text: compData.content, time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) }];
+        const now = Date.now();
+        const initialMessages = [{ 
+          sender: 'Wali Murid', 
+          senderRole: 'parent',
+          text: compData.content, 
+          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) 
+        }];
         const newComp = { 
-          id: Date.now(), 
+          id: now, 
           ...compData,
-          messages: initialMessages
+          createdAtMs: now,
+          expiresAtMs: now + 3600000,
+          isRead: false,
+          messages: initialMessages,
+          status: 'Belum Ditangani'
         };
         setComplaints(prev => [newComp, ...prev]);
-        showToast("Pengaduan Terkirim", "Pengaduan Anda telah terkirim ke Admin TU.", "success");
+        showToast("Pengaduan Terkirim", "Pengaduan Anda telah terkirim ke Admin TU. Sesi obrolan aktif selama 1 jam.", "success");
 
         const supabase = getSupabaseClient();
         if (supabase) {
           try {
-            await supabase.from('complaints').insert([{
+            const { data } = await supabase.from('complaints').insert([{
               student_id: compData.studentId,
               student_name: compData.studentName,
               wali_name: compData.waliName,
@@ -8895,8 +9389,13 @@ function ParentDashboardView({
               admin_reply: '',
               messages: JSON.stringify(initialMessages),
               status: 'Belum Ditangani',
+              is_read: false,
               date: compData.date
-            }]);
+            }]).select();
+            if (data && data[0]) {
+              const mapped = mapComplaintFromDb(data[0]);
+              setComplaints(prev => prev.map(c => c.id === now ? mapped : c));
+            }
           } catch (err) {}
         }
       };
@@ -8904,6 +9403,7 @@ function ParentDashboardView({
       const handleReplyComplaint = async (id, replyText, senderRole = 'Admin TU', imageUrl = null) => {
         let updatedMessages = [];
         let updatedStatus = 'Sudah Ditangani';
+        const isFromAdmin = senderRole === 'Admin TU';
 
         setComplaints(prev => prev.map(c => {
           if (c.id === id) {
@@ -8912,6 +9412,7 @@ function ParentDashboardView({
 
             const newMsg = {
               sender: senderRole,
+              senderRole: isFromAdmin ? 'admin' : 'parent',
               text: replyText,
               imageUrl: imageUrl,
               time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
@@ -8925,13 +9426,14 @@ function ParentDashboardView({
             }
 
             updatedMessages = [...existingMsgs, newMsg];
-            updatedStatus = senderRole === 'Admin TU' ? 'Sudah Ditangani' : c.status;
+            updatedStatus = isFromAdmin ? 'Sudah Ditangani' : c.status;
 
             return { 
               ...c, 
-              adminReply: senderRole === 'Admin TU' ? replyText : c.adminReply,
+              adminReply: isFromAdmin ? replyText : c.adminReply,
               messages: updatedMessages, 
-              status: updatedStatus 
+              status: updatedStatus,
+              isRead: isFromAdmin ? true : false
             };
           }
           return c;
@@ -8945,7 +9447,8 @@ function ParentDashboardView({
             await supabase.from('complaints').update({
               admin_reply: replyText,
               messages: JSON.stringify(updatedMessages),
-              status: updatedStatus
+              status: updatedStatus,
+              is_read: isFromAdmin ? true : false
             }).eq('id', id);
           } catch (err) {}
         }
@@ -9313,36 +9816,240 @@ function ParentDashboardView({
       return (
         <>
           <div className="min-h-screen bg-slate-100 flex flex-col w-full text-slate-800">
-            <div className="w-full flex-1 bg-white flex flex-col md:flex-row min-h-screen mobile-full-height">
+            {/* TOP MOBILE APP BAR with 3-Line Hamburger Menu for Admin (Midnight Obsidian Sapphire Luxury Theme) */}
+            <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#0a1838]/95 via-[#0d2250]/95 to-[#07132e]/95 backdrop-blur-xl px-4.5 py-3.5 border-b border-white/10 shadow-xl flex items-center justify-between min-h-[66px] text-white">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400 via-indigo-600 to-blue-700 p-0.5 shadow-lg shadow-blue-950/50 overflow-hidden shrink-0 flex items-center justify-center ring-2 ring-cyan-400/30">
+                  <img src="logo.png" alt="PAUD Setia Bhakti" className="w-8 h-8 object-contain filter drop-shadow" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-base font-black text-white truncate tracking-tight">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h1>
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-cyan-300 truncate mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Admin TU • {settings.adminName || 'Admin'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rounded Dark Frosted 3-Line Hamburger Button */}
+              <button
+                type="button"
+                onClick={() => setIsAdminMobileMenuOpen(!isAdminMobileMenuOpen)}
+                className="relative w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex flex-col items-center justify-center gap-[5px] p-3 transition-all shadow-lg border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                aria-label="Buka Menu Admin"
+              >
+                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 rotate-45 translate-y-[7.5px]' : 'w-5'}`}></span>
+                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'opacity-0 w-0' : 'w-4 self-start ml-0.5'}`}></span>
+                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 -rotate-45 -translate-y-[7.5px]' : 'w-5'}`}></span>
+
+                {transactions.filter(t => !t.isRead).length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full ring-2 ring-white animate-pulse flex items-center justify-center text-[10px] font-black text-white shadow-md">
+                    !
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* MOBILE SLIDE-OUT NAVIGATION DRAWER - Admin */}
+            {isAdminMobileMenuOpen && (
+              <div className="md:hidden fixed inset-0 z-50 overflow-hidden animate-in fade-in duration-200">
+                <div 
+                  className="absolute inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity" 
+                  onClick={() => setIsAdminMobileMenuOpen(false)}
+                ></div>
+
+                <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] bg-gradient-to-b from-[#0a1838] via-[#091735] to-[#040b1a] text-white flex flex-col justify-between shadow-2xl z-10 border-l border-white/15 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
+                  {/* Luminous Glow Orbs in Drawer */}
+                  <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/15 blur-3xl pointer-events-none"></div>
+                  <div className="absolute bottom-20 -left-10 w-40 h-40 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none"></div>
+
+                  <div className="p-4 sm:p-5 relative z-10">
+                    {/* Drawer Header */}
+                    <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/15 flex items-center justify-center p-1.5 shadow-md shrink-0">
+                          <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-sm font-black text-white leading-tight truncate">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h2>
+                          <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block truncate">Panel Administrator TU</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsAdminMobileMenuOpen(false)}
+                        className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white flex items-center justify-center transition-colors border border-white/10 active:scale-95 shrink-0"
+                      >
+                        <Icon name="x" size={18} />
+                      </button>
+                    </div>
+
+                    {/* Admin User Chip in Drawer */}
+                    <div className="p-3.5 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 flex items-center gap-3 mb-4 shadow-lg shadow-black/30">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-lg border border-white/20 overflow-hidden shrink-0 shadow-md">
+                        {settings.adminName ? settings.adminName.charAt(0) : 'A'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-black text-white truncate capitalize">{settings.adminName || 'Admin TU'}</p>
+                        <p className="text-xs text-slate-400 font-bold truncate mt-0.5">Tahun Ajaran {settings.academicYear || 'Aktif'}</p>
+                      </div>
+                    </div>
+
+                    {/* Admin Navigation Groups */}
+                    <div className="space-y-1.5">
+                      {[
+                        { id: 'dashboard', label: 'Dashboard', icon: 'home', defaultView: 'dashboard', views: ['dashboard'] },
+                        { 
+                          id: 'keuangan', 
+                          label: 'Keuangan SPP', 
+                          icon: 'credit-card', 
+                          defaultView: 'transaksi', 
+                          views: ['transaksi', 'tunggakan', 'laporan'],
+                          subItems: [
+                            { id: 'transaksi', label: 'Catat Bayar Manual', icon: 'plus-circle' },
+                            { id: 'tunggakan', label: 'Follow-Up Tunggakan', icon: 'phone-call', badge: students.filter(s => (s.unpaidMonths && s.unpaidMonths.length > 0) || (s.unpaidCount > 0)).length || null, badgeType: 'danger' },
+                            { id: 'laporan', label: 'Cetak Laporan PDF', icon: 'printer' }
+                          ]
+                        },
+                        { 
+                          id: 'kesiswaan', 
+                          label: 'Kesiswaan', 
+                          icon: 'users', 
+                          defaultView: 'siswa', 
+                          views: ['siswa', 'catatan'], 
+                          badge: null,
+                          subItems: [
+                            { id: 'siswa', label: 'Data Murid', icon: 'user-check' },
+                            { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text' }
+                          ]
+                        },
+                        { 
+                          id: 'komunikasi', 
+                          label: 'Komunikasi', 
+                          icon: 'message-square', 
+                          defaultView: 'pengumuman', 
+                          views: ['pengumuman', 'pengaduan'], 
+                          badge: null,
+                          subItems: [
+                            { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper' },
+                            { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: (complaints.filter(isComplaintPending).length) || null, badgeType: 'danger' }
+                          ]
+                        },
+                        { id: 'pengaturan', label: 'Pengaturan', icon: 'settings', defaultView: 'pengaturan', views: ['pengaturan'] }
+                      ].map(group => {
+                        const isGroupActive = group.views.includes(currentView);
+                        const isExpanded = adminExpandedGroup === group.id;
+
+                        return (
+                          <div key={group.id} className="w-full">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (group.subItems) {
+                                  if (isExpanded) {
+                                    setAdminExpandedGroup(null);
+                                  } else {
+                                    setAdminExpandedGroup(group.id);
+                                    if (!isGroupActive) {
+                                      setCurrentView(group.defaultView);
+                                    }
+                                  }
+                                } else {
+                                  setAdminExpandedGroup(group.id);
+                                  setCurrentView(group.defaultView);
+                                  setIsAdminMobileMenuOpen(false);
+                                }
+                              }}
+                              className={`w-full min-h-[44px] py-2.5 px-3.5 rounded-xl flex items-center justify-between text-xs sm:text-sm font-extrabold transition-all duration-200 active:scale-[0.99] ${
+                                isGroupActive
+                                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border border-white/10'
+                                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1 truncate">
+                                <Icon name={group.icon} size={18} className="shrink-0" />
+                                <span className="truncate capitalize">{group.label}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {group.subItems && (
+                                  <Icon name="chevron-down" size={16} className={`transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+                                )}
+                              </div>
+                            </button>
+
+                            {group.subItems && isExpanded && (
+                              <div className="border-l-2 border-slate-800 ml-4 pl-3 mt-1.5 space-y-1">
+                                {group.subItems.map(sub => (
+                                  <button
+                                    key={sub.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setCurrentView(sub.id);
+                                      setAdminExpandedGroup(group.id);
+                                      setIsAdminMobileMenuOpen(false);
+                                    }}
+                                    className={`w-full min-h-[40px] py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-between transition-all active:scale-[0.99] ${
+                                      currentView === sub.id
+                                        ? 'bg-white/15 text-white font-black border border-white/15 shadow-xs'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1 truncate">
+                                      <Icon name={sub.icon} size={15} className="shrink-0" />
+                                      <span className="truncate capitalize">{sub.label}</span>
+                                    </div>
+                                    {sub.badge > 0 && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse shrink-0">
+                                        {sub.badge}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Sticky Drawer Footer Actions */}
+                  <div className="sticky bottom-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 p-4 space-y-2 mt-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetchData(true);
+                        setIsAdminMobileMenuOpen(false);
+                      }}
+                      className="w-full min-h-[42px] py-2.5 px-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-white text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                    >
+                      <Icon name="refresh-cw" size={15} className={`shrink-0 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+                      <span className="truncate">Sinkronisasi Data Baru</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdminMobileMenuOpen(false);
+                        handleUserLogout();
+                      }}
+                      className="w-full min-h-[42px] py-2.5 px-3.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/20 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                    >
+                      <Icon name="log-out" size={15} className="shrink-0" />
+                      <span className="truncate">Keluar Akun Admin TU</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="w-full flex-1 bg-[#ebf1f8] flex flex-col md:flex-row min-h-screen mobile-full-height">
               {/* ROYAL BLUE SIDEBAR - Hidden on mobile */}
               <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
                 
-                {/* Luminous Cyber-Neon Wave Vector Art at Bottom-Left of Admin Sidebar */}
-                <div className="absolute -bottom-8 -left-8 w-80 h-80 pointer-events-none select-none z-0 overflow-hidden opacity-90">
-                  <svg viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full filter drop-shadow-[0_0_20px_rgba(6,182,212,0.45)]">
-                    <path d="M-20,320 C30,260 60,190 20,120 C-10,70 10,20 60,0 C90,60 70,140 130,200 C180,250 250,270 320,290 L320,340 L-20,340 Z" fill="url(#cyan-glow-mesh-admin-1)" opacity="0.35" />
-                    <path d="M-10,320 C40,240 90,210 120,160 C150,110 200,90 260,120 C210,160 170,220 130,260 C90,300 40,320 -10,320 Z" fill="url(#cyan-glow-mesh-admin-2)" opacity="0.55" />
-                    <path d="M0,320 C60,250 110,220 160,190 C210,160 260,170 310,210 C260,230 200,250 150,280 C100,310 40,320 0,320 Z" fill="url(#cyan-glow-mesh-admin-3)" opacity="0.75" />
-                    <path d="M-10,310 Q80,240 140,180 T290,140" stroke="#38bdf8" strokeWidth="2.5" strokeLinecap="round" opacity="0.9" filter="drop-shadow(0 0 6px #38bdf8)" />
-                    <path d="M0,320 Q100,260 170,210 T320,190" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" opacity="0.95" filter="drop-shadow(0 0 8px #22d3ee)" />
-                    <path d="M10,330 Q120,280 190,240 T340,230" stroke="#818cf8" strokeWidth="1.5" strokeLinecap="round" opacity="0.75" />
-                    <defs>
-                      <linearGradient id="cyan-glow-mesh-admin-1" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.85" />
-                        <stop offset="100%" stopColor="#1e40af" stopOpacity="0" />
-                      </linearGradient>
-                      <linearGradient id="cyan-glow-mesh-admin-2" x1="0%" y1="100%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.9" />
-                        <stop offset="60%" stopColor="#3b82f6" stopOpacity="0.5" />
-                        <stop offset="100%" stopColor="#1e3a8a" stopOpacity="0" />
-                      </linearGradient>
-                      <linearGradient id="cyan-glow-mesh-admin-3" x1="30%" y1="100%" x2="90%" y2="10%">
-                        <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
-                        <stop offset="100%" stopColor="#6366f1" stopOpacity="0.1" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                </div>
+                {/* Subtle Ambient Highlights in Admin Sidebar */}
+                <div className="absolute -bottom-10 -left-10 w-64 h-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none select-none z-0"></div>
+                <div className="absolute top-20 right-0 w-48 h-48 rounded-full bg-indigo-500/10 blur-[60px] pointer-events-none select-none z-0"></div>
 
                 <div className="relative z-10">
                   {/* Brand / School Header with Frosted Glass Container (Matching Image 3) */}
@@ -9381,11 +10088,10 @@ function ParentDashboardView({
                         icon: 'users', 
                         defaultView: 'siswa', 
                         views: ['siswa', 'catatan'], 
-                        badge: students.length,
-                        badgeType: 'sky',
+                        badge: null,
                         subItems: [
-                          { id: 'siswa', label: 'Data Murid', icon: 'user-check', badge: students.length, badgeType: 'sky' },
-                          { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text', badge: notes.length, badgeType: 'purple' }
+                          { id: 'siswa', label: 'Data Murid', icon: 'user-check' },
+                          { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text' }
                         ]
                       },
                       { 
@@ -9394,11 +10100,10 @@ function ParentDashboardView({
                         icon: 'message-square', 
                         defaultView: 'pengumuman', 
                         views: ['pengumuman', 'pengaduan'], 
-                        badge: (complaints.filter(c => isComplaintPending(c)).length) || null,
-                        badgeType: 'danger',
+                        badge: null,
                         subItems: [
-                          { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper', badge: announcements.length, badgeType: 'cyan' },
-                          { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: complaints.filter(c => isComplaintPending(c)).length, badgeType: 'danger' }
+                          { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper' },
+                          { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: (complaints.filter(c => isComplaintPending(c)).length) || null, badgeType: 'danger' }
                         ]
                       },
                       { id: 'pengaturan', label: 'Pengaturan', icon: 'settings', defaultView: 'pengaturan', views: ['pengaturan'] }
@@ -9532,7 +10237,7 @@ function ParentDashboardView({
               </aside>
 
             {/* MAIN AESTHETIC CONTENT CARD */}
-            <main className="flex-1 bg-[#f0f4f9] bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
+            <main className="flex-1 bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
               {/* Header Top Bar */}
               <header className="px-6 md:px-10 pt-7 pb-5 border-b border-slate-200/80 flex flex-col gap-4 bg-white/90 backdrop-blur-md sticky top-0 z-10">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -9732,6 +10437,7 @@ function ParentDashboardView({
                 complaints={complaints}
                 onReplyComplaint={handleReplyComplaint}
                 onToggleComplaintStatus={handleToggleComplaintStatus}
+                onMarkAsRead={handleMarkReadNotification}
               />
             )}
 
@@ -9769,46 +10475,6 @@ function ParentDashboardView({
               </div>
             </main>
           </div>
-
-          {/* MOBILE BOTTOM NAVIGATION BAR - Admin */}
-          <nav className="mobile-bottom-nav admin-variant" role="navigation" aria-label="Admin Mobile Navigation">
-            {[
-              { id: 'dashboard', label: 'Dasbor', icon: 'layout-grid', view: 'dashboard', badge: 0 },
-              { id: 'kesiswaan', label: 'Siswa', icon: 'users', view: 'siswa', badge: students.length, badgeType: 'info' },
-              { id: 'keuangan', label: 'Keuangan', icon: 'credit-card', view: 'transaksi', badge: transactions.filter(t => !t.isRead).length, badgeType: 'danger' },
-              { id: 'komunikasi', label: 'Pesan', icon: 'message-square', view: 'pengumuman', badge: complaints.filter(c => isComplaintPending(c)).length, badgeType: 'danger' },
-              { id: 'pengaturan', label: 'Setting', icon: 'settings', view: 'pengaturan', badge: 0 }
-            ].map(tab => {
-              const viewGroups = {
-                dashboard: ['dashboard'],
-                kesiswaan: ['siswa', 'catatan'],
-                keuangan: ['transaksi', 'tunggakan', 'laporan'],
-                komunikasi: ['pengumuman', 'pengaduan'],
-                pengaturan: ['pengaturan']
-              };
-              const isActive = viewGroups[tab.id]?.includes(currentView);
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setCurrentView(tab.view);
-                    setAdminExpandedGroup(tab.id);
-                  }}
-                  className={`mobile-bottom-nav-item ${isActive ? 'active' : ''}`}
-                  aria-label={tab.label}
-                  aria-current={isActive ? 'page' : undefined}
-                >
-                  <span className="mobile-bottom-nav-icon">
-                    <Icon name={tab.icon} size={22} />
-                    {tab.badge > 0 && (
-                      <span className={`mobile-bottom-nav-badge ${tab.badgeType || 'danger'}`}>{tab.badge > 99 ? '99+' : tab.badge}</span>
-                    )}
-                  </span>
-                  <span className="mobile-bottom-nav-label">{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
 
         </div>
 

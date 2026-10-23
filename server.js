@@ -14,6 +14,7 @@ const MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2'
@@ -21,27 +22,6 @@ const MIME_TYPES = {
 
 const server = http.createServer((req, res) => {
   const urlPath = req.url.split('?')[0];
-
-  if (urlPath === '/save-flowchart-image' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => { body += chunk; });
-    req.on('end', () => {
-      try {
-        const { image } = JSON.parse(body);
-        const base64Data = image.replace(/^data:image\/png;base64,/, '');
-        const targetPath = path.join(__dirname, 'Flowchart_Sistem_SPP_Midtrans.png');
-        fs.writeFileSync(targetPath, base64Data, 'base64');
-        console.log('✅ Flowchart image successfully saved to:', targetPath);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, path: targetPath }));
-      } catch (err) {
-        console.error('Error saving flowchart:', err);
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      }
-    });
-    return;
-  }
 
   if (urlPath === '/env.js') {
     const envFilePath = path.join(__dirname, 'env.js');
@@ -62,7 +42,7 @@ const server = http.createServer((req, res) => {
 
     const safeEnv = {};
     for (const [k, v] of Object.entries(envData)) {
-      if (!/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD)/i.test(k)) {
+      if (!/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY)/i.test(k)) {
         safeEnv[k] = v;
       }
     }
@@ -78,6 +58,13 @@ const server = http.createServer((req, res) => {
   get supabaseUrl() { return this.get('SUPABASE_URL'); }
   get supabaseKey() { return this.get('SUPABASE_KEY') || this.get('SUPABASE_ANON_KEY'); }
   get midtransClientKey() { return this.get('MIDTRANS_CLIENT_KEY'); }
+  get schoolName() { return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI'); }
+  get schoolAddress() { return this.get('SCHOOL_ADDRESS', 'Bekasi, Jawa Barat'); }
+  get schoolPhone() { return this.get('SCHOOL_PHONE', '081234567890'); }
+  get academicYear() { return this.get('ACADEMIC_YEAR', '2025/2026'); }
+  get adminName() { return this.get('DEFAULT_ADMIN_NAME', 'Siti Rahma (Admin TU)'); }
+  get adminUsername() { return this.get('DEFAULT_ADMIN_USER', 'admin'); }
+  get adminPassword() { return this.get('DEFAULT_ADMIN_PASS', 'admin123'); }
   toObject() { return { ...this.#config }; }
 }
 (function() {

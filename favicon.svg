@@ -1,13 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#2563eb"/>
-      <stop offset="100%" stop-color="#1e40af"/>
+    <linearGradient id="sapphireBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a1838"/>
+      <stop offset="50%" stop-color="#0e2a66"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
     </linearGradient>
+    <linearGradient id="sunGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fde047"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="bookCyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#grad)"/>
-  <path d="M32 14L10 25L32 36L54 25L32 14Z" fill="#ffffff"/>
-  <path d="M19 31V43C19 47 25 50 32 50C39 50 45 47 45 43V31" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <path d="M47 29V44C47 45 48.5 46 50 46C51.5 46 53 45 53 44V29" stroke="#facc15" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-  <circle cx="50" cy="46" r="2" fill="#facc15"/>
+
+  <!-- Squircle Base with Deep Midnight Sapphire Glass Gradient -->
+  <rect width="128" height="128" rx="34" fill="url(#sapphireBg)"/>
+  <rect x="2" y="2" width="124" height="124" rx="32" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+
+  <!-- Golden Rising Sun -->
+  <circle cx="64" cy="46" r="18" fill="url(#sunGold)" filter="url(#glow)"/>
+  
+  <!-- Sun Rays -->
+  <path d="M64 20V24M64 68V72M38 46H42M86 46H90M45 27L48 30M80 62L83 65M45 65L48 62M80 30L83 27" stroke="#fbbf24" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Open Book of Knowledge -->
+  <path d="M64 78C52 70 34 72 26 77V99C34 94 52 92 64 99C76 92 94 94 102 99V77C94 72 76 70 64 78Z" fill="#ffffff" fill-opacity="0.95"/>
+  <path d="M64 78V99" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M26 77C34 72 52 70 64 78C76 70 94 72 102 77" stroke="#38bdf8" stroke-width="2.5" fill="none"/>
+
+  <!-- Sprout of Growth in Center -->
+  <path d="M64 68C61 63 56 61 52 64C52 69 57 73 64 78C71 73 76 69 76 64C72 61 67 63 64 68Z" fill="#34d399"/>
+  <circle cx="64" cy="62" r="3" fill="#fbbf24"/>
 </svg>

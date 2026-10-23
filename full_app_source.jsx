@@ -274,23 +274,28 @@
         }
       }
 
-      let currentSchoolName = row.school_name || localExt.schoolName || 'PAUD SETIA BHAKTI';
-      if (!currentSchoolName || currentSchoolName === 'PAUD TUNAS BANGSA') {
-        currentSchoolName = 'PAUD SETIA BHAKTI';
-      }
+      const defaultSchool = window.AppEnv?.schoolName || window.ENV?.SCHOOL_NAME || 'PAUD SETIA BHAKTI';
+      const defaultAddr = window.AppEnv?.schoolAddress || window.ENV?.SCHOOL_ADDRESS || 'Bekasi, Jawa Barat';
+      const defaultPhone = window.AppEnv?.schoolPhone || window.ENV?.SCHOOL_PHONE || '081234567890';
+      const defaultYear = window.AppEnv?.academicYear || window.ENV?.ACADEMIC_YEAR || '2025/2026';
+      const defaultAdmin = window.AppEnv?.adminName || window.ENV?.DEFAULT_ADMIN_NAME || 'Siti Rahma (Admin TU)';
+      const defaultAdminUser = window.AppEnv?.adminUsername || window.ENV?.DEFAULT_ADMIN_USER || 'admin';
+      const defaultMidtransClient = window.AppEnv?.midtransClientKey || window.ENV?.MIDTRANS_CLIENT_KEY || '';
+
+      const currentSchoolName = row.school_name || localExt.schoolName || defaultSchool;
 
       return {
         id: row.id,
         schoolName: currentSchoolName,
-        address: row.address || localExt.address || 'Bekasi, Jawa Barat',
-        phone: row.phone || localExt.phone || '081234567890',
-        academicYear: row.academic_year || localExt.academicYear || '2025/2026',
-        activePeriodName: row.active_period_name || localExt.activePeriodName || `Periode ${row.academic_year || '2025/2026'}`,
-        adminName: row.admin_name || localExt.adminName || 'Siti Rahma (Admin TU)',
-        adminUsername: row.admin_username || localExt.adminUsername || 'admin',
-        adminPassword: row.admin_password || localExt.adminPassword || 'admin123',
+        address: row.address || localExt.address || defaultAddr,
+        phone: row.phone || localExt.phone || defaultPhone,
+        academicYear: row.academic_year || localExt.academicYear || defaultYear,
+        activePeriodName: row.active_period_name || localExt.activePeriodName || `Periode ${row.academic_year || defaultYear}`,
+        adminName: row.admin_name || localExt.adminName || defaultAdmin,
+        adminUsername: row.admin_username || localExt.adminUsername || defaultAdminUser,
+        adminPassword: row.admin_password || localExt.adminPassword || window.AppEnv?.adminPassword || window.ENV?.DEFAULT_ADMIN_PASS || 'admin123',
         dueDateDay: Number(row.due_date_day || localExt.dueDateDay || 10),
-        midtransClientKey: row.midtrans_client_key || localExt.midtransClientKey || '',
+        midtransClientKey: row.midtrans_client_key || localExt.midtransClientKey || defaultMidtransClient,
         midtransServerKey: row.midtrans_server_key || localExt.midtransServerKey || '',
         startMonth: row.start_month || localExt.startMonth || 'Juli',
         startYear: Number(row.start_year || localExt.startYear || 2025),
@@ -342,18 +347,18 @@
       endMonth: 'Juni',
       endYear: 2026,
       semester: 'Semua',
-      academicYear: '2025/2026',
-      activePeriodName: 'Periode 2025/2026',
+      academicYear: window.AppEnv?.academicYear || window.ENV?.ACADEMIC_YEAR || '2025/2026',
+      activePeriodName: `Periode ${window.AppEnv?.academicYear || window.ENV?.ACADEMIC_YEAR || '2025/2026'}`,
       academicPeriods: [],
       customClasses: [],
-      schoolName: 'PAUD SETIA BHAKTI',
-      address: 'Bekasi, Jawa Barat',
-      phone: '081234567890',
-      adminName: 'Siti Rahma (Admin TU)',
-      adminUsername: 'admin',
-      adminPassword: 'admin123',
+      schoolName: window.AppEnv?.schoolName || window.ENV?.SCHOOL_NAME || 'PAUD SETIA BHAKTI',
+      address: window.AppEnv?.schoolAddress || window.ENV?.SCHOOL_ADDRESS || 'Bekasi, Jawa Barat',
+      phone: window.AppEnv?.schoolPhone || window.ENV?.SCHOOL_PHONE || '081234567890',
+      adminName: window.AppEnv?.adminName || window.ENV?.DEFAULT_ADMIN_NAME || 'Siti Rahma (Admin TU)',
+      adminUsername: window.AppEnv?.adminUsername || window.ENV?.DEFAULT_ADMIN_USER || 'admin',
+      adminPassword: window.AppEnv?.adminPassword || window.ENV?.DEFAULT_ADMIN_PASS || 'admin123',
       dueDateDay: 10,
-      midtransClientKey: '',
+      midtransClientKey: window.AppEnv?.midtransClientKey || window.ENV?.MIDTRANS_CLIENT_KEY || '',
       midtransServerKey: ''
     };
 
@@ -1707,6 +1712,97 @@ function ParentDashboardView({
 
       const totalParentUnread = unreadAnnCount + unreadNotesCount + unreadComplaintsCount;
 
+      const parentNotificationItems = useMemo(() => {
+        const items = [];
+
+        // 1. Complaint / chat messages from Admin TU
+        myComplaints.forEach(c => {
+          const msgs = c.messages || [];
+          const adminMsgs = msgs.filter(m => 
+            m.sender === 'Admin TU' || m.sender?.toLowerCase().includes('admin') || m.sender?.toLowerCase().includes('tu')
+          );
+          const hasAdminReply = adminMsgs.length > 0 || !!c.adminReply;
+          const isUnread = msgs.length > 0 ? (readComplaintMsgs[c.id] || 0) < msgs.length : (hasAdminReply && !readComplaintMsgs[c.id]);
+
+          if (hasAdminReply || isUnread) {
+            const lastAdminMsg = adminMsgs[adminMsgs.length - 1];
+            const snippet = lastAdminMsg ? lastAdminMsg.text : (c.adminReply || (msgs[msgs.length - 1]?.text) || 'Tanggapan baru dari Admin TU');
+            const time = lastAdminMsg?.time || c.date;
+
+            items.push({
+              id: 'complaint_' + c.id,
+              category: 'chat',
+              title: `Balasan Chat TU: ${c.title || 'Pengaduan'}`,
+              snippet: snippet,
+              time: time,
+              isUnread: isUnread,
+              timestamp: c.createdAtMs || (typeof c.id === 'number' ? c.id : (c.created_at ? new Date(c.created_at).getTime() : 0)),
+              onClick: () => {
+                const nextCount = msgs.length > 0 ? msgs.length : 1;
+                const updated = { ...readComplaintMsgs, [c.id]: nextCount };
+                setReadComplaintMsgs(updated);
+                try { localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updated)); } catch(e) {}
+                setShowParentBell(false);
+                setActiveTab('pengaduan');
+              }
+            });
+          }
+        });
+
+        // 2. Catatan TU
+        myNotes.forEach(n => {
+          const isUnread = !readNotes.includes(n.id);
+          items.push({
+            id: 'note_' + n.id,
+            category: 'note',
+            title: `Catatan TU: ${n.title || 'Catatan Baru'}`,
+            snippet: n.content || 'Catatan penting perkembangan siswa dari TU',
+            time: n.date || '',
+            isUnread: isUnread,
+            timestamp: n.created_at ? new Date(n.created_at).getTime() : (typeof n.id === 'number' ? n.id : 0),
+            onClick: () => {
+              if (!readNotes.includes(n.id)) {
+                const next = [...readNotes, n.id];
+                setReadNotes(next);
+                try { localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
+              }
+              setShowParentBell(false);
+              setActiveTab('evaluasi');
+            }
+          });
+        });
+
+        // 3. Announcements (Pengumuman Sekolah)
+        announcements.forEach(a => {
+          const isUnread = !readAnnouncements.includes(a.id);
+          items.push({
+            id: 'ann_' + a.id,
+            category: 'announcement',
+            title: `Pengumuman: ${a.title}`,
+            snippet: a.content || 'Klik untuk membuka rincian pengumuman',
+            time: a.date || '',
+            isUnread: isUnread,
+            timestamp: a.created_at ? new Date(a.created_at).getTime() : (typeof a.id === 'number' ? a.id : 0),
+            onClick: () => {
+              if (!readAnnouncements.includes(a.id)) {
+                const next = [...readAnnouncements, a.id];
+                setReadAnnouncements(next);
+                try { localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
+              }
+              setShowParentBell(false);
+              setActiveTab('berita');
+            }
+          });
+        });
+
+        // Sort: Unread first, then newer items first
+        return items.sort((a, b) => {
+          if (a.isUnread && !b.isUnread) return -1;
+          if (!a.isUnread && b.isUnread) return 1;
+          return (b.timestamp || 0) - (a.timestamp || 0);
+        });
+      }, [myComplaints, myNotes, announcements, readComplaintMsgs, readNotes, readAnnouncements, student]);
+
       // Auto-mark notifications as read when opening specific tabs or notifications
       useEffect(() => {
         if (activeTab === 'pengaduan' && myComplaints.length > 0) {
@@ -2301,9 +2397,9 @@ function ParentDashboardView({
 
                       {showParentBell && (
                         <>
-                          {/* Mobile Backdrop Overlay */}
+                          {/* Backdrop Overlay (closes when clicked outside on mobile & desktop) */}
                           <div 
-                            className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 sm:hidden"
+                            className="fixed inset-0 bg-slate-900/20 sm:bg-transparent z-40"
                             onClick={() => setShowParentBell(false)}
                           />
                           <div className="fixed inset-x-3 top-20 sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:mt-3 w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
@@ -2335,7 +2431,8 @@ function ParentDashboardView({
 
                                       const updatedMsgs = { ...readComplaintMsgs };
                                       myComplaints.forEach(c => {
-                                        if (c.messages) updatedMsgs[c.id] = c.messages.length;
+                                        const count = (c.messages && c.messages.length > 0) ? c.messages.length : 1;
+                                        updatedMsgs[c.id] = count;
                                       });
                                       setReadComplaintMsgs(updatedMsgs);
                                       try {
@@ -2351,43 +2448,58 @@ function ParentDashboardView({
                               </div>
                             </div>
 
-                            <div className="space-y-2 max-h-72 overflow-y-auto text-xs">
-                              {announcements.length === 0 && (
-                                <p className="text-slate-400 text-center py-4 font-medium">Tidak ada notifikasi pengumuman saat ini.</p>
-                              )}
-
-                              {announcements.slice(0, 6).map(ann => {
-                                const isUnread = !readAnnouncements.includes(ann.id);
-                                return (
+                            <div className="space-y-2 max-h-80 overflow-y-auto text-xs">
+                              {parentNotificationItems.length === 0 ? (
+                                <p className="text-slate-400 text-center py-5 font-medium">Tidak ada notifikasi saat ini.</p>
+                              ) : (
+                                parentNotificationItems.slice(0, 8).map(item => (
                                   <div
-                                    key={ann.id}
-                                    onClick={() => {
-                                      if (isUnread) {
-                                        const next = [...readAnnouncements, ann.id];
-                                        setReadAnnouncements(next);
-                                        try { localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(next)); } catch(e) {}
-                                      }
-                                      setShowParentBell(false);
-                                      setActiveTab('berita');
-                                    }}
-                                    className={`p-3 rounded-xl border cursor-pointer transition-all hover:scale-[0.99] ${
-                                      isUnread 
-                                        ? 'bg-blue-50/80 border-blue-200 font-extrabold text-blue-950 shadow-sm' 
+                                    key={item.id}
+                                    onClick={item.onClick}
+                                    className={`p-3 rounded-2xl border cursor-pointer transition-all hover:scale-[0.99] ${
+                                      item.isUnread 
+                                        ? item.category === 'chat'
+                                          ? 'bg-amber-50/90 border-amber-300 font-extrabold text-amber-950 shadow-xs'
+                                          : item.category === 'note'
+                                            ? 'bg-purple-50/90 border-purple-200 font-extrabold text-purple-950 shadow-xs'
+                                            : 'bg-blue-50/90 border-blue-200 font-extrabold text-blue-950 shadow-xs'
                                         : 'bg-slate-50/80 border-slate-200 text-slate-600'
                                     }`}
                                   >
-                                    <div className="flex justify-between items-center mb-1">
-                                      <span className="font-extrabold text-[12px] truncate">Pengumuman: {ann.title}</span>
-                                      {isUnread ? (
-                                        <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[9px] font-black shrink-0">Baru</span>
+                                    <div className="flex justify-between items-center mb-1 gap-2">
+                                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                        <Icon 
+                                          name={item.category === 'chat' ? 'message-circle' : item.category === 'note' ? 'file-text' : 'megaphone'} 
+                                          size={13} 
+                                          className={`shrink-0 ${
+                                            item.isUnread 
+                                              ? item.category === 'chat' ? 'text-amber-600' : item.category === 'note' ? 'text-purple-600' : 'text-blue-600'
+                                              : 'text-slate-400'
+                                          }`} 
+                                        />
+                                        <span className="font-extrabold text-[12px] truncate">{item.title}</span>
+                                      </div>
+                                      {item.isUnread ? (
+                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${
+                                          item.category === 'chat' 
+                                            ? 'bg-amber-500 text-white animate-pulse' 
+                                            : item.category === 'note' 
+                                              ? 'bg-purple-600 text-white' 
+                                              : 'bg-blue-600 text-white'
+                                        }`}>
+                                          {item.category === 'chat' ? 'Balasan Baru' : 'Baru'}
+                                        </span>
                                       ) : (
                                         <span className="text-[10px] text-slate-400 font-semibold shrink-0">Dibaca</span>
                                       )}
                                     </div>
-                                    <p className="text-[10px] text-slate-500 font-normal line-clamp-1">{ann.content || 'Klik untuk membuka pengumuman sekolah'}</p>
+                                    <p className="text-[11px] text-slate-600 font-normal line-clamp-1">{item.snippet}</p>
+                                    {item.time && (
+                                      <span className="text-[9px] text-slate-400 mt-1 block font-medium">{item.time}</span>
+                                    )}
                                   </div>
-                                );
-                              })}
+                                ))
+                              )}
                             </div>
                           </div>
                         </>
@@ -2488,7 +2600,7 @@ function ParentDashboardView({
                           </div>
                         </div>
                         <p className="text-xl sm:text-2xl font-black text-slate-900">{myNotes.length} Catatan</p>
-                        <p className="text-xs text-slate-500 font-semibold mt-1">Perkembangan siswa</p>
+                        <p className="text-xs text-slate-500 font-semibold mt-1">Catatan penting TU</p>
                       </div>
                     </div>
 
@@ -3632,10 +3744,12 @@ function ParentDashboardView({
             academicYear={settings?.academicYear} 
           />
 
-          <div className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] p-6 sm:p-8 bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white border border-white/15 shadow-2xl shadow-blue-950/40 flex flex-wrap items-center justify-between gap-5">
-            {/* Luminous Glow Orbs */}
-            <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-blue-500/20 blur-3xl pointer-events-none select-none"></div>
-            <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-cyan-400/15 blur-3xl pointer-events-none select-none"></div>
+          <div className="relative rounded-[28px] sm:rounded-[32px] p-6 sm:p-8 bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white border border-white/15 shadow-2xl shadow-blue-950/40 flex flex-wrap items-center justify-between gap-5">
+            {/* Luminous Glow Orbs (contained safely so dropdown is not clipped) */}
+            <div className="absolute inset-0 overflow-hidden rounded-[28px] sm:rounded-[32px] pointer-events-none select-none">
+              <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-blue-500/20 blur-3xl"></div>
+              <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-cyan-400/15 blur-3xl"></div>
+            </div>
 
             <div className="relative z-10">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/15 border border-cyan-400/30 text-cyan-300 text-xs font-black mb-2">
@@ -3678,9 +3792,9 @@ function ParentDashboardView({
 
                 {showBellDropdown && (
                   <>
-                    {/* Mobile Backdrop Overlay */}
+                    {/* Backdrop Overlay for closing on outside click (Mobile & Desktop) */}
                     <div 
-                      className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 sm:hidden"
+                      className="fixed inset-0 bg-slate-900/20 sm:bg-transparent z-40"
                       onClick={() => setShowBellDropdown(false)}
                     />
                     <div className="fixed inset-x-3 top-20 sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:mt-3 w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
@@ -5805,7 +5919,7 @@ function ParentDashboardView({
               <meta charset="UTF-8">
               <title>Laporan SPP - ${settings?.schoolName || 'PAUD'}</title>
               <link rel="stylesheet" href="style.css">
-              <script src="https://cdn.tailwindcss.com"><\/script>
+              <script src="libs/tailwind.js"><\/script>
               <style>
                 body { padding: 24px; background: #ffffff; color: #0f172a; font-family: sans-serif; }
                 @media print { body { padding: 0; } }
@@ -7846,14 +7960,14 @@ function ParentDashboardView({
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-extrabold text-slate-500 text-xs">Rp</span>
+                        <div className="relative flex items-center">
+                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-black text-slate-500 text-xs">Rp</span>
                           <input
                             type="number"
                             value={cls.tarif || ''}
                             onChange={(e) => handleUpdateClass(idx, 'tarif', e.target.value)}
-                            placeholder="Tarif SPP"
-                            className="w-36 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-emerald-700 text-right focus:bg-white text-xs"
+                            placeholder="0"
+                            className="w-36 pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-emerald-700 text-right focus:bg-white focus:border-teal-500 focus:outline-none text-xs"
                           />
                         </div>
                         <button
@@ -7882,13 +7996,18 @@ function ParentDashboardView({
                   onChange={(e) => setNewClassName(e.target.value)}
                   className="flex-1 px-3.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
                 />
-                <input
-                  type="number"
-                  placeholder="Tarif SPP (Rp)"
-                  value={newClassTarif}
-                  onChange={(e) => setNewClassTarif(e.target.value)}
-                  className="w-36 px-3.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
-                />
+                <div className="relative flex items-center">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-black text-slate-500 text-sm">
+                    Rp
+                  </span>
+                  <input
+                    type="number"
+                    placeholder="1.200.000"
+                    value={newClassTarif}
+                    onChange={(e) => setNewClassTarif(e.target.value)}
+                    className="w-40 pl-11 pr-3.5 py-2 bg-white border border-slate-300 rounded-xl font-black text-slate-900 text-right focus:border-teal-500 focus:outline-none shadow-inner"
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={handleAddClass}
@@ -9380,8 +9499,9 @@ function ParentDashboardView({
         const supabase = getSupabaseClient();
         if (supabase) {
           try {
+            const validStudentId = (compData.studentId && typeof compData.studentId === 'string' && compData.studentId.includes('-')) ? compData.studentId : null;
             const { data } = await supabase.from('complaints').insert([{
-              student_id: compData.studentId,
+              student_id: validStudentId,
               student_name: compData.studentName,
               wali_name: compData.waliName,
               title: compData.title,
@@ -9524,14 +9644,16 @@ function ParentDashboardView({
         return;
       }
       
+      const validStudentId = (noteData.studentId && typeof noteData.studentId === 'string' && noteData.studentId.includes('-')) ? noteData.studentId : null;
       const dbPayload = {
-        student_id: noteData.studentId,
+        student_id: validStudentId,
         student_name: noteData.studentName,
         title: noteData.title,
         content: noteData.content,
         category: noteData.category,
         date: noteData.date,
-        comments: JSON.stringify(noteData.comments || [])
+        comments: JSON.stringify(noteData.comments || []),
+        is_read: false
       };
       
       const { data, error } = await supabase.from('student_notes').insert([dbPayload]).select();
@@ -9676,7 +9798,9 @@ function ParentDashboardView({
         const supabase = getSupabaseClient();
         if (supabase) {
           try {
+            const validStudentId = (trxObj.studentId && typeof trxObj.studentId === 'string' && trxObj.studentId.includes('-')) ? trxObj.studentId : null;
             await supabase.from('transactions').insert([{
+              student_id: validStudentId,
               student_name: trxObj.studentName,
               kelas: trxObj.kelas,
               month: trxObj.month,
@@ -9684,7 +9808,8 @@ function ParentDashboardView({
               method: trxObj.method,
               status: 'Lunas',
               date: trxObj.date,
-              kuitansi_no: trxObj.kuitansiNo
+              kuitansi_no: trxObj.kuitansiNo,
+              is_read: false
             }]);
           } catch (err) {}
         }

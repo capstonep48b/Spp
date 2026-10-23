@@ -44,7 +44,7 @@ class EnvironmentConfig {
       const cleanKey = key.trim();
       // KEAMANAN: Filter otomatis kunci rahasia server (server key, secret, private key, password)
       // Kunci server seperti MIDTRANS_SERVER_KEY tidak boleh terekspos di browser client!
-      const isSensitiveServerKey = /(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD)/i.test(cleanKey);
+      const isSensitiveServerKey = /(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY)/i.test(cleanKey);
       if (!isSensitiveServerKey) {
         sanitized[cleanKey] = String(val || '').trim();
       }
@@ -73,6 +73,34 @@ class EnvironmentConfig {
 
   get midtransClientKey() {
     return this.get('MIDTRANS_CLIENT_KEY');
+  }
+
+  get schoolName() {
+    return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI');
+  }
+
+  get schoolAddress() {
+    return this.get('SCHOOL_ADDRESS', 'Bekasi, Jawa Barat');
+  }
+
+  get schoolPhone() {
+    return this.get('SCHOOL_PHONE', '081234567890');
+  }
+
+  get academicYear() {
+    return this.get('ACADEMIC_YEAR', '2025/2026');
+  }
+
+  get adminName() {
+    return this.get('DEFAULT_ADMIN_NAME', 'Siti Rahma (Admin TU)');
+  }
+
+  get adminUsername() {
+    return this.get('DEFAULT_ADMIN_USER', 'admin');
+  }
+
+  get adminPassword() {
+    return this.get('DEFAULT_ADMIN_PASS', 'admin123');
   }
 
   toObject() {

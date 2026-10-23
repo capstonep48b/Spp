@@ -20,7 +20,7 @@ class EnvironmentConfig {
       const cleanKey = key.trim();
       // KEAMANAN: Filter otomatis kunci rahasia server (server key, secret, private key, password)
       // Kunci server seperti MIDTRANS_SERVER_KEY tidak boleh terekspos di browser client!
-      const isSensitiveServerKey = /(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|PASSWORD)/i.test(cleanKey);
+      const isSensitiveServerKey = /(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY)/i.test(cleanKey);
       if (!isSensitiveServerKey) {
         sanitized[cleanKey] = String(val || '').trim();
       }
@@ -51,6 +51,34 @@ class EnvironmentConfig {
     return this.get('MIDTRANS_CLIENT_KEY');
   }
 
+  get schoolName() {
+    return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI');
+  }
+
+  get schoolAddress() {
+    return this.get('SCHOOL_ADDRESS', 'Bekasi, Jawa Barat');
+  }
+
+  get schoolPhone() {
+    return this.get('SCHOOL_PHONE', '081234567890');
+  }
+
+  get academicYear() {
+    return this.get('ACADEMIC_YEAR', '2025/2026');
+  }
+
+  get adminName() {
+    return this.get('DEFAULT_ADMIN_NAME', 'Siti Rahma (Admin TU)');
+  }
+
+  get adminUsername() {
+    return this.get('DEFAULT_ADMIN_USER', 'admin');
+  }
+
+  get adminPassword() {
+    return this.get('DEFAULT_ADMIN_PASS', 'admin123');
+  }
+
   toObject() {
     return { ...this.#config };
   }
@@ -59,10 +87,25 @@ class EnvironmentConfig {
 // Inisialisasi Singleton Aman
 (function() {
   const _rawValues = {
+  "#": "=======================================================",
+  "# KONFIGURASI ENVIRONMENT & API - APLIKASI SPP": "",
+  "# Supabase Database & Realtime API": "",
+  "SUPABASE_URL": "https://mgywbrmneeorynisujkf.supabase.co",
+  "SUPABASE_KEY": "sb_publishable_BT_1lHhvJerwY0k4fWzIbg_51-VQ7V5",
+  "# Midtrans Payment Gateway": "",
   "MIDTRANS_CLIENT_KEY": "SB-Mid-client-demo",
   "MIDTRANS_SERVER_KEY": "SB-Mid-server-demo",
-  "SUPABASE_URL": "https://mgywbrmneeorynisujkf.supabase.co",
-  "SUPABASE_KEY": "sb_publishable_BT_1lHhvJerwY0k4fWzIbg_51-VQ7V5"
+  "# Identitas Sekolah & Default Sistem": "",
+  "SCHOOL_NAME": "PAUD SETIA BHAKTI",
+  "SCHOOL_ADDRESS": "Bekasi, Jawa Barat",
+  "SCHOOL_PHONE": "081234567890",
+  "ACADEMIC_YEAR": "2025/2026",
+  "# Kredensial Default Administrator TU": "",
+  "DEFAULT_ADMIN_NAME": "Siti Rahma (Admin TU)",
+  "DEFAULT_ADMIN_USER": "admin",
+  "DEFAULT_ADMIN_PASS": "admin123",
+  "# Server Port": "",
+  "PORT": "3000"
 };
   const _envInstance = new EnvironmentConfig(_rawValues);
 

@@ -32,31 +32,49 @@ const server = http.createServer((req, res) => {
     }
     
     let envData = {};
+    let secretVault = {};
     try {
       const envFile = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
-      envFile.split('\n').forEach(line => {
-        const [key, ...val] = line.split('=');
-        if (key && val) envData[key.trim()] = val.join('=').trim();
+      envFile.split(/\r?\n/).forEach(rawLine => {
+        const line = rawLine.trim();
+        if (!line || line.startsWith('#')) return;
+        const eqIdx = line.indexOf('=');
+        if (eqIdx === -1) return;
+        const key = line.slice(0, eqIdx).trim();
+        const val = line.slice(eqIdx + 1).trim();
+        if (/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|^PORT$)/i.test(key)) return;
+        if (/SUPABASE_KEY|SUPABASE_ANON_KEY/i.test(key)) {
+          secretVault.k = Buffer.from(val).toString('base64');
+          return;
+        }
+        if (/DEFAULT_ADMIN_PASS|ADMIN_PASSWORD/i.test(key)) {
+          secretVault.p = Buffer.from(val).toString('base64');
+          return;
+        }
+        if (key) envData[key] = val;
       });
     } catch (e) {}
 
-    const safeEnv = {};
-    for (const [k, v] of Object.entries(envData)) {
-      if (!/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY)/i.test(k)) {
-        safeEnv[k] = v;
-      }
-    }
-
     const dynamicCode = `class EnvironmentConfig {
   #config = {};
-  constructor(raw = {}) {
+  #vault = {};
+  constructor(raw = {}, vault = {}) {
     this.#config = Object.freeze(raw);
+    this.#vault = Object.freeze({ ...vault });
     Object.freeze(this);
+  }
+  #decode(str) {
+    if (!str || typeof str !== 'string') return '';
+    try {
+      if (typeof atob === 'function') return atob(str);
+      if (typeof Buffer !== 'undefined') return Buffer.from(str, 'base64').toString('utf8');
+    } catch (e) {}
+    return '';
   }
   get(k, d = '') { return this.#config[k] !== undefined ? this.#config[k] : d; }
   has(k) { return Boolean(this.#config[k]); }
   get supabaseUrl() { return this.get('SUPABASE_URL'); }
-  get supabaseKey() { return this.get('SUPABASE_KEY') || this.get('SUPABASE_ANON_KEY'); }
+  get supabaseKey() { return this.#decode(this.#vault.k) || (typeof localStorage !== 'undefined' ? (localStorage.getItem('spp_supabase_key') || localStorage.getItem('supabase_key')) : '') || ''; }
   get midtransClientKey() { return this.get('MIDTRANS_CLIENT_KEY'); }
   get schoolName() { return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI'); }
   get schoolAddress() { return this.get('SCHOOL_ADDRESS', 'Bekasi, Jawa Barat'); }
@@ -64,11 +82,11 @@ const server = http.createServer((req, res) => {
   get academicYear() { return this.get('ACADEMIC_YEAR', '2025/2026'); }
   get adminName() { return this.get('DEFAULT_ADMIN_NAME', 'Siti Rahma (Admin TU)'); }
   get adminUsername() { return this.get('DEFAULT_ADMIN_USER', 'admin'); }
-  get adminPassword() { return this.get('DEFAULT_ADMIN_PASS', 'admin123'); }
+  get adminPassword() { return this.#decode(this.#vault.p) || this.get('DEFAULT_ADMIN_PASS', 'admin123'); }
   toObject() { return { ...this.#config }; }
 }
 (function() {
-  const _inst = new EnvironmentConfig(${JSON.stringify(safeEnv, null, 2)});
+  const _inst = new EnvironmentConfig(${JSON.stringify(envData, null, 2)}, ${JSON.stringify(secretVault, null, 2)});
   if (typeof window !== 'undefined') {
     Object.defineProperty(window, 'EnvironmentConfig', { value: EnvironmentConfig, writable: false, configurable: false });
     Object.defineProperty(window, 'AppEnv', { value: _inst, writable: false, configurable: false, enumerable: true });

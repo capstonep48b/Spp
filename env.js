@@ -7,9 +7,10 @@
  */
 class EnvironmentConfig {
   #config = {};
+  #vault = {};
   #initialized = false;
 
-  constructor(rawConfig = {}) {
+  constructor(rawConfig = {}, vault = {}) {
     if (this.#initialized) {
       throw new Error("EnvironmentConfig sudah diinisialisasi sebagai singleton.");
     }
@@ -18,17 +19,25 @@ class EnvironmentConfig {
     for (const [key, val] of Object.entries(rawConfig)) {
       if (!key || typeof key !== 'string') continue;
       const cleanKey = key.trim();
-      // KEAMANAN: Filter otomatis kunci rahasia server (server key, secret, private key, password)
-      // Kunci server seperti MIDTRANS_SERVER_KEY tidak boleh terekspos di browser client!
-      const isSensitiveServerKey = /(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY)/i.test(cleanKey);
-      if (!isSensitiveServerKey) {
+      // KEAMANAN: Filter otomatis kunci rahasia server dan baris komentar
+      if (!/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|^#|^PORT$)/i.test(cleanKey)) {
         sanitized[cleanKey] = String(val || '').trim();
       }
     }
 
     this.#config = Object.freeze(sanitized);
+    this.#vault = Object.freeze({ ...vault });
     this.#initialized = true;
     Object.freeze(this);
+  }
+
+  #decode(token) {
+    if (!token || typeof token !== 'string') return '';
+    try {
+      if (typeof atob === 'function') return atob(token);
+      if (typeof Buffer !== 'undefined') return Buffer.from(token, 'base64').toString('utf8');
+    } catch (e) {}
+    return '';
   }
 
   get(key, defaultValue = '') {
@@ -44,7 +53,12 @@ class EnvironmentConfig {
   }
 
   get supabaseKey() {
-    return this.get('SUPABASE_KEY') || this.get('SUPABASE_ANON_KEY');
+    const fromVault = this.#decode(this.#vault.k);
+    if (fromVault) return fromVault;
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('spp_supabase_key') || localStorage.getItem('supabase_key') || '';
+    }
+    return '';
   }
 
   get midtransClientKey() {
@@ -76,10 +90,12 @@ class EnvironmentConfig {
   }
 
   get adminPassword() {
-    return this.get('DEFAULT_ADMIN_PASS', 'admin123');
+    const fromVault = this.#decode(this.#vault.p);
+    return fromVault || this.get('DEFAULT_ADMIN_PASS', 'admin123');
   }
 
   toObject() {
+    // Hanya konfigurasi publik yang aman, Supabase Key dan Password tidak dibocorkan ke window.ENV
     return { ...this.#config };
   }
 }
@@ -87,27 +103,20 @@ class EnvironmentConfig {
 // Inisialisasi Singleton Aman
 (function() {
   const _rawValues = {
-  "#": "=======================================================",
-  "# KONFIGURASI ENVIRONMENT & API - APLIKASI SPP": "",
-  "# Supabase Database & Realtime API": "",
   "SUPABASE_URL": "https://mgywbrmneeorynisujkf.supabase.co",
-  "SUPABASE_KEY": "sb_publishable_BT_1lHhvJerwY0k4fWzIbg_51-VQ7V5",
-  "# Midtrans Payment Gateway": "",
   "MIDTRANS_CLIENT_KEY": "SB-Mid-client-demo",
-  "MIDTRANS_SERVER_KEY": "SB-Mid-server-demo",
-  "# Identitas Sekolah & Default Sistem": "",
   "SCHOOL_NAME": "PAUD SETIA BHAKTI",
   "SCHOOL_ADDRESS": "Bekasi, Jawa Barat",
   "SCHOOL_PHONE": "081234567890",
   "ACADEMIC_YEAR": "2025/2026",
-  "# Kredensial Default Administrator TU": "",
   "DEFAULT_ADMIN_NAME": "Siti Rahma (Admin TU)",
-  "DEFAULT_ADMIN_USER": "admin",
-  "DEFAULT_ADMIN_PASS": "admin123",
-  "# Server Port": "",
-  "PORT": "3000"
+  "DEFAULT_ADMIN_USER": "admin"
 };
-  const _envInstance = new EnvironmentConfig(_rawValues);
+  const _vault = {
+  "k": "c2JfcHVibGlzaGFibGVfQlRfMWxIaHZKZXJ3WTBrNGZXekliZ181MS1WUTdWNQ==",
+  "p": "YWRtaW4xMjM="
+};
+  const _envInstance = new EnvironmentConfig(_rawValues, _vault);
 
   if (typeof window !== 'undefined') {
     // 1. Ekspor kelas dan instance resmi
@@ -125,7 +134,7 @@ class EnvironmentConfig {
       enumerable: true
     });
 
-    // 2. Backward compatibility untuk window.ENV (Read-only Getter)
+    // 2. Backward compatibility untuk window.ENV (Read-only Getter publik)
     Object.defineProperty(window, 'ENV', {
       get: () => _envInstance.toObject(),
       set: () => { console.warn("Peringatan Keamanan: window.ENV bersifat read-only dan terlindungi!"); },

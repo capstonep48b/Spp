@@ -95,10 +95,12 @@ CREATE TABLE IF NOT EXISTS public.students (
     telepon VARCHAR(50),
     password VARCHAR(255) DEFAULT NULL,
     photo_url TEXT DEFAULT '',
-    status VARCHAR(50) DEFAULT 'Aktif',
+    status VARCHAR(50) DEFAULT 'Aktif', -- Status Akun & Login: 'Aktif' (ON), 'Non-Aktif' (OFF), 'Lulus' (OFF), 'Keluar' (OFF)
     keringanan_note VARCHAR(255) DEFAULT '',
     arrears_amount NUMERIC(12,2) DEFAULT 0,
     arrears_note VARCHAR(255) DEFAULT 'Tunggakan Tahun Sebelumnya',
+    start_active_month VARCHAR(50) DEFAULT '',
+    start_active_year INT DEFAULT NULL,
     session_token VARCHAR(255) DEFAULT '',
     class_history JSONB DEFAULT '[]',
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -123,6 +125,8 @@ ALTER TABLE public.students ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS keringanan_note VARCHAR(255) DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS arrears_amount NUMERIC(12,2) DEFAULT 0;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS arrears_note VARCHAR(255) DEFAULT 'Tunggakan Tahun Sebelumnya';
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS start_active_month VARCHAR(50) DEFAULT '';
+ALTER TABLE public.students ADD COLUMN IF NOT EXISTS start_active_year INT DEFAULT NULL;
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS session_token VARCHAR(255) DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS class_history JSONB DEFAULT '[]';
 
@@ -161,6 +165,7 @@ ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS payment_type VARCHAR(50
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS payment_time TIMESTAMPTZ DEFAULT NULL;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS academic_year VARCHAR(50) DEFAULT NULL;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS period_name VARCHAR(100) DEFAULT NULL;
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS keringanan_note VARCHAR(255) DEFAULT '';
 
 -- 4. TABEL ANNOUNCEMENTS
 -- Berita, Pengumuman & Agenda Kegiatan Sekolah dengan Foto Dokumentasi

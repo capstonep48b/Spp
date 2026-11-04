@@ -50,13 +50,31 @@
     // Mappers Database Supabase & App State
     const mapStudentFromDb = (row) => {
       let classHistory = [];
+      if (row.class_history) {
+        try {
+          classHistory = typeof row.class_history === 'string' ? JSON.parse(row.class_history) : row.class_history;
+        } catch (e) {}
+      }
+      if (!Array.isArray(classHistory) || classHistory.length === 0) {
+        try {
+          const localKey = 'spp_class_history_' + (row.id || row.nis);
+          const stored = localStorage.getItem(localKey);
+          if (stored) {
+            classHistory = JSON.parse(stored);
+          }
+        } catch (e) {}
+      }
+
+      let completedLevels = {};
       try {
-        const localKey = 'spp_class_history_' + (row.id || row.nis);
-        const stored = localStorage.getItem(localKey);
-        if (stored) {
-          classHistory = JSON.parse(stored);
+        const localLevelKey = 'spp_completed_levels_' + (row.id || row.nis);
+        const storedLevels = localStorage.getItem(localLevelKey);
+        if (storedLevels) {
+          completedLevels = JSON.parse(storedLevels);
         }
       } catch (e) {}
+
+      const isAktif = row.status ? (row.status === 'Aktif') : (row.status_aktif !== undefined ? Boolean(row.status_aktif) : true);
 
       return {
         id: row.id,
@@ -77,13 +95,153 @@
         wali: row.wali || '',
         telepon: row.telepon || '',
         password: row.password || (row.nis ? `Sb${row.nis}` : '123456'),
-        statusAktif: row.status ? (row.status === 'Aktif') : (row.status_aktif !== undefined ? row.status_aktif : true),
+        status: isAktif ? 'Aktif' : 'Non-Aktif',
+        statusAktif: isAktif,
         fotoUrl: row.photo_url || row.foto_url || '',
         keringanan_note: row.keringanan_note || '',
-        arrearsAmount: 0,
-        arrearsNote: row.arrears_note || '',
-        classHistory: Array.isArray(classHistory) ? classHistory : []
+        arrearsAmount: Number(row.arrears_amount || 0),
+        arrearsNote: (row.arrears_note && !String(row.arrears_note).startsWith('sess_')) ? row.arrears_note : '',
+        sessionToken: row.session_token || '',
+        startActiveMonth: row.start_active_month || row.startActiveMonth || '',
+        startActiveYear: row.start_active_year ? Number(row.start_active_year) : (row.startActiveYear ? Number(row.startActiveYear) : null),
+        classHistory: Array.isArray(classHistory) ? classHistory : [],
+        completedLevels: completedLevels
       };
+    };
+
+    const ALL_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+    // Helper Format Tanggal Indonesia: Tanggal NamaBulan Tahun (contoh: 5 November 2026)
+    const formatDateIndo = (dateVal) => {
+      if (!dateVal || dateVal === '-') return dateVal || '-';
+      if (dateVal instanceof Date) {
+        if (isNaN(dateVal.getTime())) return '-';
+        return `${dateVal.getDate()} ${ALL_MONTHS[dateVal.getMonth()]} ${dateVal.getFullYear()}`;
+      }
+      const str = String(dateVal).trim();
+      if (!str || str === '-') return '-';
+
+      // Jika sudah format "5 November 2026" atau "05 - November - 2026" (dengan atau tanpa jam di belakangnya)
+      const indoMatch = str.match(/^(\d{1,2})(?:\s*-\s*|\s+)([A-Za-z]+)(?:\s*-\s*|\s+)(\d{4})(.*)$/);
+      if (indoMatch) {
+        const mIdx = ALL_MONTHS.findIndex(m => m.toLowerCase() === indoMatch[2].toLowerCase());
+        if (mIdx !== -1) {
+          const dayNum = parseInt(indoMatch[1], 10);
+          const suffix = indoMatch[4] ? indoMatch[4].trim() : '';
+          return `${dayNum} ${ALL_MONTHS[mIdx]} ${indoMatch[3]}${suffix ? ' ' + suffix : ''}`;
+        }
+      }
+
+      // Jika format DD/MM/YYYY atau D/M/YYYY (contoh: 5/11/2026 atau 05/11/2026, dengan atau tanpa jam)
+      const slashMatch = str.match(/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})(.*)$/);
+      if (slashMatch) {
+        const dayNum = parseInt(slashMatch[1], 10);
+        const monthNum = parseInt(slashMatch[2], 10);
+        const yearNum = slashMatch[3];
+        const suffix = slashMatch[4] ? slashMatch[4].trim() : '';
+        if (monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+          return `${dayNum} ${ALL_MONTHS[monthNum - 1]} ${yearNum}${suffix ? ' ' + suffix : ''}`;
+        }
+      }
+
+      // Jika format YYYY/MM/DD
+      const slashYmdMatch = str.match(/^(\d{4})[\/](\d{1,2})[\/](\d{1,2})(.*)$/);
+      if (slashYmdMatch) {
+        const yearNum = slashYmdMatch[1];
+        const monthNum = parseInt(slashYmdMatch[2], 10);
+        const dayNum = parseInt(slashYmdMatch[3], 10);
+        const suffix = slashYmdMatch[4] ? slashYmdMatch[4].trim() : '';
+        if (monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+          return `${dayNum} ${ALL_MONTHS[monthNum - 1]} ${yearNum}${suffix ? ' ' + suffix : ''}`;
+        }
+      }
+
+      // Jika format YYYY-MM-DD (tanpa T ISO)
+      const dashYmdMatch = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (dashYmdMatch) {
+        const yearNum = dashYmdMatch[1];
+        const monthNum = parseInt(dashYmdMatch[2], 10);
+        const dayNum = parseInt(dashYmdMatch[3], 10);
+        if (monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+          return `${dayNum} ${ALL_MONTHS[monthNum - 1]} ${yearNum}`;
+        }
+      }
+
+      // Jika format DD-MM-YYYY
+      const dashDmyMatch = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(.*)$/);
+      if (dashDmyMatch) {
+        const dayNum = parseInt(dashDmyMatch[1], 10);
+        const monthNum = parseInt(dashDmyMatch[2], 10);
+        const yearNum = dashDmyMatch[3];
+        const suffix = dashDmyMatch[4] ? dashDmyMatch[4].trim() : '';
+        if (monthNum >= 1 && monthNum <= 12 && dayNum >= 1 && dayNum <= 31) {
+          return `${dayNum} ${ALL_MONTHS[monthNum - 1]} ${yearNum}${suffix ? ' ' + suffix : ''}`;
+        }
+      }
+
+      // Jika di dalam string ada pola DD/MM/YYYY (misal di dalam teks waktu)
+      if (/\b\d{1,2}[\/]\d{1,2}[\/]\d{4}\b/.test(str)) {
+        return str.replace(/\b(\d{1,2})[\/](\d{1,2})[\/](\d{4})\b/g, (full, dStr, mStr, yStr) => {
+          const dNum = parseInt(dStr, 10);
+          const mNum = parseInt(mStr, 10);
+          if (mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+            return `${dNum} ${ALL_MONTHS[mNum - 1]} ${yStr}`;
+          }
+          return full;
+        });
+      }
+
+      // Fallback ke Date parser (untuk ISO string seperti 2026-11-05T01:20:00Z)
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        return `${d.getDate()} ${ALL_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      }
+
+      return str;
+    };
+
+    // Helper Format Tanggal & Waktu untuk Catatan TU / Pengaduan (contoh: 5 November 2026 • 14:30 WIB)
+    const formatDateTimeIndo = (timeOrDateVal, fallbackDateVal = '') => {
+      if (!timeOrDateVal || timeOrDateVal === '-' || timeOrDateVal === 'Wali') {
+        return fallbackDateVal ? formatDateIndo(fallbackDateVal) : '-';
+      }
+      const str = String(timeOrDateVal).trim();
+      // Jika hanya jam saja (contoh: "01.45" atau "14:30" atau "14:30 WIB")
+      if (/^\d{1,2}[:.]\d{2}(?:[:.]\d{2})?(?:\s*(?:WIB|WITA|WIT|AM|PM))?$/i.test(str)) {
+        const cleanTime = str.replace(/\./g, ':').replace(/\s*(WIB|WITA|WIT)$/i, '') + ' WIB';
+        const baseDate = fallbackDateVal ? formatDateIndo(fallbackDateVal).split('•')[0].trim() : formatDateIndo(new Date());
+        return baseDate && baseDate !== '-' ? `${baseDate} • ${cleanTime}` : cleanTime;
+      }
+      return formatDateIndo(str);
+    };
+
+    const dateToYyyyMmDd = (formattedVal) => {
+      if (!formattedVal) return '';
+      const str = String(formattedVal).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+      const indoMatch = str.match(/^(\d{1,2})(?:\s*-\s*|\s+)([A-Za-z]+)(?:\s*-\s*|\s+)(\d{4})/);
+      if (indoMatch) {
+        const day = indoMatch[1].padStart(2, '0');
+        const mIdx = ALL_MONTHS.findIndex(m => m.toLowerCase() === indoMatch[2].toLowerCase());
+        if (mIdx !== -1) {
+          const month = String(mIdx + 1).padStart(2, '0');
+          return `${indoMatch[3]}-${month}-${day}`;
+        }
+      }
+      const dmyMatch = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+      if (dmyMatch) {
+        const day = dmyMatch[1].padStart(2, '0');
+        const month = dmyMatch[2].padStart(2, '0');
+        return `${dmyMatch[3]}-${month}-${day}`;
+      }
+      const d = new Date(str);
+      if (!isNaN(d.getTime())) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      }
+      return '';
     };
 
     const mapTransactionFromDb = (row) => {
@@ -102,8 +260,9 @@
         method: row.method || '-',
         status: row.status,
         isRead: Boolean(row.is_read || localAdminRead),
-        date: row.date || '-',
-        kuitansiNo: row.kuitansi_no || '-'
+        date: formatDateIndo(row.date && row.date !== '-' ? row.date : (row.created_at || '-')),
+        kuitansiNo: row.kuitansi_no || '-',
+        keringananNote: row.keringanan_note || ''
       };
     };
 
@@ -113,7 +272,7 @@
       content: row.content || '',
       imageUrl: row.image_url || '',
       isRead: row.is_read || false,
-      date: row.date || new Date().toLocaleDateString('id-ID')
+      date: formatDateIndo(row.date || row.created_at || new Date())
     });
 
     const mapComplaintFromDb = (row) => {
@@ -124,6 +283,8 @@
         const readList = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
         if (readList.includes(row.id)) localAdminRead = true;
       } catch (e) {}
+      const formattedDate = formatDateIndo(row.date || row.created_at || new Date());
+      const rawMessages = row.messages ? (typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages) : [];
       return {
         id: row.id,
         studentId: row.student_id,
@@ -132,25 +293,37 @@
         title: row.title || 'Pengaduan / Masukan',
         content: row.content || '',
         adminReply: row.admin_reply || '',
-        messages: row.messages ? (typeof row.messages === 'string' ? JSON.parse(row.messages) : row.messages) : [],
+        messages: Array.isArray(rawMessages) ? rawMessages.map(m => ({ ...m, time: formatDateTimeIndo(m.time, formattedDate) })) : [],
         status: row.status || 'Belum Ditangani',
         isRead: Boolean(row.is_read || localAdminRead),
-        date: row.date || new Date().toLocaleDateString('id-ID'),
+        date: formattedDate,
         createdAtMs: createdTime,
         expiresAtMs: expiresTime
       };
     };
 
-    const mapNoteFromDb = (row) => ({
-      id: row.id,
-      studentId: row.student_id,
-      studentName: row.student_name,
-      date: row.date || new Date().toLocaleDateString('id-ID'),
-      category: row.category || 'Perkembangan Motorik',
-      content: row.content || '',
-      isRead: row.is_read || false,
-      comments: typeof row.comments === 'string' ? JSON.parse(row.comments || '[]') : (row.comments || [])
-    });
+    const mapNoteFromDb = (row) => {
+      const baseDate = formatDateIndo(row.date || row.created_at || new Date());
+      const rawDateStr = String(row.date || '');
+      const hasTime = /[•,]|\d{1,2}[:.]\d{2}/.test(rawDateStr);
+      const timeSuffix = (!hasTime && row.created_at)
+        ? ' • ' + new Date(row.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':') + ' WIB'
+        : '';
+      const fullDate = `${baseDate}${timeSuffix}`;
+      const rawComments = typeof row.comments === 'string' ? JSON.parse(row.comments || '[]') : (row.comments || []);
+      return {
+        id: row.id,
+        studentId: row.student_id,
+        studentName: row.student_name,
+        title: row.title || 'Catatan Tata Usaha (TU)',
+        date: fullDate,
+        category: row.category || 'Catatan TU',
+        content: row.content || '',
+        isRead: row.is_read || false,
+        created_at: row.created_at,
+        comments: Array.isArray(rawComments) ? rawComments.map(c => ({ ...c, time: formatDateTimeIndo(c.time, baseDate) })) : []
+      };
+    };
 
     const GreetingMascotBanner = ({ name, role = 'Pengguna', schoolName, academicYear }) => {
       const [liveTime, setLiveTime] = React.useState('');
@@ -181,10 +354,10 @@
       const { greeting, icon, sub } = getGreetingData();
 
       return (
-        <div className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] p-5 sm:p-7 md:p-8 mb-6 bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white border border-white/15 shadow-2xl shadow-blue-950/40 flex flex-col md:flex-row items-center justify-between gap-5 transition-all">
-          {/* Luminous Glow Orbs matching Login aesthetics */}
-          <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-blue-500/20 blur-[80px] pointer-events-none select-none"></div>
-          <div className="absolute -bottom-16 -left-16 w-56 h-56 rounded-full bg-cyan-400/15 blur-[80px] pointer-events-none select-none"></div>
+        <div className="relative overflow-hidden rounded-[28px] sm:rounded-[32px] p-5 sm:p-7 md:p-8 mb-6 bg-gradient-to-br from-[#072a6b] via-[#0f44ad] to-[#0284c7] text-white border-2 border-cyan-300/40 shadow-2xl shadow-blue-900/40 flex flex-col md:flex-row items-center justify-between gap-5 transition-all">
+          {/* Luminous Smurf Glow Orbs */}
+          <div className="absolute -top-16 -right-16 w-64 h-64 rounded-full bg-cyan-400/30 blur-[70px] pointer-events-none select-none animate-pulse"></div>
+          <div className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-blue-400/30 blur-[70px] pointer-events-none select-none"></div>
 
           <div className="flex items-center gap-4 sm:gap-5 z-10 w-full md:w-auto">
             <div className="relative shrink-0">
@@ -201,10 +374,24 @@
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="text-lg sm:text-xl md:text-2xl font-black text-white tracking-tight leading-snug">
-                  {greeting} {icon}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-200 to-white">{name}</span> <span className="animate-waving-hand inline-block text-xl sm:text-2xl ml-1">👋</span>
+                  {role === 'Wali Murid' ? (
+                    <>
+                      {greeting} {icon}! Ayah & Bunda dari <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-sky-200 to-white">{name}</span>
+                    </>
+                  ) : (
+                    <>
+                      {greeting} {icon}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 via-sky-200 to-white">{name}</span>
+                    </>
+                  )}
+                  <span className="animate-waving-hand inline-block text-xl sm:text-2xl ml-1">👋</span>
                 </h3>
               </div>
-              <p className="text-xs sm:text-sm font-medium text-slate-300 mt-1 leading-relaxed">{sub}</p>
+              <p className="text-xs sm:text-sm font-medium text-slate-200 mt-1 leading-relaxed">
+                {role === 'Wali Murid'
+                  ? 'Selamat datang di ruang informasi akademik & SPP ananda. Pantau pembayaran, evaluasi guru, dan pengumuman sekolah dengan nyaman & transparan.'
+                  : 'Buku Induk Kesiswaan & Rekapitulasi Pembayaran SPP Sekolah. Kelola administrasi dengan cermat dan rapi.'
+                }
+              </p>
               
               <div className="flex flex-wrap items-center gap-2 mt-3">
                 <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-white/10 text-cyan-200 border border-white/15 backdrop-blur-md shadow-inner flex items-center gap-1.5">
@@ -213,9 +400,15 @@
                 <span className="px-3 py-1 rounded-full text-[11px] font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 backdrop-blur-md flex items-center gap-1.5">
                   📅 <span>Periode {academicYear || '2026/2027'}</span>
                 </span>
-                <span className="hidden sm:inline-flex px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-500/15 text-amber-300 border border-amber-500/30 backdrop-blur-md items-center gap-1.5">
-                  ⭐ <span>Akreditasi A Unggul</span>
-                </span>
+                {role === 'Wali Murid' ? (
+                  <span className="hidden sm:inline-flex px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-500/20 text-amber-200 border border-amber-400/30 backdrop-blur-md items-center gap-1.5">
+                    🎒 <span>Ruang Belajar Ceria & Berakhlak</span>
+                  </span>
+                ) : (
+                  <span className="hidden sm:inline-flex px-3 py-1 rounded-full text-[11px] font-extrabold bg-amber-500/20 text-amber-200 border border-amber-400/30 backdrop-blur-md items-center gap-1.5">
+                    📖 <span>Buku Besar & Kas TU</span>
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -366,8 +559,9 @@
     // Aturan:
     // 1. TIDAK DIHITUNG pending jika sesi sudah TERKUNCI / lewat 1 jam (> 3600000 ms)
     // 2. TIDAK DIHITUNG pending jika status terkunci/selesai
-    // 3. TIDAK DIHITUNG pending jika pesan terakhir sudah dibalas oleh Admin TU
-    // 4. DIHITUNG pending HANYA JIKA masih dalam 1 jam DAN pesan terakhir dari Wali Murid (baru buat atau wali membalas lagi)
+    // 3. TIDAK DIHITUNG pending jika sudah DIBACA oleh Admin (isRead true atau sudah dibuka di chat)
+    // 4. TIDAK DIHITUNG pending jika pesan terakhir sudah dibalas oleh Admin TU
+    // 5. DIHITUNG pending HANYA JIKA masih dalam 1 jam, pesan terakhir dari Wali Murid, dan belum dibaca oleh Admin
     const isComplaintPending = (c) => {
       if (!c) return false;
       const nowMs = Date.now();
@@ -395,11 +589,31 @@
       if (expiresAt && nowMs > expiresAt) return false;
       if (c.isLocked || c.status === 'Terkunci' || c.status === 'Locked' || c.status === 'Selesai' || c.status === 'Tertutup') return false;
 
-      // 2. Sesi masih aktif (< 1 jam): Periksa pesan terakhir
+      // 2. Cek apakah sudah dibaca oleh admin (Notifikasi merah hilang saat dibaca)
+      let localAdminReadList = [];
+      let localAdminReadMsgCounts = {};
+      try {
+        localAdminReadList = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
+        localAdminReadMsgCounts = JSON.parse(localStorage.getItem('spp_admin_read_complaint_msgs') || '{}');
+      } catch (e) {}
+
       const msgs = Array.isArray(c.messages) 
         ? c.messages 
         : (typeof c.messages === 'string' ? (() => { try { return JSON.parse(c.messages); } catch(e){ return []; } })() : []);
 
+      const readCount = localAdminReadMsgCounts[c.id];
+      // Jika chat sudah dibuka/dibaca dan tidak ada pesan baru setelahnya -> notifikasi merah hilang!
+      if (readCount !== undefined && msgs.length <= readCount) {
+        return false;
+      }
+      if (c.isRead && (readCount === undefined || msgs.length <= readCount)) {
+        return false;
+      }
+      if (localAdminReadList.includes(c.id) && msgs.length === 0) {
+        return false;
+      }
+
+      // 3. Sesi masih aktif (< 1 jam): Periksa pesan terakhir
       if (msgs.length > 0) {
         const lastMsg = msgs[msgs.length - 1];
         const isLastFromAdmin = Boolean(
@@ -409,8 +623,9 @@
           (typeof lastMsg.sender === 'string' && lastMsg.sender.toLowerCase().includes('admin'))
         );
         // Jika pesan terakhir dari admin -> sudah dibalas -> TIDAK PENDING
-        // Jika pesan terakhir dari wali murid (baru buat / wali membalas lagi) -> PENDING!
-        return !isLastFromAdmin;
+        if (isLastFromAdmin) return false;
+        // Jika pesan terakhir dari wali murid dan belum dibaca -> PENDING!
+        return true;
       }
 
       // Jika belum ada array messages, cek adminReply
@@ -418,11 +633,9 @@
         return false;
       }
 
-      // Belum dibalas sama sekali & masih dalam 1 jam -> PENDING!
+      // Belum dibalas sama sekali & belum dibaca & masih dalam 1 jam -> PENDING!
       return true;
     };
-
-    const ALL_MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
     // Helper: Generate daftar bulan secara dinamis berdasarkan periode awal (bulan + tahun) s/d akhir (bulan + tahun)
     const getMonthsList = (settingsOrStartMonth, academicYear = '', optEndMonth = '', optStartYear = null, optEndYear = null) => {
@@ -482,6 +695,11 @@
       if (semStr === 'all' || semStr === 'semua' || semStr.includes('tahun') || semStr.includes('semua')) {
         return monthsList;
       }
+      // Jika rentang bulan yang dipilih sudah <= 6 bulan (misal Jan - Jun atau Jul - Des),
+      // rentang ini sudah merupakan satu semester penuh! JANGAN dipotong lagi agar tidak terpotong menjadi 3 bulan.
+      if (monthsList.length <= 6) {
+        return monthsList;
+      }
       const half = Math.ceil(monthsList.length / 2);
       if (semStr === '1' || semStr.includes('1') || semStr.includes('ganjil')) {
         return monthsList.slice(0, half);
@@ -492,14 +710,42 @@
       return monthsList;
     };
 
-    // Helper: Cek apakah suatu bulan ajaran sudah berjalan / jatuh tempo s/d tanggal hari ini
-    // ATURAN MUTLAK:
-    // 1. Tahun di masa depan (misal 2027, 2028, 2029 dst saat hari ini 2026) -> BELUM JALAN SAMA SEKALI -> BUKAN TUNGGAKAN!
-    // 2. Tahun lampau (misal 2025 ke bawah saat hari ini 2026) -> SUDAH JATUH TEMPO
-    // 3. Tahun berjalan (mYear === curYear):
-    //    - Bulan yang sudah lewat (< curMonth) -> SUDAH JATUH TEMPO
-    //    - Bulan yang belum tiba (> curMonth) -> BELUM JALAN (Bukan Tunggakan)
-    //    - Bulan berjalan (=== curMonth) -> Jatuh tempo jika tanggal hari ini sudah mencapai/melewati dueDateDay (default tgl 10)
+    // Helper: Deteksi semester otomatis dari objek atau nama periode pembayaran
+    const detectSemesterFromPeriod = (period, fallback = 'all') => {
+      if (!period) {
+        const fb = String(fallback || '').toLowerCase();
+        if (fb.includes('1') || fb.includes('ganjil')) return '1';
+        if (fb.includes('2') || fb.includes('genap')) return '2';
+        return 'all';
+      }
+
+      const pName = String(period.name || '').toLowerCase();
+      const pSem = String(period.semester || '').toLowerCase();
+
+      // 1. Cek jika nama atau semester menyebut Semester 1 / Ganjil secara spesifik
+      if (pName.includes('(semester 1)') || pName.includes('semester 1') || pName.includes('smt 1') || pName.includes('ganjil') || pSem.includes('1') || pSem.includes('ganjil')) {
+        return '1';
+      }
+
+      // 2. Cek jika nama atau semester menyebut Semester 2 / Genap secara spesifik
+      if (pName.includes('(semester 2)') || pName.includes('semester 2') || pName.includes('smt 2') || pName.includes('genap') || pSem.includes('2') || pSem.includes('genap')) {
+        return '2';
+      }
+
+      // 3. Deteksi rentang bulan jika periode semesteran (6 bulan)
+      const startM = String(period.startMonth || '').toLowerCase();
+      const endM = String(period.endMonth || '').toLowerCase();
+      if (startM.includes('jul') && (endM.includes('des') || endM.includes('dec'))) return '1';
+      if (startM.includes('jan') && endM.includes('jun')) return '2';
+
+      // 4. Default: jika semester diset 'semua' atau 1 tahun penuh
+      return 'all';
+    };
+
+    // Helper: Cek apakah suatu bulan ajaran sudah jatuh tempo / menunggak
+    // ATURAN SISTEM KEUANGAN (Permintaan 1):
+    // Bulan berjalan saat ini (current month / "bulan now") dan bulan lampau SUDAH TERMASUK tagihan jatuh tempo / menunggak jika belum lunas!
+    // Bulan ke depannya (mIdx > curMonth) berstatus "Belum Jatuh Tempo".
     const isMonthDueOrElapsed = (monthStr, now = new Date(), optArg = 10) => {
       if (!monthStr) return false;
       const cleanStr = monthStr.trim();
@@ -512,38 +758,140 @@
       
       const curYear = now.getFullYear();
       const curMonth = now.getMonth(); // 0: Jan, ..., 9: Okt, ..., 11: Des
-      const curDay = now.getDate();
       
-      let dueDateDay = 10;
-      if (typeof optArg === 'number' && optArg <= 31) {
-        dueDateDay = optArg;
-      } else if (typeof optArg === 'object' && optArg !== null && optArg.dueDateDay) {
-        dueDateDay = parseInt(optArg.dueDateDay, 10) || 10;
-      }
-      
-      // 1. Tahun di masa depan (belum berjalan sama sekali)
+      // 1. Tahun di masa depan (belum berjalan sama sekali) -> Belum Jatuh Tempo
       if (mYear > curYear) {
         return false;
       }
       
-      // 2. Tahun masa lalu (sudah lewat)
+      // 2. Tahun masa lalu (sudah lewat dari tahun berjalan) -> Sudah Lewat / Menunggak
       if (mYear < curYear) {
         return true;
       }
       
-      // 3. Tahun berjalan (mYear === curYear)
-      if (mIdx < curMonth) {
-        return true; // Bulan sebelumnya dalam tahun ini sudah lewat
-      }
-      if (mIdx > curMonth) {
-        return false; // Bulan mendatang dalam tahun ini belum tiba
+      // 3. Tahun berjalan (mYear === curYear):
+      // Bulan saat ini (bulan now) ataupun bulan lampau -> Jatuh Tempo / Menunggak jika belum lunas
+      if (mIdx <= curMonth) {
+        return true;
       }
       
-      // Bulan sekarang (mIdx === curMonth): jatuh tempo jika tanggal hari ini sudah mencapai/melewati dueDateDay
-      return curDay >= dueDateDay;
+      // Bulan ke depannya (mIdx > curMonth) berstatus "belum jatuh tempo"
+      return false;
     };
 
-    function Icon({ name, size = 18, className = "" }) {
+    // Helper: Cek apakah suatu bulan ajaran (misal "Januari 2026") sudah masuk dalam masa aktif siswa
+    // Siswa hanya ditagih SPP dan dihitung tunggakan mulai dari bulan & tahun saat siswa aktif sampai periode diterapkan
+    const isMonthOnOrAfterStudentStart = (monthStr, student, settings = null) => {
+      if (!monthStr) return false;
+      const cleanStr = monthStr.trim();
+      const parts = cleanStr.split(/\s+/);
+      const mName = parts[0];
+      const mIdx = ALL_MONTHS.indexOf(mName);
+      if (mIdx === -1) return true;
+
+      const mYear = parts[1] ? parseInt(parts[1], 10) : (settings?.startYear ? parseInt(settings.startYear, 10) : new Date().getFullYear());
+
+      // Ambil acuan bulan & tahun mulai aktif siswa
+      let sStartMonth = student?.startActiveMonth;
+      let sStartYear = student?.startActiveYear ? parseInt(student.startActiveYear, 10) : null;
+
+      // Jika belum diset spesifik di data siswa, gunakan startMonth & startYear dari settings periode aktif
+      if (!sStartMonth) {
+        sStartMonth = settings?.startMonth || 'Januari';
+      }
+      if (!sStartYear || isNaN(sStartYear)) {
+        sStartYear = settings?.startYear ? parseInt(settings.startYear, 10) : mYear;
+      }
+
+      const sStartIdx = ALL_MONTHS.indexOf(sStartMonth);
+      if (sStartIdx === -1) return true;
+
+      if (mYear < sStartYear) return false;
+      if (mYear > sStartYear) return true;
+      return mIdx >= sStartIdx;
+    };
+
+    // Helper: Titik awal paling awal operasional sekolah dari daftar preset periode
+    const getSystemEarliestPeriodStart = (settings) => {
+      let startY = settings?.startYear ? parseInt(settings.startYear, 10) : 2026;
+      let startM = settings?.startMonth || 'Juli';
+      let startIdx = ALL_MONTHS.indexOf(startM);
+      if (startIdx === -1) startIdx = 6;
+
+      if (Array.isArray(settings?.academicPeriods) && settings.academicPeriods.length > 0) {
+        settings.academicPeriods.forEach(p => {
+          const pY = parseInt(p.startYear, 10);
+          const pIdx = ALL_MONTHS.indexOf(p.startMonth);
+          if (!isNaN(pY) && pIdx !== -1) {
+            if (pY < startY || (pY === startY && pIdx < startIdx)) {
+              startY = pY;
+              startM = p.startMonth;
+              startIdx = pIdx;
+            }
+          }
+        });
+      }
+      return { month: startM, year: startY, monthIdx: startIdx };
+    };
+
+    // Helper: Titik mulai efektif penagihan siswa (memperhatikan kapan murid masuk)
+    const getStudentEffectiveStart = (student, settings) => {
+      const sysEarliest = getSystemEarliestPeriodStart(settings);
+      let sMonth = student?.startActiveMonth;
+      let sYear = student?.startActiveYear ? parseInt(student.startActiveYear, 10) : null;
+
+      if (!sMonth || !sYear || isNaN(sYear)) {
+        // Siswa tidak memiliki tanggal masuk spesifik, gunakan awal mula operasional sekolah (Januari 2026)
+        return {
+          month: sysEarliest.month,
+          year: sysEarliest.year
+        };
+      }
+
+      const sIdx = ALL_MONTHS.indexOf(sMonth);
+      if (sIdx === -1) {
+        return {
+          month: sysEarliest.month,
+          year: sysEarliest.year
+        };
+      }
+
+      // Jika tanggal masuk murid tercatat sebelum sistem sekolah berdiri, batas bawah adalah sysEarliest
+      if (sYear < sysEarliest.year || (sYear === sysEarliest.year && sIdx < sysEarliest.monthIdx)) {
+        return { month: sysEarliest.month, year: sysEarliest.year };
+      }
+
+      return { month: sMonth, year: sYear };
+    };
+
+    // Helper: Menghasilkan seluruh rangkaian bulan penagihan siswa sejak siswa aktif masuk
+    // Menarik sisa-sisa tunggakan dari sebelum semester/periode aktif saat ini s/d akhir periode aktif
+    const getStudentAllBillingMonths = (student, settings, optSelectedPeriod = null) => {
+      const effStart = getStudentEffectiveStart(student, settings);
+      
+      const targetEndObj = optSelectedPeriod || settings;
+      const endM = targetEndObj?.endMonth || settings?.endMonth || 'Juni';
+      const endY = parseInt(targetEndObj?.endYear || settings?.endYear) || (effStart.year + 1);
+
+      let startM = effStart.month;
+      let startY = effStart.year;
+
+      if (optSelectedPeriod && !optSelectedPeriod.isActive && optSelectedPeriod.startMonth && optSelectedPeriod.startYear) {
+        const pStartIdx = ALL_MONTHS.indexOf(optSelectedPeriod.startMonth);
+        const pStartY = parseInt(optSelectedPeriod.startYear, 10);
+        const sStartIdx = ALL_MONTHS.indexOf(effStart.month);
+        if (pStartY > effStart.year || (pStartY === effStart.year && pStartIdx > sStartIdx)) {
+          startM = optSelectedPeriod.startMonth;
+          startY = pStartY;
+        }
+      }
+
+      const allMonths = getMonthsList(startM, '', endM, startY, endY);
+      return allMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+    };
+
+    const ICON_SVG_CACHE = new Map();
+    const Icon = React.memo(function Icon({ name, size = 18, className = "" }) {
       const spanRef = useRef(null);
 
       useEffect(() => {
@@ -555,6 +903,12 @@
 
           if (!window.lucide || !window.lucide.icons) {
             setTimeout(renderIcon, 50);
+            return;
+          }
+
+          const cacheKey = `${name}_${size}_${className}`;
+          if (ICON_SVG_CACHE.has(cacheKey)) {
+            spanRef.current.innerHTML = ICON_SVG_CACHE.get(cacheKey);
             return;
           }
 
@@ -571,9 +925,10 @@
             if (className) {
               svg.setAttribute('class', className);
             }
+            const html = svg.outerHTML;
+            ICON_SVG_CACHE.set(cacheKey, html);
             if (spanRef.current) {
-              spanRef.current.innerHTML = '';
-              spanRef.current.appendChild(svg);
+              spanRef.current.innerHTML = html;
             }
           }
         };
@@ -592,7 +947,65 @@
           style={{ width: size, height: size, verticalAlign: 'middle' }}
         />
       );
-    }
+    });
+
+    // Ornamen Pola / Corak Estetik Bagian Bawah Sidebar Navigasi (Admin & Wali Murid)
+    const SidebarBottomOrnament = React.memo(function SidebarBottomOrnament({ roleLabel = 'Portal Terpadu' }) {
+      return (
+        <div className="sidebar-corak-ornament px-3.5 pt-4 pb-2 mt-auto relative z-10 select-none pointer-events-none" aria-hidden="true">
+          <div className="relative rounded-2xl overflow-hidden border border-cyan-300/20 bg-gradient-to-br from-white/[0.08] via-sky-400/[0.06] to-blue-950/30 p-3.5 shadow-inner">
+            {/* Layered Ornamental Geometric & Wave SVG Corak */}
+            <svg className="absolute inset-0 w-full h-full opacity-35" viewBox="0 0 260 120" fill="none" preserveAspectRatio="none">
+              <defs>
+                <pattern id="sidebarDiamondGrid" width="24" height="24" patternUnits="userSpaceOnUse">
+                  <path d="M12 0L24 12L12 24L0 12Z" stroke="rgba(186,230,253,0.38)" strokeWidth="0.7" fill="none" />
+                  <circle cx="12" cy="12" r="1.5" fill="rgba(56,189,248,0.55)" />
+                </pattern>
+              </defs>
+              <rect width="260" height="120" fill="url(#sidebarDiamondGrid)" />
+              <path d="M-20 85 C40 50, 95 110, 155 72 C205 42, 240 85, 280 58 L280 130 L-20 130 Z" fill="rgba(56,189,248,0.16)" />
+              <path d="M-20 100 C50 68, 120 118, 185 82 C225 60, 255 95, 280 75 L280 130 L-20 130 Z" fill="rgba(14,165,233,0.22)" />
+              <circle cx="225" cy="24" r="32" stroke="rgba(125,211,252,0.3)" strokeWidth="1" strokeDasharray="3 3" />
+              <circle cx="225" cy="24" r="20" stroke="rgba(255,255,255,0.22)" strokeWidth="1" />
+            </svg>
+
+            <div className="relative z-10 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-cyan-400/20 border border-cyan-300/35 flex items-center justify-center text-cyan-200 shrink-0 shadow-xs">
+                <Icon name="sparkles" size={14} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-cyan-200/95 truncate">{roleLabel}</p>
+                <p className="text-[10px] font-semibold text-blue-100/75 truncate">Transparan • Terintegrasi • Aman</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    });
+
+    // Background Tipis Estetik untuk Area Konten Utama Panel Admin & Wali Murid
+    const PanelAestheticBg = React.memo(function PanelAestheticBg() {
+      return (
+        <div className="panel-subtle-bg-layer" aria-hidden="true">
+          <svg className="panel-subtle-svg-mesh" viewBox="0 0 1200 800" fill="none" preserveAspectRatio="xMidYMid slice">
+            <defs>
+              <pattern id="panelSubtleGrid" width="44" height="44" patternUnits="userSpaceOnUse">
+                <path d="M 44 0 L 0 0 0 44" fill="none" stroke="rgba(37, 99, 235, 0.04)" strokeWidth="1" />
+                <circle cx="22" cy="22" r="1.2" fill="rgba(14, 165, 233, 0.065)" />
+              </pattern>
+            </defs>
+            <rect width="1200" height="800" fill="url(#panelSubtleGrid)" />
+            <path d="M-100 620 C220 490, 480 730, 820 560 C1020 460, 1150 610, 1300 520" stroke="rgba(14, 165, 233, 0.07)" strokeWidth="2" fill="none" />
+            <path d="M-100 680 C260 540, 540 770, 880 610 C1060 520, 1180 650, 1300 580" stroke="rgba(37, 99, 235, 0.05)" strokeWidth="1.5" strokeDasharray="6 6" fill="none" />
+            <circle cx="1060" cy="140" r="180" stroke="rgba(14, 165, 233, 0.05)" strokeWidth="1.5" strokeDasharray="8 8" />
+            <circle cx="1060" cy="140" r="125" stroke="rgba(37, 99, 235, 0.04)" strokeWidth="1" />
+          </svg>
+          <div className="panel-subtle-watermark">
+            <img src="logo.png" alt="" className="panel-subtle-watermark-img" />
+          </div>
+        </div>
+      );
+    });
 
     // Modal Image Preview Lightbox
     function ImagePreviewModal({ imageUrl, title, onClose }) {
@@ -692,29 +1105,25 @@
             </div>
           </div>
 
-          {/* Ambient Glowing Aura Mesh (Electric cyan and royal blue on dark midnight) */}
-          <div className="absolute top-1/4 left-1/4 w-[460px] h-[460px] bg-cyan-500/18 rounded-full blur-[130px] pointer-events-none -translate-x-1/2 -translate-y-1/2 animate-pulse-halo"></div>
-          <div className="absolute bottom-1/4 right-1/4 w-[480px] h-[480px] bg-blue-600/25 rounded-full blur-[140px] pointer-events-none translate-x-1/3 translate-y-1/3"></div>
-
-          {/* Central Luxury Container (Glassmorphic Frosted Card with Rich Nuance) */}
-          <div className="relative w-full max-w-lg p-7 sm:p-9 rounded-[38px] loading-glass-card text-white space-y-7 animate-in fade-in zoom-in-95 duration-300 relative z-10 border border-white/20 shadow-[0_25px_80px_-15px_rgba(0,0,0,0.65),0_0_50px_-10px_rgba(6,182,212,0.22)]">
-            {/* Floating Luxury School Emblem with Orbiting Rings and Jewel Beads */}
-            <div className="relative mx-auto w-36 h-36 flex items-center justify-center">
+          {/* Central Luxury Container (Spacious Frosted Loading Card) */}
+          <div className="relative w-full max-w-xl px-8 py-10 sm:px-12 sm:py-12 rounded-[42px] loading-glass-card text-white space-y-7 animate-in fade-in zoom-in-95 duration-300 z-10 border border-cyan-300/35 shadow-[0_30px_90px_-15px_rgba(2,6,23,0.7),0_0_60px_-10px_rgba(6,182,212,0.35)] overflow-hidden">
+            {/* Floating Luxury School Emblem with Orbiting Rings and Jewel Beads (Given generous top & bottom margin so orbit rings never touch the badge below) */}
+            <div className="relative mx-auto w-36 h-36 mt-5 mb-12 flex items-center justify-center">
               {/* Outer Glowing Pulsing Halo */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500 via-blue-500 to-indigo-600 rounded-full blur-2xl opacity-60 animate-pulse-halo"></div>
+              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 rounded-full blur-2xl opacity-70 animate-pulse-halo"></div>
               
               {/* Dual Counter-Rotating Orbit Rings with Glowing Jewels */}
-              <div className="absolute -inset-4 rounded-full border-2 border-dashed border-cyan-400/60 loading-orbit-ring pointer-events-none">
+              <div className="absolute -inset-4 rounded-full border-2 border-dashed border-cyan-400/70 loading-orbit-ring pointer-events-none">
                 <span className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_12px_#f59e0b] border-2 border-slate-900"></span>
                 <span className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2.5 h-2.5 rounded-full bg-sky-400 shadow-[0_0_10px_#38bdf8] border border-slate-900"></span>
               </div>
-              <div className="absolute -inset-7 rounded-full border border-dotted border-blue-400/70 loading-orbit-counter pointer-events-none">
+              <div className="absolute -inset-7 rounded-full border border-dotted border-blue-400/80 loading-orbit-counter pointer-events-none">
                 <span className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_12px_#22d3ee] border-2 border-slate-900"></span>
                 <span className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-indigo-400 shadow-[0_0_10px_#818cf8]"></span>
               </div>
 
               {/* Central Official PAUD SETIA BHAKTI Logo Badge with 3D Ring */}
-              <div className="relative w-28 h-28 rounded-full p-2 bg-gradient-to-tr from-cyan-400 via-blue-500 to-indigo-600 shadow-[0_15px_40px_rgba(6,182,212,0.4)] overflow-hidden flex items-center justify-center border-4 border-white/90 bg-white group hover:scale-105 transition-transform animate-pulse-glow">
+              <div className="relative w-28 h-28 rounded-full p-2 bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 shadow-[0_15px_40px_rgba(6,182,212,0.45)] overflow-hidden flex items-center justify-center border-4 border-white/95 bg-white group hover:scale-105 transition-transform animate-pulse-glow">
                 <img 
                   src="logo.png" 
                   alt="Logo PAUD Setia Bhakti" 
@@ -724,7 +1133,7 @@
             </div>
 
             {/* Header Titles */}
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-2.5 pt-2">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-cyan-400/40 text-cyan-300 shadow-sm">
                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_#22d3ee] animate-pulse"></span>
                 <span className="text-[11px] font-black tracking-widest uppercase">
@@ -737,13 +1146,13 @@
               <p className="text-xs font-black text-cyan-300 tracking-wider uppercase">
                 PAUD SETIA BHAKTI • BEKASI
               </p>
-              <p className="text-xs font-medium text-slate-300 italic max-w-xs mx-auto truncate">
+              <p className="text-xs font-medium text-blue-100/80 italic max-w-sm mx-auto">
                 "Mewujudkan Generasi Cerdas & Berakhlak Mulia"
               </p>
             </div>
 
-            {/* 3 Interactive Stage Steps */}
-            <div className="grid grid-cols-3 gap-2.5 pt-1 text-left">
+            {/* 3 Interactive Stage Steps with Generous Spacing */}
+            <div className="grid grid-cols-3 gap-3.5 pt-2 text-left">
               {[
                 { step: 1, label: 'Otorisasi Akun', target: 30 },
                 { step: 2, label: 'Sinkronisasi SPP', target: 70 },
@@ -754,15 +1163,15 @@
                 return (
                   <div
                     key={s.step}
-                    className={`p-2.5 rounded-2xl border transition-all ${
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all ${
                       isPassed
-                        ? 'bg-emerald-500/20 border-emerald-400/50 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
+                        ? 'bg-emerald-500/20 border-emerald-400/60 text-emerald-200 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
                         : isCurrent
-                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.35)] ring-2 ring-cyan-400/40 animate-pulse'
+                          ? 'bg-cyan-500/25 border-cyan-300 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.4)] ring-2 ring-cyan-400/50 animate-pulse'
                           : 'bg-white/5 border-white/10 text-white/40'
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 mb-1">
+                    <div className="flex items-center gap-1.5 mb-1.5">
                       {isPassed ? (
                         <div className="w-4 h-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-[10px] shadow-sm">
                           ✓
@@ -772,16 +1181,16 @@
                       )}
                       <span className="text-[10px] font-black uppercase tracking-wider">Tahap {s.step}</span>
                     </div>
-                    <p className="text-[11.5px] font-extrabold leading-tight truncate">{s.label}</p>
+                    <p className="text-xs sm:text-[13px] font-black leading-tight">{s.label}</p>
                   </div>
                 );
               })}
             </div>
 
             {/* Animated Royal Progress Bar */}
-            <div className="space-y-2.5 pt-1">
+            <div className="space-y-3 pt-2">
               <div className="flex justify-between items-center text-xs font-bold px-1">
-                <span className="text-xs text-cyan-200 font-bold truncate max-w-[320px]">
+                <span className="text-xs text-cyan-200 font-bold truncate max-w-[340px]">
                   {stepText}
                 </span>
                 <span className="text-base font-black text-cyan-300 font-mono tracking-wider">
@@ -866,6 +1275,136 @@
     }
 
     // ==========================================
+    // CRUD POPUP MODAL (Admin & User Portals)
+    // ==========================================
+    function CrudPopupModal({ popup, onClose }) {
+      if (!popup) return null;
+
+      const isConfirm = popup.type === 'confirm' || popup.type === 'delete_confirm';
+      const isDelete = popup.type === 'delete' || popup.type === 'delete_confirm';
+      const isError = popup.type === 'error';
+      const isInfo = popup.type === 'info';
+      const isSuccess = popup.type === 'success' || (!isConfirm && !isDelete && !isError && !isInfo);
+
+      return (
+        <div 
+          className="crud-modal-backdrop" 
+          onClick={(e) => { 
+            if (e.target === e.currentTarget && !isConfirm) onClose(); 
+          }}
+        >
+          <div className="crud-modal-card" onClick={(e) => e.stopPropagation()}>
+            {/* Top Glowing Orb */}
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-36 h-36 rounded-full bg-cyan-400/25 blur-3xl pointer-events-none"></div>
+
+            {/* Close 'X' Button */}
+            {!isConfirm && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="absolute top-4 right-4 w-9 h-9 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition active:scale-95"
+              >
+                <Icon name="x" size={18} />
+              </button>
+            )}
+
+            {/* Animated Icon Avatar */}
+            <div className="mx-auto mb-4 w-16 h-16 flex items-center justify-center relative z-10">
+              {isConfirm || isDelete ? (
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/35 ring-4 ring-rose-100">
+                  <Icon name="alert-triangle" size={32} />
+                </div>
+              ) : isError ? (
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-rose-600 to-red-500 text-white flex items-center justify-center shadow-xl shadow-rose-500/35 ring-4 ring-rose-100">
+                  <Icon name="alert-circle" size={32} />
+                </div>
+              ) : isInfo ? (
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-xl shadow-sky-500/35 ring-4 ring-sky-100">
+                  <Icon name="info" size={32} />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 text-white flex items-center justify-center shadow-xl shadow-emerald-500/35 ring-4 ring-emerald-100">
+                  <Icon name="check" size={34} />
+                </div>
+              )}
+            </div>
+
+            {/* Modal Title */}
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2">
+              {popup.title || (isConfirm ? 'Konfirmasi Tindakan' : isDelete ? 'Data Berhasil Dihapus' : 'Operasi Berhasil')}
+            </h3>
+
+            {/* Modal Message */}
+            <p className="text-xs sm:text-sm font-semibold text-slate-600 leading-relaxed mb-6 px-1">
+              {popup.message}
+            </p>
+
+            {/* Extra Details Box (if provided) */}
+            {popup.details && typeof popup.details === 'object' && (
+              <div className="mb-6 p-4 bg-slate-50 border border-slate-200/90 rounded-2xl text-left text-xs font-semibold text-slate-700 space-y-1.5 shadow-inner">
+                {Object.entries(popup.details).map(([key, val]) => (
+                  <div key={key} className="flex justify-between items-center py-1 border-b border-slate-200/60 last:border-0">
+                    <span className="text-slate-500 font-bold">{key}</span>
+                    <span className="font-black text-slate-800 truncate max-w-[220px]">{String(val)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            {isConfirm ? (
+              <div className="flex items-center gap-3 justify-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (popup.onCancel) popup.onCancel();
+                    onClose();
+                  }}
+                  className="flex-1 py-3 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black text-sm transition active:scale-95 border border-slate-200"
+                >
+                  {popup.cancelText || 'Batal'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (popup.onConfirm) popup.onConfirm();
+                    onClose();
+                  }}
+                  className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-black text-sm shadow-lg shadow-rose-600/35 transition active:scale-95"
+                >
+                  {popup.confirmText || 'Ya, Lanjutkan'}
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 justify-center pt-1">
+                {popup.onExtraAction && popup.extraActionText && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      popup.onExtraAction();
+                      onClose();
+                    }}
+                    className="w-full sm:w-auto flex-1 py-3 px-5 rounded-2xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-300 font-black text-sm transition flex items-center justify-center gap-2 active:scale-95 shadow-sm"
+                  >
+                    <Icon name={popup.extraActionIcon || 'printer'} size={16} />
+                    <span>{popup.extraActionText}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full sm:w-auto flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-black text-sm shadow-lg shadow-sky-500/35 transition active:scale-95"
+                >
+                  {popup.buttonText || 'Mengerti & Tutup'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
     // 1. KOMPONEN LOGIN SPLIT CARD DUAL ROLE
     // ==========================================
     
@@ -915,6 +1454,13 @@
             return;
           }
 
+          // CEK STATUS SISWA (LULUS / KELUAR / NON-AKTIF):
+          const isStudentActive = student.statusAktif !== false && (!student.status || student.status.toLowerCase() === 'aktif');
+          if (!isStudentActive) {
+            setErrorMsg('Akun siswa ini berstatus NON-AKTIF / TELAH KELUAR / LULUS (Status Akun: OFF). Akses login ke portal telah ditutup oleh pihak sekolah. Silakan hubungi bagian Tata Usaha (TU).');
+            return;
+          }
+
           const enteredPwd = password.trim();
 
           // Cek apakah password akun saat ini adalah status Default Sistem:
@@ -951,10 +1497,60 @@
       };
 
       const [currentTime, setCurrentTime] = useState(() => new Date());
+      const [activeFeatureIdx, setActiveFeatureIdx] = useState(null);
+      const [spinningIcons, setSpinningIcons] = useState({ 0: false, 1: false, 2: false, 3: false });
+
       useEffect(() => {
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+        const timer = setInterval(() => setCurrentTime(new Date()), 15000);
         return () => clearInterval(timer);
       }, []);
+
+      const triggerIconSpin = (idx) => {
+        setActiveFeatureIdx(prev => (prev === idx ? null : idx));
+        setSpinningIcons(prev => ({ ...prev, [idx]: true }));
+        setTimeout(() => {
+          setSpinningIcons(prev => ({ ...prev, [idx]: false }));
+        }, 750);
+      };
+
+      const loginFeatures = [
+        {
+          icon: 'credit-card',
+          title: 'Bayar SPP Instan',
+          sub: 'QRIS & VA Bank',
+          detail: 'Pembayaran otomatis terverifikasi 24 jam tanpa perlu kirim bukti manual.',
+          iconBg: 'bg-sky-400/20 text-sky-300 border-sky-400/35',
+          activeBorder: 'border-sky-400/60 bg-sky-500/20 shadow-sky-500/20',
+          glowColor: 'from-sky-400/30 to-cyan-300/10'
+        },
+        {
+          icon: 'printer',
+          title: 'Kuitansi Resmi',
+          sub: 'Cetak Bukti Sah',
+          detail: 'Unduh & cetak kuitansi digital resmi berstempel PAUD Setia Bhakti kapan saja.',
+          iconBg: 'bg-emerald-400/20 text-emerald-300 border-emerald-400/35',
+          activeBorder: 'border-emerald-400/60 bg-emerald-500/20 shadow-emerald-500/20',
+          glowColor: 'from-emerald-400/30 to-teal-300/10'
+        },
+        {
+          icon: 'file-text',
+          title: 'Catatan Siswa',
+          sub: 'Laporan Motorik',
+          detail: 'Pantau catatan perkembangan, motorik, dan pesan khusus dari Tata Usaha.',
+          iconBg: 'bg-purple-400/20 text-purple-300 border-purple-400/35',
+          activeBorder: 'border-purple-400/60 bg-purple-500/20 shadow-purple-500/20',
+          glowColor: 'from-purple-400/30 to-fuchsia-300/10'
+        },
+        {
+          icon: 'message-square',
+          title: 'Layanan Aduan',
+          sub: 'Live Chat 1 Jam',
+          detail: 'Konsultasi & pengaduan langsung terhubung dengan Admin TU secara real-time.',
+          iconBg: 'bg-amber-400/20 text-amber-300 border-amber-400/35',
+          activeBorder: 'border-amber-400/60 bg-amber-500/20 shadow-amber-500/20',
+          glowColor: 'from-amber-400/30 to-yellow-300/10'
+        }
+      ];
 
       const formattedDate = currentTime.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       const formattedClock = currentTime.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB';
@@ -985,11 +1581,6 @@
             </div>
           </div>
 
-          {/* Atmospheric ambient luminous glow orbs */}
-          <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-blue-600/20 rounded-full blur-[140px] pointer-events-none animate-pulse"></div>
-          <div className="absolute -bottom-32 -right-32 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[140px] pointer-events-none"></div>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[750px] h-[750px] bg-sky-500/10 rounded-full blur-[160px] pointer-events-none"></div>
-
           {/* Top Brand & Status Pill (Visible on Desktop / Tablet) */}
           <div className="relative z-10 mb-4 hidden lg:flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl shadow-blue-950/40">
             <div className="w-7 h-7 rounded-full bg-white/20 border border-white/30 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
@@ -1006,7 +1597,7 @@
             
             {/* LEFT HERO PANEL (Midnight Sapphire): Compact on Mobile, Full Majestic on Desktop */}
             <div className="relative lg:w-[46%] xl:w-[45%] bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white p-5 sm:p-7 lg:p-10 xl:p-12 flex flex-col justify-between overflow-hidden shrink-0">
-              
+
               {/* Subtle background circles for depth */}
               <div className="absolute -top-16 -left-16 w-52 h-52 rounded-full bg-blue-500/10 blur-xl pointer-events-none"></div>
               <div className="absolute bottom-8 left-8 w-44 h-44 rounded-full bg-sky-400/15 blur-2xl pointer-events-none"></div>
@@ -1031,87 +1622,137 @@
               <div className="relative z-10 flex flex-col justify-between h-full pb-4 lg:pb-0">
                 
                 {/* 1. Header Bar: Status Capsule on Mobile & Desktop */}
-                <div className="flex items-center justify-between gap-2 mb-4">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm">
+                <div className="flex items-center justify-between gap-2.5 mb-4 sm:mb-5">
+                  <div className="inline-flex items-center gap-2 h-8 sm:h-9 px-3.5 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm">
                     <Icon name="clock" size={13} className="text-cyan-300 shrink-0" />
                     <span className="truncate">{formattedDate} • {formattedClock}</span>
                   </div>
-                  <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/15 backdrop-blur-md text-xs font-black text-cyan-200 border border-white/20 shadow-xs">
+                  <div className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-3 rounded-full bg-white/15 backdrop-blur-md text-xs font-black text-cyan-200 border border-white/20 shadow-xs">
                     <span>{greeting.emoji}</span>
                     <span>{greeting.text}!</span>
                   </div>
                 </div>
 
-                {/* 2. School Identity (LOGO PROPORTIONATE - TIDAK KEGEDEAN DI MOBILE) */}
-                <div className="flex items-center lg:items-start gap-3.5 lg:flex-col mb-4 lg:mb-6">
-                  {/* Logo Container: Compact on mobile (w-12 h-12), stately on desktop (lg:w-20 lg:h-20) */}
-                  <div className="w-12 h-12 sm:w-13 sm:h-13 lg:w-20 lg:h-20 rounded-2xl bg-white p-1.5 sm:p-2 lg:p-2.5 shadow-xl border-2 border-white/60 shrink-0 flex items-center justify-center animate-mascot-sway">
-                    <img src="logo.png" alt="PAUD Setia Bhakti" className="w-full h-full object-contain filter drop-shadow" />
+                {/* 2. School Identity: Clean, Balanced, Aligned */}
+                <div className="flex items-center gap-3 sm:gap-4 mb-4 lg:mb-6">
+                  {/* Logo Container with Strict Constrained Dimensions */}
+                  <div 
+                    className="rounded-2xl bg-white p-1.5 shadow-xl border-2 border-white/80 shrink-0 flex items-center justify-center animate-mascot-sway" 
+                    style={{ width: '56px', height: '56px', minWidth: '56px', minHeight: '56px', maxWidth: '56px', maxHeight: '56px' }}
+                  >
+                    <img 
+                      src="logo.png" 
+                      alt="PAUD Setia Bhakti" 
+                      className="w-full h-full max-h-full max-w-full object-contain filter drop-shadow select-none pointer-events-none" 
+                    />
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[10px] lg:text-xs font-black mb-1 lg:mb-2">
-                      <span>⭐ Akreditasi A Unggul • NPSN Resmi</span>
-                    </div>
-                    <h1 className="text-base sm:text-lg lg:text-3xl xl:text-4xl font-black text-white tracking-tight leading-tight truncate lg:whitespace-normal">
+                    <h1 className="text-base sm:text-xl lg:text-2xl font-black text-white tracking-tight leading-tight truncate">
                       {settings.schoolName || 'PAUD SETIA BHAKTI'}
                     </h1>
-                    <p className="text-[11px] lg:text-xs xl:text-sm text-blue-100/90 font-medium leading-relaxed mt-0.5 lg:mt-2 hidden sm:block lg:block max-w-sm">
-                      Sistem Informasi Pembayaran SPP & Administrasi Siswa Terpadu. Mewujudkan Generasi Cerdas & Berakhlak Mulia.
+                    <div className="flex items-center gap-1.5 sm:gap-2 mt-1 flex-wrap">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/30 text-amber-300 text-[10px] font-black tracking-wide">
+                        ⭐ Akreditasi A Unggul • NPSN Resmi
+                      </span>
+                      <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-400/15 border border-cyan-400/25 text-cyan-200 text-[10px] font-extrabold">
+                        📖 Kurikulum Merdeka PAUD
+                      </span>
+                    </div>
+                    <p className="text-[11px] lg:text-xs text-blue-100/80 font-medium leading-relaxed mt-1 hidden sm:block max-w-sm">
+                      Sistem Informasi Pembayaran SPP & Administrasi Kesiswaan Terpadu.
                     </p>
                   </div>
                 </div>
 
-                {/* 3. 4 Feature Cards (2x2 Grid) */}
-                <div className="grid grid-cols-2 gap-2 text-xs text-blue-100 font-semibold mb-3 lg:mb-6">
-                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
-                    <div className="w-7 h-7 rounded-lg bg-sky-400/20 text-sky-300 flex items-center justify-center shrink-0">
-                      <Icon name="credit-card" size={14} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black text-white text-[11px] truncate">Bayar SPP Instan</p>
-                      <p className="text-[9px] text-blue-200/80 truncate">QRIS & VA Bank</p>
-                    </div>
+                {/* 3. 4 Interactive Feature Cards (2x2 Grid) with Rotating/Orbital Icons */}
+                <div className="mb-3 lg:mb-5">
+                  <div className="grid grid-cols-2 gap-2.5 text-xs text-blue-100 font-semibold">
+                    {loginFeatures.map((feat, idx) => {
+                      const isActive = activeFeatureIdx === idx;
+                      const isSpinning = !!spinningIcons[idx];
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => triggerIconSpin(idx)}
+                          onMouseEnter={() => {
+                            setSpinningIcons(prev => ({ ...prev, [idx]: true }));
+                            setTimeout(() => setSpinningIcons(prev => ({ ...prev, [idx]: false })), 700);
+                          }}
+                          className={`login-feature-card-interactive group relative p-2.5 lg:p-3 rounded-2xl backdrop-blur-md border flex items-center gap-2.5 text-left transition-all duration-300 cursor-pointer overflow-hidden ${
+                            isActive
+                              ? `${feat.activeBorder} scale-[1.02] shadow-lg`
+                              : 'bg-white/10 hover:bg-white/15 border-white/15 hover:border-white/30 shadow-xs hover:-translate-y-0.5'
+                          }`}
+                        >
+                          {/* Subtle hover gradient glow */}
+                          <div className={`absolute inset-0 bg-gradient-to-br ${feat.glowColor} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}></div>
+
+                          {/* Rotating / Orbiting Icon Container */}
+                          <div className={`relative w-8 h-8 lg:w-9 lg:h-9 rounded-xl border ${feat.iconBg} flex items-center justify-center shrink-0 transition-transform duration-500 group-hover:scale-110`}>
+                            {/* Continuous rotating dashed orbit ring around the icon */}
+                            <span
+                              className="login-icon-orbit-ring absolute -inset-1 rounded-xl border border-dashed border-current opacity-40 group-hover:opacity-85 pointer-events-none"
+                              style={{ animationDelay: `${idx * -1.5}s` }}
+                            ></span>
+                            <div
+                              className={`login-feature-icon-inner flex items-center justify-center ${
+                                isSpinning ? 'login-icon-spin-burst' : 'login-icon-idle-orbit'
+                              }`}
+                              style={{ animationDelay: `${idx * 0.4}s` }}
+                            >
+                              <Icon name={feat.icon} size={15} />
+                            </div>
+                          </div>
+
+                          <div className="min-w-0 flex-1 relative z-10">
+                            <p className="font-black text-white text-[11px] lg:text-xs truncate group-hover:text-cyan-200 transition-colors">{feat.title}</p>
+                            <p className="text-[9px] lg:text-[10px] text-blue-200/85 truncate">{feat.sub}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-400/20 text-emerald-300 flex items-center justify-center shrink-0">
-                      <Icon name="printer" size={14} />
+
+                  {/* Interactive Feature Detail Pill when a user clicks one of the 4 cards */}
+                  {activeFeatureIdx !== null && loginFeatures[activeFeatureIdx] && (
+                    <div className="mt-2 px-3 py-2 rounded-xl bg-white/15 backdrop-blur-md border border-cyan-300/30 text-[10px] sm:text-[11px] text-cyan-100 font-bold flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                      <span className="leading-snug">{loginFeatures[activeFeatureIdx].detail}</span>
+                      <button
+                        type="button"
+                        onClick={() => setActiveFeatureIdx(null)}
+                        className="text-cyan-300 hover:text-white shrink-0 p-0.5"
+                        title="Tutup info"
+                      >
+                        <Icon name="x" size={12} />
+                      </button>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black text-white text-[11px] truncate">Kuitansi Resmi</p>
-                      <p className="text-[9px] text-blue-200/80 truncate">Cetak Bukti Sah</p>
-                    </div>
-                  </div>
-                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
-                    <div className="w-7 h-7 rounded-lg bg-purple-400/20 text-purple-300 flex items-center justify-center shrink-0">
-                      <Icon name="file-text" size={14} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black text-white text-[11px] truncate">Catatan Siswa</p>
-                      <p className="text-[9px] text-blue-200/80 truncate">Laporan Motorik</p>
-                    </div>
-                  </div>
-                  <div className="p-2 lg:p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/15 flex items-center gap-2 shadow-xs">
-                    <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
-                      <Icon name="message-square" size={14} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-black text-white text-[11px] truncate">Layanan Aduan</p>
-                      <p className="text-[9px] text-blue-200/80 truncate">Live Chat 1 Jam</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* 4. Testimonial Quote (Visible on Desktop) */}
-                <div className="p-3.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/15 text-[11px] text-blue-100/90 leading-snug hidden lg:block w-full mb-4">
-                  <p className="italic">"Alhamdulillah bayar SPP jadi sangat mudah, bebas antre dan transparan langsung dari handphone."</p>
-                  <p className="text-[10px] font-black text-cyan-300 mt-1 uppercase tracking-wider">— Layanan Terpadu PAUD Setia Bhakti</p>
+                {/* 4. Official Slogan Card (Visible on Mobile & Desktop) */}
+                <div className="p-3.5 lg:p-4 rounded-2xl bg-gradient-to-br from-white/12 via-white/8 to-cyan-400/10 backdrop-blur-md border border-white/20 text-blue-50 leading-snug w-full mb-3 lg:mb-4 shadow-inner relative overflow-hidden group">
+                  <div className="absolute -right-6 -bottom-6 w-20 h-20 rounded-full bg-cyan-400/15 blur-xl pointer-events-none"></div>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-400/20 border border-cyan-300/30 text-[9px] font-black text-cyan-200 uppercase tracking-widest">
+                      <Icon name="sparkles" size={10} className="text-cyan-300" />
+                      Slogan Layanan Resmi
+                    </span>
+                  </div>
+                  <p className="text-xs lg:text-[13px] font-extrabold text-white tracking-tight leading-relaxed">
+                    "Kini Bayar SPP Makin Mudah. Tanpa Antre, Transparan, dan Aman."
+                  </p>
+                  <p className="text-[10px] font-black text-cyan-300 mt-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-3 h-0.5 bg-cyan-400 rounded-full inline-block"></span>
+                    Layanan Terpadu PAUD Setia Bhakti
+                  </p>
                 </div>
 
                 {/* Footer Desktop Note */}
                 <div className="hidden lg:flex items-center justify-between pt-3 border-t border-white/15 text-[11px] font-bold text-blue-200 uppercase tracking-wider">
                   <span>PORTAL RESMI SPP</span>
-                  <span>VERSI 2.4</span>
+                  <span>VERSI 1.0</span>
                 </div>
 
               </div>
@@ -1346,13 +1987,6 @@
                 </form>
 
               </div>
-
-              {/* Bottom Security Footer */}
-              <div className="pt-5 mt-5 border-t border-slate-100 flex items-center justify-center text-[11px] font-bold text-slate-400 gap-2">
-                <Icon name="shield-check" size={14} className="text-emerald-600 shrink-0" />
-                <span>Koneksi Aman 256-Bit SSL • Privasi & Data Siswa Terlindungi</span>
-              </div>
-
             </div>
 
           </div>
@@ -1378,11 +2012,13 @@
       const handleSubmit = (e) => {
         if (e) e.preventDefault();
         if (!commentText.trim() || hasUserReplied) return;
+        const now = new Date();
+        const clockStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
         onAddCommentNote(note.id, {
           sender: 'Wali Murid',
           senderRole: 'parent',
           text: commentText.trim(),
-          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+          time: `${formatDateIndo(now)} • ${clockStr} WIB`
         });
         setCommentText('');
       };
@@ -1400,8 +2036,8 @@
                 {note.category || 'Catatan Perkembangan'}
               </span>
             </div>
-            <span className="text-xs font-bold text-slate-400 flex items-center gap-1">
-              <Icon name="calendar" size={13} /> {note.date}
+            <span className="text-xs font-bold text-slate-500 flex items-center gap-1">
+              <Icon name="calendar" size={13} className="text-blue-600" /> {formatDateTimeIndo(note.date)}
             </span>
           </div>
 
@@ -1448,7 +2084,7 @@
                             <Icon name={isTu ? 'shield-check' : 'user'} size={12} className={isTu ? 'text-blue-600' : 'text-emerald-600'} />
                             {senderLabel}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-bold">{c.time || ''}</span>
+                          <span className="text-[10px] text-slate-500 font-bold">{formatDateTimeIndo(c.time, note.date)}</span>
                         </div>
                         <p className="text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">{c.text}</p>
                       </div>
@@ -1530,7 +2166,16 @@ function ParentDashboardView({
       const [isSppExpanded, setIsSppExpanded] = useState(true);
       const [complaintTitle, setComplaintTitle] = useState('');
       const [complaintContent, setComplaintContent] = useState('');
+      const [complaintImage, setComplaintImage] = useState('');
       const [showParentBell, setShowParentBell] = useState(false);
+      const [showParentClassHistory, setShowParentClassHistory] = useState(false);
+
+      // Auto-close notification dropdown when switching tabs
+      useEffect(() => {
+        setShowParentBell(false);
+        setShowParentClassHistory(false);
+      }, [activeTab]);
+
       const [readAnnouncements, setReadAnnouncements] = useState(() => {
         try { return JSON.parse(localStorage.getItem('read_announcements_' + (student ? student.id : 'guest'))) || []; } catch(e) { return []; }
       });
@@ -1557,9 +2202,10 @@ function ParentDashboardView({
       const [historyClassFilter, setHistoryClassFilter] = useState('all');
 
       useEffect(() => {
-        const timer = setInterval(() => setNowMs(Date.now()), 1000);
+        const intervalMs = activeTab === 'pengaduan' ? 1000 : 15000;
+        const timer = setInterval(() => setNowMs(Date.now()), intervalMs);
         return () => clearInterval(timer);
-      }, []);
+      }, [activeTab]);
 
       const studentTrx = useMemo(() => {
         return transactions.filter(t => 
@@ -1568,21 +2214,17 @@ function ParentDashboardView({
         );
       }, [transactions, student]);
 
-      const academicMonths = useMemo(() => {
-        const baseMonths = getMonthsList(settings);
-        const s = (settings?.semester || '').toLowerCase();
-        let semFilter = 'all';
-        if (s.includes('1') || s.includes('ganjil')) semFilter = '1';
-        if (s.includes('2') || s.includes('genap')) semFilter = '2';
-        return getSemesterMonths(baseMonths, semFilter);
-      }, [settings]);
+      // Rangkaian seluruh bulan penagihan siswa sejak aktif masuk (menarik sisa tunggakan sebelum semester berjalan) s/d akhir periode
+      const studentActiveMonths = useMemo(() => {
+        return getStudentAllBillingMonths(student, settings);
+      }, [student, settings]);
 
       const monthlyBills = useMemo(() => {
-        return academicMonths.map(month => ({
+        return studentActiveMonths.map(month => ({
           month,
           amount: Number(student?.tarif || 0)
         }));
-      }, [academicMonths, student]);
+      }, [studentActiveMonths, student]);
 
       const paidBills = useMemo(() => {
         const paidMonthNames = studentTrx
@@ -1625,8 +2267,16 @@ function ParentDashboardView({
       }, [monthlyBills, studentTrx, settings]);
 
       const totalDueDebt = useMemo(() => {
-        return unpaidBills.reduce((acc, b) => acc + b.amount, 0);
-      }, [unpaidBills]);
+        let previousArrears = Number(student?.arrearsAmount || 0);
+        if (student?.arrearsNote && student?.kelas) {
+          const noteLower = String(student.arrearsNote).toLowerCase();
+          const clsLower = String(student.kelas).toLowerCase();
+          if (noteLower.includes(clsLower) || noteLower.startsWith('sess_')) {
+            previousArrears = 0;
+          }
+        }
+        return unpaidBills.reduce((acc, b) => acc + b.amount, 0) + previousArrears;
+      }, [unpaidBills, student?.arrearsAmount, student?.arrearsNote, student?.kelas]);
 
       const allPaidTransactions = useMemo(() => {
         return studentTrx.filter(t => t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses');
@@ -1727,7 +2377,7 @@ function ParentDashboardView({
           if (hasAdminReply || isUnread) {
             const lastAdminMsg = adminMsgs[adminMsgs.length - 1];
             const snippet = lastAdminMsg ? lastAdminMsg.text : (c.adminReply || (msgs[msgs.length - 1]?.text) || 'Tanggapan baru dari Admin TU');
-            const time = lastAdminMsg?.time || c.date;
+            const time = formatDateTimeIndo(lastAdminMsg?.time, c.date);
 
             items.push({
               id: 'complaint_' + c.id,
@@ -1757,7 +2407,7 @@ function ParentDashboardView({
             category: 'note',
             title: `Catatan TU: ${n.title || 'Catatan Baru'}`,
             snippet: n.content || 'Catatan penting perkembangan siswa dari TU',
-            time: n.date || '',
+            time: formatDateTimeIndo(n.date || ''),
             isUnread: isUnread,
             timestamp: n.created_at ? new Date(n.created_at).getTime() : (typeof n.id === 'number' ? n.id : 0),
             onClick: () => {
@@ -1780,7 +2430,7 @@ function ParentDashboardView({
             category: 'announcement',
             title: `Pengumuman: ${a.title}`,
             snippet: a.content || 'Klik untuk membuka rincian pengumuman',
-            time: a.date || '',
+            time: formatDateIndo(a.date || ''),
             isUnread: isUnread,
             timestamp: a.created_at ? new Date(a.created_at).getTime() : (typeof a.id === 'number' ? a.id : 0),
             onClick: () => {
@@ -1872,7 +2522,7 @@ function ParentDashboardView({
                 <div className="p-6 md:p-8 overflow-y-auto">
                   <div className="flex items-center gap-2 text-[11px] font-bold text-teal-600 uppercase mb-4">
                     <Icon name="calendar" size={14} />
-                    {selectedAnnouncement.date}
+                    {formatDateIndo(selectedAnnouncement.date)}
                   </div>
                   <h3 className="text-2xl sm:text-3xl font-black text-slate-900 mb-6 leading-tight">{selectedAnnouncement.title}</h3>
                   <div className="text-sm font-medium text-slate-700 leading-relaxed whitespace-pre-wrap">
@@ -1883,8 +2533,271 @@ function ParentDashboardView({
             </div>
           )}
 
-          {/* TOP MOBILE APP BAR with 3-Line Hamburger Menu (Midnight Obsidian Sapphire Luxury Theme) */}
-          <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#0a1838]/95 via-[#0d2250]/95 to-[#07132e]/95 backdrop-blur-xl px-4.5 py-3.5 border-b border-white/10 shadow-xl flex items-center justify-between min-h-[66px] text-white">
+          {/* ROOT-LEVEL PARENT RIWAYAT JENJANG KELAS & MUTASI MODAL */}
+          {showParentClassHistory && (() => {
+            const existingHist = Array.isArray(student?.classHistory) ? student.classHistory : [];
+            const hasInitial = existingHist.some(h => {
+              const t = (h.type || '').toLowerCase();
+              return t.includes('pendaftaran') || t.includes('awal');
+            });
+
+            const initialRecord = {
+              id: 'parent_init_entry',
+              type: 'Pendaftaran Awal',
+              date: student?.createdAt ? new Date(student.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Awal Masuk',
+              transferDate: student?.createdAt || '',
+              fromClass: '-',
+              toClass: existingHist.length > 0 ? (existingHist[0].fromClass || student.kelas) : student.kelas,
+              effectiveMonth: student?.startActiveMonth || settings.startMonth || 'Januari',
+              effectiveYear: student?.startActiveYear || settings.startYear || 2026,
+              newTarif: student?.tarif,
+              carriedOverArrears: 0,
+              note: 'Pendaftaran pertama ananda di PAUD Setia Bhakti'
+            };
+
+            const fullHistoryList = hasInitial ? existingHist : [initialRecord, ...existingHist];
+
+            const formatMutationDate = (h) => {
+              if (h.transferDate) {
+                try {
+                  const parts = String(h.transferDate).split('-');
+                  if (parts.length === 3) {
+                    const d = parseInt(parts[2], 10);
+                    const m = ALL_MONTHS[parseInt(parts[1], 10) - 1] || parts[1];
+                    const y = parts[0];
+                    return `${d} ${m} ${y}`;
+                  }
+                } catch (e) {}
+                return h.transferDate;
+              }
+              return h.date || h.academicYear || '-';
+            };
+
+            return (
+              <div className="fixed inset-0 z-[1100] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+                <div 
+                  className="fixed inset-0 bg-slate-950/80 backdrop-blur-md"
+                  onClick={() => setShowParentClassHistory(false)}
+                />
+                <div className="bg-white rounded-3xl max-w-3xl w-full p-5 sm:p-7 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col border border-slate-200 m-auto relative z-10 text-slate-800">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 bg-gradient-to-tr from-blue-600 to-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-md">
+                        <Icon name="history" size={22} />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-slate-900 text-base sm:text-lg">Riwayat Jenjang Kelas & Mutasi Ananda</h3>
+                        <p className="text-xs text-slate-500 font-bold">{student.name} • NIS: <span className="font-mono text-indigo-700">{student.nis}</span></p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowParentClassHistory(false)}
+                      className="p-2 text-slate-400 hover:text-slate-600 font-black rounded-xl hover:bg-slate-100 transition-colors"
+                    >
+                      <Icon name="x" size={20} />
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-3.5 text-xs pr-1">
+                    {/* Status Info Box */}
+                    <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl text-[11px] text-blue-950 leading-relaxed space-y-1">
+                      <p className="font-black text-blue-900 flex items-center gap-1.5">
+                        <Icon name="shield-check" size={15} className="text-blue-600" />
+                        Transparansi Tagihan & Mutasi Rombel:
+                      </p>
+                      <p>
+                        • Jika ananda pindah rombel di pertengahan semester berjalan (misal: masuk di bulan Februari), maka bulan sebelum ia masuk (Januari) <strong>tidak dihitung sebagai hutang atau tunggakan</strong>.
+                      </p>
+                      <p>
+                        • Tagihan dihitung mulai bulan ia masuk ({student.startActiveMonth || 'Januari'} {student.startActiveYear || 2026} dan seterusnya). Tagihan bulan berjalan dan mendatang berstatus <strong>"Belum Jatuh Tempo"</strong>.
+                      </p>
+                    </div>
+
+                    {/* Table */}
+                    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-100 text-slate-600 font-black uppercase tracking-wider text-[10px] border-b border-slate-200">
+                              <th className="py-2.5 px-3 text-center w-8">No</th>
+                              <th className="py-2.5 px-3 whitespace-nowrap">Tanggal Pindah</th>
+                              <th className="py-2.5 px-3 whitespace-nowrap">Jenis Mutasi</th>
+                              <th className="py-2.5 px-3 whitespace-nowrap">Perubahan Rombel</th>
+                              <th className="py-2.5 px-3 whitespace-nowrap">Mulai Ditagih</th>
+                              <th className="py-2.5 px-3 whitespace-nowrap">Tarif SPP</th>
+                              <th className="py-2.5 px-3">Catatan</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 font-medium">
+                            {fullHistoryList.map((h, idx) => {
+                              const isPendaftaran = (h.type || '').toLowerCase().includes('pendaftaran') || (h.type || '').toLowerCase().includes('awal');
+                              return (
+                                <tr key={h.id || idx} className="hover:bg-slate-50 transition-colors">
+                                  <td className="py-3 px-3 text-center font-bold text-slate-400 text-[11px]">{idx + 1}</td>
+                                  <td className="py-3 px-3 whitespace-nowrap font-bold text-slate-800">{formatMutationDate(h)}</td>
+                                  <td className="py-3 px-3 whitespace-nowrap">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                      isPendaftaran ? 'bg-emerald-100 text-emerald-800' : 'bg-indigo-100 text-indigo-800'
+                                    }`}>
+                                      {h.type || 'Mutasi Rombel'}
+                                    </span>
+                                  </td>
+                                  <td className="py-3 px-3 whitespace-nowrap font-black text-slate-800">
+                                    <div className="flex items-center gap-1">
+                                      <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600 text-[11px]">{h.fromClass || '-'}</span>
+                                      <span className="text-indigo-600 font-bold">➔</span>
+                                      <span className="px-1.5 py-0.5 bg-emerald-50 rounded text-emerald-900 text-[11px] font-black">{h.toClass || '-'}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-3 whitespace-nowrap">
+                                    <div className="font-black text-indigo-950">{h.effectiveMonth || '-'} {h.effectiveYear || ''}</div>
+                                    <span className="text-[9px] text-emerald-700 font-bold">Bebas tunggakan lalu</span>
+                                  </td>
+                                  <td className="py-3 px-3 whitespace-nowrap font-black text-blue-700 font-mono">
+                                    {h.newTarif ? formatRupiah(h.newTarif) : '-'}
+                                  </td>
+                                  <td className="py-3 px-3 text-slate-600 text-[11px] max-w-xs">{h.note || '-'}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowParentClassHistory(false)}
+                      className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* ROOT-LEVEL PARENT NOTIFICATION MODAL (FLOATING DROPDOWN DARI ATAS, TIDAK TERTUTUP BANNER) */}
+          {showParentBell && (
+            <div className="fixed inset-0 z-[9999] pointer-events-auto">
+              {/* Subtle Click-Away Backdrop */}
+              <div 
+                className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[9999]" 
+                onClick={() => setShowParentBell(false)} 
+              />
+              {/* Dropdown Card */}
+              <div className="fixed inset-x-3 sm:inset-x-auto sm:right-8 top-[72px] sm:top-20 z-[10000] w-auto max-w-sm sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 max-h-[82vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-extrabold text-xs uppercase text-slate-700">Notifikasi Sekolah</h4>
+                    {totalParentUnread > 0 && (
+                      <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
+                        {totalParentUnread} Baru
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {totalParentUnread > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newAnnIds = [...new Set([...readAnnouncements, ...announcements.map(a => a.id)])];
+                          setReadAnnouncements(newAnnIds);
+                          try {
+                            localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(newAnnIds));
+                          } catch(e) {}
+
+                          const newNoteIds = [...new Set([...readNotes, ...myNotes.map(n => n.id)])];
+                          setReadNotes(newNoteIds);
+                          try {
+                            localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(newNoteIds));
+                          } catch(e) {}
+
+                          const updatedMsgs = { ...readComplaintMsgs };
+                          myComplaints.forEach(c => {
+                            const count = (c.messages && c.messages.length > 0) ? c.messages.length : 1;
+                            updatedMsgs[c.id] = count;
+                          });
+                          setReadComplaintMsgs(updatedMsgs);
+                          try {
+                            localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updatedMsgs));
+                          } catch(e) {}
+                        }}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        Tandai Dibaca
+                      </button>
+                    )}
+                    <button onClick={() => setShowParentBell(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Tutup</button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-80 overflow-y-auto text-xs">
+                  {parentNotificationItems.length === 0 ? (
+                    <div className="text-center py-6 text-slate-400 font-medium">
+                      <Icon name="bell-off" size={26} className="mx-auto mb-1.5 text-slate-300" />
+                      Tidak ada notifikasi baru saat ini.
+                    </div>
+                  ) : (
+                    parentNotificationItems.slice(0, 8).map(item => (
+                      <div
+                        key={item.id}
+                        onClick={item.onClick}
+                        className={`p-3 rounded-2xl border cursor-pointer transition-all hover:scale-[0.99] ${
+                          item.isUnread 
+                            ? item.category === 'chat'
+                              ? 'bg-amber-50/90 border-amber-300 font-extrabold text-amber-950 shadow-xs'
+                              : item.category === 'note'
+                                ? 'bg-purple-50/90 border-purple-200 font-extrabold text-purple-950 shadow-xs'
+                                : 'bg-blue-50/90 border-blue-200 font-extrabold text-blue-950 shadow-xs'
+                            : 'bg-slate-50/80 border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center mb-1 gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <Icon 
+                              name={item.category === 'chat' ? 'message-circle' : item.category === 'note' ? 'file-text' : 'megaphone'} 
+                              size={13} 
+                              className={`shrink-0 ${
+                                item.isUnread 
+                                  ? item.category === 'chat' ? 'text-amber-600' : item.category === 'note' ? 'text-purple-600' : 'text-blue-600'
+                                  : 'text-slate-400'
+                              }`} 
+                            />
+                            <span className="font-extrabold text-[12px] truncate">{item.title}</span>
+                          </div>
+                          {item.isUnread ? (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${
+                              item.category === 'chat' 
+                                ? 'bg-amber-500 text-white animate-pulse' 
+                                : item.category === 'note' 
+                                  ? 'bg-purple-600 text-white' 
+                                  : 'bg-blue-600 text-white'
+                            }`}>
+                              {item.category === 'chat' ? 'Balasan Baru' : 'Baru'}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-semibold shrink-0">Dibaca</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-600 font-normal line-clamp-1">{item.snippet}</p>
+                        {item.time && (
+                          <span className="text-[9px] text-slate-400 mt-1 block font-medium">{item.time}</span>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TOP MOBILE APP BAR with 3-Line Hamburger Menu (Vibrant Smurf Royal Blue Theme) */}
+          <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#072a6b]/95 via-[#0d3b8f]/95 to-[#1554c2]/95 backdrop-blur-xl px-4 sm:px-6 py-3.5 border-b border-cyan-400/30 shadow-xl shadow-blue-950/20 flex items-center justify-between min-h-[66px] text-white">
             <div className="flex items-center gap-3.5 min-w-0">
               <div 
                 onClick={() => student.fotoUrl && setPreviewImage({ url: student.fotoUrl, title: `Foto Profil - ${student.name}` })}
@@ -1907,23 +2820,54 @@ function ParentDashboardView({
               </div>
             </div>
 
-            {/* Rounded Dark Frosted 3-Line Hamburger Button */}
-            <button
-              type="button"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="relative w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex flex-col items-center justify-center gap-[5px] p-3 transition-all shadow-lg border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
-              aria-label="Buka Menu"
-            >
-              <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'w-5 rotate-45 translate-y-[7.5px]' : 'w-5'}`}></span>
-              <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0 w-0' : 'w-4 self-start ml-0.5'}`}></span>
-              <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'w-5 -rotate-45 -translate-y-[7.5px]' : 'w-5'}`}></span>
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Refresh / Sinkronisasi Button on Mobile */}
+              <button
+                type="button"
+                onClick={() => onRefresh(true)}
+                disabled={isRefreshing}
+                className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                aria-label="Sinkronisasi Data"
+                title="Sinkronisasi Data"
+              >
+                <Icon name="refresh-cw" size={18} className={isRefreshing ? 'animate-spin text-cyan-300' : 'text-white'} />
+              </button>
 
-              {totalParentUnread > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full ring-2 ring-white animate-pulse flex items-center justify-center text-[10px] font-black text-white shadow-md">
-                  {totalParentUnread > 9 ? '!' : totalParentUnread}
-                </span>
-              )}
-            </button>
+              {/* Notification Bell Button on Mobile */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowParentBell(!showParentBell);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                aria-label="Lihat Notifikasi"
+                title="Notifikasi"
+              >
+                <Icon name="bell" size={19} />
+                {totalParentUnread > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center animate-pulse ring-2 ring-white shadow-md">
+                    {totalParentUnread > 9 ? '9+' : totalParentUnread}
+                  </span>
+                )}
+              </button>
+
+              {/* Rounded Dark Frosted 3-Line Hamburger Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileMenuOpen(!isMobileMenuOpen);
+                  setShowParentBell(false);
+                }}
+                className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex flex-col items-center justify-center gap-[4.5px] p-2.5 transition-all shadow-lg border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                aria-label="Buka Menu"
+                title="Menu Navigasi"
+              >
+                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'w-5 rotate-45 translate-y-[7px]' : 'w-5'}`}></span>
+                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0 w-0' : 'w-4 self-start ml-0.5'}`}></span>
+                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isMobileMenuOpen ? 'w-5 -rotate-45 -translate-y-[7px]' : 'w-5'}`}></span>
+              </button>
+            </div>
           </div>
 
           {/* MOBILE SLIDE-OUT NAVIGATION DRAWER */}
@@ -1934,7 +2878,7 @@ function ParentDashboardView({
                 onClick={() => setIsMobileMenuOpen(false)}
               ></div>
 
-              <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] bg-gradient-to-b from-[#0a1838] via-[#091735] to-[#040b1a] text-white flex flex-col justify-between shadow-2xl z-10 border-l border-white/15 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
+              <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] smurf-mobile-drawer text-white flex flex-col justify-between shadow-2xl z-10 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
                 {/* Luminous Glow Orbs in Drawer */}
                 <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/15 blur-3xl pointer-events-none"></div>
                 <div className="absolute bottom-20 -left-10 w-40 h-40 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none"></div>
@@ -2003,8 +2947,8 @@ function ParentDashboardView({
                           }}
                           className={`w-full min-h-[44px] py-2.5 px-3.5 rounded-xl flex items-center justify-between text-xs sm:text-sm font-extrabold transition-all duration-200 active:scale-[0.99] ${
                             activeTab === item.id
-                              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border border-white/10'
-                              : 'text-slate-300 hover:text-white hover:bg-white/5'
+                              ? 'smurf-nav-active'
+                              : 'smurf-nav-item'
                           }`}
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1 truncate">
@@ -2065,8 +3009,13 @@ function ParentDashboardView({
                   </div>
                 </div>
 
+                {/* Ornamental Corak Pattern at Bottom of Mobile Drawer */}
+                <div className="mt-auto relative z-10">
+                  <SidebarBottomOrnament roleLabel="Portal Wali Murid" />
+                </div>
+
                 {/* Sticky Drawer Footer Actions */}
-                <div className="sticky bottom-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 p-4 space-y-2 mt-auto">
+                <div className="sticky bottom-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 p-4 space-y-2 relative z-10">
                   <button
                     type="button"
                     onClick={() => {
@@ -2096,7 +3045,11 @@ function ParentDashboardView({
           )}
 
           {/* MAIN FULL-WIDTH APP CONTAINER */}
-          <div className="w-full flex-1 bg-[#ebf1f8] flex flex-col md:flex-row min-h-screen mobile-full-height">
+          <div className="w-full flex-1 bg-aesthetic-pattern flex flex-col md:flex-row min-h-screen mobile-full-height relative">
+            {/* Ambient Smurf Glowing Orbs */}
+            <div className="smurf-ambient-orb smurf-orb-1"></div>
+            <div className="smurf-ambient-orb smurf-orb-2"></div>
+            <div className="smurf-ambient-orb smurf-orb-3"></div>
             {/* LEFT ROYAL BLUE SIDEBAR - Hidden on mobile, replaced by bottom nav */}
             <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
               
@@ -2132,10 +3085,10 @@ function ParentDashboardView({
                   {/* 1. Dashboard Utama */}
                   <button
                     onClick={() => setActiveTab('dashboard')}
-                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
+                    className={`py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'dashboard'
-                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
-                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                        ? 'smurf-nav-active'
+                        : 'smurf-nav-item font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
@@ -2155,10 +3108,10 @@ function ParentDashboardView({
                           setIsSppExpanded(!isSppExpanded);
                         }
                       }}
-                      className={`w-full py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
+                      className={`w-full py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                         activeTab === 'spp'
-                          ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
-                          : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                          ? 'smurf-nav-active'
+                          : 'smurf-nav-item font-bold'
                       }`}
                     >
                       <div className="flex items-center gap-3 truncate">
@@ -2221,10 +3174,10 @@ function ParentDashboardView({
                   {/* 3. Pengumuman */}
                   <button
                     onClick={() => setActiveTab('berita')}
-                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
+                    className={`py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'berita'
-                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
-                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                        ? 'smurf-nav-active'
+                        : 'smurf-nav-item font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
@@ -2243,10 +3196,10 @@ function ParentDashboardView({
                   {/* 4. Catatan TU */}
                   <button
                     onClick={() => setActiveTab('evaluasi')}
-                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
+                    className={`py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'evaluasi'
-                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
-                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                        ? 'smurf-nav-active'
+                        : 'smurf-nav-item font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
@@ -2265,10 +3218,10 @@ function ParentDashboardView({
                   {/* 5. Pengaduan (Warm Coral/Orange Badge when > 0, matching Image 3) */}
                   <button
                     onClick={() => setActiveTab('pengaduan')}
-                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
+                    className={`py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'pengaduan'
-                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
-                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                        ? 'smurf-nav-active'
+                        : 'smurf-nav-item font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
@@ -2287,10 +3240,10 @@ function ParentDashboardView({
                   {/* 6. Pengaturan */}
                   <button
                     onClick={() => setActiveTab('pengaturan')}
-                    className={`py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
+                    className={`py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap shrink-0 rounded-2xl ${
                       activeTab === 'pengaturan'
-                        ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
-                        : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                        ? 'smurf-nav-active'
+                        : 'smurf-nav-item font-bold'
                     }`}
                   >
                     <div className="flex items-center gap-3 truncate">
@@ -2301,40 +3254,44 @@ function ParentDashboardView({
                 </nav>
               </div>
 
-              {/* Sidebar Footer: Student Profile Chip with Quick Logout Button (Matching Image 3) */}
-              <div className="p-3 sm:p-3.5 m-3 sm:m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white hidden md:block relative z-10 shadow-lg shadow-blue-950/20">
-                <div className="flex items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="relative shrink-0">
-                      <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white overflow-hidden border border-white/25">
-                        {student.fotoUrl ? (
-                          <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover" />
-                        ) : (
-                          student.name ? student.name.charAt(0) : 'S'
-                        )}
+              {/* Bottom Sidebar Section: Decorative Corak Ornament + Student Profile Chip */}
+              <div className="mt-auto relative z-10 hidden md:block">
+                <SidebarBottomOrnament roleLabel="Portal Wali Murid" />
+                <div className="p-3 sm:p-3.5 m-3 sm:m-4 mt-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white relative z-10 shadow-lg shadow-blue-950/20">
+                  <div className="flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="relative shrink-0">
+                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white overflow-hidden border border-white/25">
+                          {student.fotoUrl ? (
+                            <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover" />
+                          ) : (
+                            student.name ? student.name.charAt(0) : 'S'
+                          )}
+                        </div>
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse"></span>
                       </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse"></span>
+                      <div className="truncate flex-1">
+                        <p className="text-sm font-black text-white truncate">{student.name}</p>
+                        <p className="text-xs text-blue-100/80 font-semibold truncate">Kelas {student.kelas} • NIS {student.nis}</p>
+                      </div>
                     </div>
-                    <div className="truncate flex-1">
-                      <p className="text-sm font-black text-white truncate">{student.name}</p>
-                      <p className="text-xs text-blue-100/80 font-semibold truncate">Kelas {student.kelas} • NIS {student.nis}</p>
-                    </div>
+                    <button
+                      onClick={onLogout}
+                      title="Keluar Akun"
+                      className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/90 hover:text-white transition-all shadow-sm shrink-0"
+                    >
+                      <Icon name="log-out" size={16} />
+                    </button>
                   </div>
-                  <button
-                    onClick={onLogout}
-                    title="Keluar Akun"
-                    className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/90 hover:text-white transition-all shadow-sm shrink-0"
-                  >
-                    <Icon name="log-out" size={16} />
-                  </button>
                 </div>
               </div>
             </aside>
 
             {/* RIGHT AESTHETIC CONTENT PANEL */}
             <main className="flex-1 bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
+              <PanelAestheticBg />
               {/* Header Top Bar */}
-              <header className="px-4 sm:px-6 md:px-10 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-slate-200/80 flex flex-col gap-4 bg-white/90 backdrop-blur-md sticky top-0 z-10">
+              <header className="px-4 sm:px-6 md:px-10 pt-4 sm:pt-7 pb-3.5 sm:pb-5 border-b border-slate-200/80 flex flex-col gap-3.5 sm:gap-4 bg-white/90 backdrop-blur-md relative z-20 md:sticky md:top-0">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3">
@@ -2382,9 +3339,11 @@ function ParentDashboardView({
                     </button>
 
                     <div className="relative">
+                      {/* Bell button on desktop (hidden on mobile because mobile uses top bar) */}
                       <button
+                        type="button"
                         onClick={() => setShowParentBell(!showParentBell)}
-                        className="p-2 sm:p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 relative transition-colors"
+                        className="hidden md:flex p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 relative transition-colors items-center justify-center"
                         title="Notifikasi"
                       >
                         <Icon name="bell" size={18} />
@@ -2394,116 +3353,6 @@ function ParentDashboardView({
                           </span>
                         )}
                       </button>
-
-                      {showParentBell && (
-                        <>
-                          {/* Backdrop Overlay (closes when clicked outside on mobile & desktop) */}
-                          <div 
-                            className="fixed inset-0 bg-slate-900/20 sm:bg-transparent z-40"
-                            onClick={() => setShowParentBell(false)}
-                          />
-                          <div className="fixed inset-x-3 top-20 sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:mt-3 w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
-                            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                              <div className="flex items-center gap-2">
-                                <h4 className="font-extrabold text-xs uppercase text-slate-700">Notifikasi</h4>
-                                {totalParentUnread > 0 && (
-                                  <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
-                                    {totalParentUnread} Baru
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                {totalParentUnread > 0 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newAnnIds = [...new Set([...readAnnouncements, ...announcements.map(a => a.id)])];
-                                      setReadAnnouncements(newAnnIds);
-                                      try {
-                                        localStorage.setItem('read_announcements_' + (student ? student.id : 'guest'), JSON.stringify(newAnnIds));
-                                      } catch(e) {}
-
-                                      const newNoteIds = [...new Set([...readNotes, ...myNotes.map(n => n.id)])];
-                                      setReadNotes(newNoteIds);
-                                      try {
-                                        localStorage.setItem('read_notes_' + (student ? student.id : 'guest'), JSON.stringify(newNoteIds));
-                                      } catch(e) {}
-
-                                      const updatedMsgs = { ...readComplaintMsgs };
-                                      myComplaints.forEach(c => {
-                                        const count = (c.messages && c.messages.length > 0) ? c.messages.length : 1;
-                                        updatedMsgs[c.id] = count;
-                                      });
-                                      setReadComplaintMsgs(updatedMsgs);
-                                      try {
-                                        localStorage.setItem('read_complaint_msgs_' + (student ? student.id : 'guest'), JSON.stringify(updatedMsgs));
-                                      } catch(e) {}
-                                    }}
-                                    className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
-                                  >
-                                    Tandai Dibaca
-                                  </button>
-                                )}
-                                <button onClick={() => setShowParentBell(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Tutup</button>
-                              </div>
-                            </div>
-
-                            <div className="space-y-2 max-h-80 overflow-y-auto text-xs">
-                              {parentNotificationItems.length === 0 ? (
-                                <p className="text-slate-400 text-center py-5 font-medium">Tidak ada notifikasi saat ini.</p>
-                              ) : (
-                                parentNotificationItems.slice(0, 8).map(item => (
-                                  <div
-                                    key={item.id}
-                                    onClick={item.onClick}
-                                    className={`p-3 rounded-2xl border cursor-pointer transition-all hover:scale-[0.99] ${
-                                      item.isUnread 
-                                        ? item.category === 'chat'
-                                          ? 'bg-amber-50/90 border-amber-300 font-extrabold text-amber-950 shadow-xs'
-                                          : item.category === 'note'
-                                            ? 'bg-purple-50/90 border-purple-200 font-extrabold text-purple-950 shadow-xs'
-                                            : 'bg-blue-50/90 border-blue-200 font-extrabold text-blue-950 shadow-xs'
-                                        : 'bg-slate-50/80 border-slate-200 text-slate-600'
-                                    }`}
-                                  >
-                                    <div className="flex justify-between items-center mb-1 gap-2">
-                                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                        <Icon 
-                                          name={item.category === 'chat' ? 'message-circle' : item.category === 'note' ? 'file-text' : 'megaphone'} 
-                                          size={13} 
-                                          className={`shrink-0 ${
-                                            item.isUnread 
-                                              ? item.category === 'chat' ? 'text-amber-600' : item.category === 'note' ? 'text-purple-600' : 'text-blue-600'
-                                              : 'text-slate-400'
-                                          }`} 
-                                        />
-                                        <span className="font-extrabold text-[12px] truncate">{item.title}</span>
-                                      </div>
-                                      {item.isUnread ? (
-                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-black shrink-0 ${
-                                          item.category === 'chat' 
-                                            ? 'bg-amber-500 text-white animate-pulse' 
-                                            : item.category === 'note' 
-                                              ? 'bg-purple-600 text-white' 
-                                              : 'bg-blue-600 text-white'
-                                        }`}>
-                                          {item.category === 'chat' ? 'Balasan Baru' : 'Baru'}
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] text-slate-400 font-semibold shrink-0">Dibaca</span>
-                                      )}
-                                    </div>
-                                    <p className="text-[11px] text-slate-600 font-normal line-clamp-1">{item.snippet}</p>
-                                    {item.time && (
-                                      <span className="text-[9px] text-slate-400 mt-1 block font-medium">{item.time}</span>
-                                    )}
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </div>
-                        </>
-                      )}
                     </div>
 
                     <button
@@ -2519,7 +3368,7 @@ function ParentDashboardView({
               </header>
 
               {/* Main Content Body */}
-              <div key={activeTab} className="p-4 sm:p-6 md:p-10 space-y-6 sm:space-y-7 flex-1 animate-tab-switch">
+              <div key={activeTab} className="px-3.5 py-4 sm:px-6 md:p-10 space-y-6 sm:space-y-7 flex-1 animate-tab-switch relative z-10">
                 {/* TAB 0: DASHBOARD UTAMA */}
                 {activeTab === 'dashboard' && (
                   <section className="space-y-6 sm:space-y-7 animate-in fade-in duration-300">
@@ -2673,7 +3522,7 @@ function ParentDashboardView({
                             <div className="space-y-3">
                               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
                                 <span className="text-[11px] font-bold text-teal-600 uppercase flex items-center gap-1 mb-1">
-                                  <Icon name="calendar" size={12} /> {announcements[0].date}
+                                  <Icon name="calendar" size={12} /> {formatDateIndo(announcements[0].date)}
                                 </span>
                                 <h4 className="font-black text-slate-800 text-base">{announcements[0].title}</h4>
                                 <p className="text-xs text-slate-600 font-medium line-clamp-3 mt-1.5">{announcements[0].content}</p>
@@ -2773,11 +3622,17 @@ function ParentDashboardView({
                             </span>
                           </div>
                           <p className="text-xs font-extrabold text-slate-500 uppercase tracking-wider">Tunggakan s/d Bulan Ini</p>
-                          <h4 className={`text-xl sm:text-2xl md:text-3xl font-black mt-1 ${unpaidBills.length > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                          <h4 className={`text-xl sm:text-2xl md:text-3xl font-black mt-1 ${totalDueDebt > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
                             {formatRupiah(totalDueDebt)}
                           </h4>
+                          {Number(student?.arrearsAmount || 0) > 0 && !(student?.arrearsNote && student?.kelas && student.arrearsNote.toLowerCase().includes(student.kelas.toLowerCase())) && !String(student?.arrearsNote).startsWith('sess_') && (
+                            <div className="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 text-[10.5px] font-black border border-amber-300">
+                              <Icon name="history" size={11} className="text-amber-700" />
+                              <span>+ Tunggakan Kelas Sebelumnya: {formatRupiah(student.arrearsAmount)}</span>
+                            </div>
+                          )}
                           <p className="text-xs font-medium text-slate-500 mt-1">
-                            {unpaidBills.length > 0 ? 'Wajib segera dilunasi' : 'Semua tagihan aman'}
+                            {totalDueDebt > 0 ? 'Wajib segera dilunasi' : 'Semua tagihan aman'}
                           </p>
                         </div>
 
@@ -2837,6 +3692,15 @@ function ParentDashboardView({
                           <p className="text-xs font-medium text-slate-500 mt-1 truncate">
                             Periode {settings.academicYear || 'Aktif'}
                           </p>
+                          <button
+                            type="button"
+                            onClick={() => setShowParentClassHistory(true)}
+                            className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-amber-100/70 text-amber-900 border border-amber-300 rounded-xl text-xs font-black transition-all shadow-2xs group active:scale-95 cursor-pointer w-full justify-center sm:justify-start"
+                            title="Klik untuk melihat linimasa riwayat jenjang & mutasi rombel ananda"
+                          >
+                            <Icon name="history" size={13} className="text-amber-700 group-hover:rotate-45 transition-transform" />
+                            <span>Lihat Riwayat Jenjang Kelas</span>
+                          </button>
                         </div>
                       </div>
 
@@ -2907,14 +3771,54 @@ function ParentDashboardView({
                               </span>
                             )}
                           </div>
-                          <div className="overflow-x-auto p-2 sm:p-3">
-                            {unpaidBills.length === 0 ? (
+                          <div className="p-2 sm:p-3 space-y-3">
+                            {Number(student?.arrearsAmount || 0) > 0 && !(student?.arrearsNote && student?.kelas && student.arrearsNote.toLowerCase().includes(student.kelas.toLowerCase())) && !String(student?.arrearsNote).startsWith('sess_') && (
+                              <div className="p-4 sm:p-5 rounded-2xl bg-amber-50/95 border-2 border-amber-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
+                                <div className="flex items-start gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+                                    <Icon name="history" size={20} />
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="font-black text-amber-950 text-sm sm:text-base">Tunggakan Bawaan Kelas Sebelumnya</h4>
+                                      <span className="px-2 py-0.5 rounded-md bg-amber-200 text-amber-900 text-[10px] font-black uppercase">Akumulasi Mutasi / Naik Kelas</span>
+                                    </div>
+                                    <p className="text-xs text-amber-800 font-bold mt-0.5">{(student.arrearsNote && !student.arrearsNote.startsWith('sess_')) ? student.arrearsNote : 'Tunggakan dari kelas / periode ajaran sebelumnya'}</p>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto shrink-0">
+                                  <div className="text-left sm:text-right bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl border sm:border-0 border-amber-200">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 block sm:hidden">Total Tunggakan:</span>
+                                    <div className="font-black text-rose-700 text-xl sm:text-2xl">{formatRupiah(student.arrearsAmount)}</div>
+                                    <span className="text-[11px] font-semibold text-slate-500 block">Konfirmasi / Kasir TU & Online</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => onPayMidtrans({
+                                      month: (student.arrearsNote && !student.arrearsNote.startsWith('sess_')) ? `Tunggakan (${student.arrearsNote})` : 'Tunggakan Kelas Sebelumnya',
+                                      amount: Number(student.arrearsAmount),
+                                      isArrearsPayment: true
+                                    })}
+                                    className="py-2.5 px-4 bg-gradient-to-r from-amber-600 via-orange-600 to-rose-600 hover:from-amber-700 hover:to-rose-700 text-white font-black rounded-xl text-xs sm:text-sm shadow-md shadow-orange-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap"
+                                  >
+                                    <Icon name="credit-card" size={16} />
+                                    <span>Bayar Online</span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {unpaidBills.length === 0 && Number(student?.arrearsAmount || 0) === 0 ? (
                               <div className="p-8 sm:p-10 text-center flex flex-col items-center justify-center">
                                 <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
                                   <Icon name="shield-check" size={32}/>
                                 </div>
                                 <p className="font-black text-slate-800 text-lg sm:text-xl">Tidak Ada Tunggakan</p>
                                 <p className="text-xs sm:text-base text-slate-500 font-medium mt-1">Semua tagihan SPP ananda s/d bulan berjalan dalam status aman & lunas.</p>
+                              </div>
+                            ) : unpaidBills.length === 0 ? (
+                              <div className="p-5 text-center text-xs font-bold text-slate-500 bg-slate-50 rounded-xl border border-slate-200">
+                                Seluruh tagihan SPP bulanan kelas {student.kelas} saat ini telah lunas.
                               </div>
                             ) : (
                               <table className="w-full text-left">
@@ -3061,33 +3965,59 @@ function ParentDashboardView({
                                   : `Belum ada riwayat pembayaran pada kelas ${historyClassFilter}.`}
                               </p>
                             ) : (
-                              <table className="w-full text-left">
-                                <tbody className="divide-y divide-slate-100">
+                              <table className="w-full text-left border-collapse">
+                                <thead>
+                                  <tr className="text-[11px] sm:text-xs font-black uppercase tracking-wider">
+                                    <th className="py-3.5 px-4 pastel-th-sky rounded-l-2xl text-left whitespace-nowrap">Bulan SPP & Tanggal</th>
+                                    <th className="py-3.5 px-4 pastel-th-yellow text-left whitespace-nowrap">Kelas</th>
+                                    <th className="py-3.5 px-4 pastel-th-mint text-center whitespace-nowrap">Status</th>
+                                    <th className="py-3.5 px-4 pastel-th-teal text-right whitespace-nowrap">Nominal</th>
+                                    <th className="py-3.5 px-4 pastel-th-blue text-center rounded-r-2xl whitespace-nowrap">Aksi</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-xs sm:text-sm font-medium">
                                   {filteredPaidBills.map((trx, idx) => (
-                                    <tr key={trx.id || idx} className="hover:bg-slate-50 transition-colors">
-                                      <td className="py-4 px-4 sm:px-6">
-                                        <div className="font-black text-slate-800 text-base sm:text-xl">{trx.month}</div>
+                                    <tr key={trx.id || idx} className="hover:bg-amber-50/40 transition-colors">
+                                      <td className="py-3.5 px-4">
+                                        <div className="font-black text-slate-800 text-sm sm:text-base">{trx.month}</div>
                                         <div className="flex items-center gap-2 mt-0.5">
-                                          <span className="text-xs font-bold text-slate-400 uppercase">Tgl: {trx.date}</span>
-                                          <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-800 border border-blue-200">
-                                            Kelas: {trx.kelas || student?.kelas}
-                                          </span>
+                                          <span className="text-[11px] font-bold text-slate-500">Tgl: {formatDateIndo(trx.date)}</span>
+                                          {trx.kuitansiNo && (
+                                            <span className="font-mono text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.2 rounded">
+                                              {trx.kuitansiNo}
+                                            </span>
+                                          )}
                                         </div>
                                       </td>
-                                      <td className="py-4 px-4 sm:px-6">
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-xl font-black text-xs">
-                                          <Icon name="check-circle-2" size={13} /> LUNAS
+                                      <td className="py-3.5 px-4">
+                                        <span className="px-2.5 py-1 rounded-xl text-xs font-black bg-amber-100/80 text-amber-900 border border-amber-300">
+                                          {trx.kelas || student?.kelas}
                                         </span>
                                       </td>
-                                      <td className="py-4 px-4 sm:px-6 font-black text-emerald-700 text-right text-base sm:text-xl">
-                                        {formatRupiah(trx.amount || trx.nominal)}
+                                      <td className="py-3.5 px-4 text-center">
+                                        <span className="status-pill-lunas">
+                                          <Icon name="check" size={11} /> LUNAS
+                                        </span>
                                       </td>
-                                      <td className="py-4 px-4 sm:px-6 text-right w-36 sm:w-48">
+                                      <td className="py-3.5 px-4 font-black text-emerald-700 text-right text-sm sm:text-base whitespace-nowrap">
+                                        <div>{formatRupiah(trx.amount || trx.nominal)}</div>
+                                        {Boolean(
+                                          trx.keringananNote ||
+                                          (student?.keringanan_note && (trx.amount || trx.nominal) < (settings?.customClasses?.find(c => c.name === (trx.kelas || student?.kelas))?.tarif || 350000))
+                                        ) && (
+                                          <div className="text-[10.5px] text-amber-700 font-extrabold flex items-center justify-end gap-0.5 mt-0.5">
+                                            <span>*keringanan</span>
+                                          </div>
+                                        )}
+                                      </td>
+                                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
                                         <button
                                           onClick={() => onShowKuitansi(trx)}
-                                          className="w-full py-2.5 px-3 sm:px-4 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold rounded-xl text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 border border-blue-200 shadow-sm"
+                                          className="btn-print-kuitansi"
+                                          title="Cetak Kuitansi Resmi"
                                         >
-                                          <Icon name="receipt" size={15} /> Kuitansi
+                                          <Icon name="printer" size={13} />
+                                          <span>Cetak Kuitansi</span>
                                         </button>
                                       </td>
                                     </tr>
@@ -3141,7 +4071,7 @@ function ParentDashboardView({
                               <div>
                                 <div className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 uppercase mb-2">
                                   <Icon name="calendar" size={13} />
-                                  <span>{ann.date}</span>
+                                  <span>{formatDateIndo(ann.date)}</span>
                                 </div>
                                 <h4 className="font-black text-slate-800 text-base mb-2 leading-tight line-clamp-2">{ann.title}</h4>
                                 <p className="text-xs text-slate-600 leading-relaxed font-medium line-clamp-3 mb-4">{ann.content}</p>
@@ -3268,7 +4198,7 @@ function ParentDashboardView({
                                 </div>
                                 <h4 className="font-black text-slate-800 text-lg mt-1.5">{activeComplaint.title}</h4>
                               </div>
-                              <span className="text-xs text-slate-400 font-bold">{activeComplaint.date}</span>
+                              <span className="text-xs text-slate-500 font-bold">{formatDateIndo(activeComplaint.date)}</span>
                             </div>
 
                             {/* Thread Pesan Live */}
@@ -3287,7 +4217,7 @@ function ParentDashboardView({
                                           <Icon name={isAdmin ? 'shield-check' : 'user'} size={12} className={isAdmin ? 'text-blue-600' : 'text-blue-200'} />
                                           {isAdmin ? 'Petugas Tata Usaha (TU)' : 'Anda (Wali Murid)'}
                                         </span>
-                                        <span className="text-[10px] opacity-75 font-medium">{m.time || ''}</span>
+                                        <span className="text-[10px] opacity-75 font-medium">{formatDateTimeIndo(m.time, activeComplaint.date)}</span>
                                       </div>
                                       <p className="font-semibold whitespace-pre-wrap leading-relaxed">{m.text}</p>
                                       {m.imageUrl && (
@@ -3302,7 +4232,37 @@ function ParentDashboardView({
                             </div>
 
                             {/* Form Balas Chat Aktif */}
-                            <div className="flex gap-2 pt-1">
+                            <div className="flex items-center gap-2 pt-1">
+                              <input
+                                type="file"
+                                id={`parent_file_${activeComplaint.id}`}
+                                className="hidden"
+                                accept="image/*"
+                                onChange={e => {
+                                  const file = e.target.files[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = ev => {
+                                      onReplyComplaint(
+                                        activeComplaint.id,
+                                        replyText[activeComplaint.id]?.trim() || '(Mengirim Lampiran Foto)',
+                                        'Wali Murid',
+                                        ev.target.result
+                                      );
+                                      setReplyText({ ...replyText, [activeComplaint.id]: '' });
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById(`parent_file_${activeComplaint.id}`).click()}
+                                className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-colors flex items-center justify-center shrink-0 border border-slate-300 shadow-sm"
+                                title="Kirim Foto / Lampiran"
+                              >
+                                <Icon name="image" size={18} />
+                              </button>
                               <input
                                 type="text"
                                 value={replyText[activeComplaint.id] || ''}
@@ -3343,10 +4303,12 @@ function ParentDashboardView({
                               waliName: student.wali || 'Wali Murid',
                               title: complaintTitle.trim(),
                               content: complaintContent.trim(),
-                              date: new Date().toLocaleDateString('id-ID')
+                              imageUrl: complaintImage || null,
+                              date: formatDateIndo(new Date())
                             });
                             setComplaintTitle('');
                             setComplaintContent('');
+                            setComplaintImage('');
                           }}
                           className="bg-slate-50 p-5 sm:p-7 rounded-3xl border border-slate-200/80 mb-8 space-y-4 shadow-xs"
                         >
@@ -3379,6 +4341,48 @@ function ParentDashboardView({
                               placeholder="Tuliskan pengaduan atau pertanyaan Anda secara rinci..."
                               className="w-full px-4 py-3 bg-white border border-slate-300 rounded-2xl text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none shadow-inner"
                             ></textarea>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-600 mb-1.5">Lampirkan Foto / Gambar (Opsional)</label>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <input
+                                type="file"
+                                id="parent_new_complaint_file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={e => {
+                                  const file = e.target.files[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = ev => setComplaintImage(ev.target.result);
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById('parent_new_complaint_file').click()}
+                                className="px-4 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 flex items-center gap-2 shadow-xs transition-colors"
+                              >
+                                <Icon name="image" size={15} className="text-blue-600" />
+                                <span>{complaintImage ? 'Ganti Lampiran Foto' : 'Pilih Foto / Gambar'}</span>
+                              </button>
+                              {complaintImage && (
+                                <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl">
+                                  <img src={complaintImage} alt="Preview" className="w-8 h-8 object-cover rounded-lg border border-blue-200" />
+                                  <span className="text-[11px] font-bold text-blue-900">Foto Terpilih</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setComplaintImage('')}
+                                    className="p-1 text-rose-500 hover:text-rose-700 rounded-full hover:bg-rose-50"
+                                    title="Hapus Foto"
+                                  >
+                                    <Icon name="x" size={13} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="pt-2">
@@ -3432,7 +4436,7 @@ function ParentDashboardView({
                                       </div>
                                       <h5 className="font-black text-slate-800 text-base mt-1">{comp.title}</h5>
                                     </div>
-                                    <span className="text-[11px] text-slate-400 font-bold">{comp.date}</span>
+                                    <span className="text-[11px] text-slate-500 font-bold">{formatDateIndo(comp.date)}</span>
                                   </div>
 
                                   {/* Chat Thread */}
@@ -3451,7 +4455,7 @@ function ParentDashboardView({
                                                 <Icon name={isAdmin ? 'shield-check' : 'user'} size={12} className={isAdmin ? 'text-blue-600' : 'text-slate-500'} />
                                                 {isAdmin ? 'Tata Usaha (TU)' : 'Wali Murid'}
                                               </span>
-                                              <span className="text-[10px] text-slate-400 font-medium">{m.time || ''}</span>
+                                              <span className="text-[10px] text-slate-500 font-medium">{formatDateTimeIndo(m.time, comp.date)}</span>
                                             </div>
                                             <p className="font-medium whitespace-pre-wrap">{m.text}</p>
                                           </div>
@@ -3735,6 +4739,120 @@ function ParentDashboardView({
 
       return (
         <div className="space-y-8 animate-in fade-in duration-300">
+          {/* ROOT-LEVEL ADMIN NOTIFICATION DROPDOWN (BEBAS DARI STACKING CONTEXT BANNER & STAT CARDS) */}
+          {showBellDropdown && (
+            <div className="fixed inset-0 z-[9999] pointer-events-auto">
+              {/* Subtle Click-Away Backdrop */}
+              <div 
+                className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[9999]"
+                onClick={() => setShowBellDropdown(false)}
+              />
+              <div className="fixed inset-x-3 sm:inset-x-auto sm:right-8 top-[74px] sm:top-24 z-[10000] w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 max-h-[82vh] overflow-y-auto">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <Icon name="bell" size={14} />
+                    </div>
+                    <h4 className="font-extrabold text-xs uppercase text-slate-800 tracking-wide">Notifikasi Admin</h4>
+                    {totalUnreadCount > 0 && (
+                      <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
+                        {totalUnreadCount} Baru
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {totalUnreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          complaints.forEach(c => onMarkReadNotification && onMarkReadNotification('complaint', c.id));
+                          transactions.forEach(t => onMarkReadNotification && onMarkReadNotification('transaction', t.id));
+                        }}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        Tandai Dibaca
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowBellDropdown(false)}
+                      className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-xs font-bold transition-colors"
+                    >
+                      Tutup
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-80 overflow-y-auto text-xs pr-0.5">
+                  {complaints.length === 0 && transactions.length === 0 && (
+                    <div className="text-center py-6 text-slate-400 font-medium">
+                      <Icon name="bell-off" size={26} className="mx-auto mb-1.5 text-slate-300" />
+                      Belum ada aktivitas notifikasi.
+                    </div>
+                  )}
+
+                  {/* Pending Complaints */}
+                  {complaints.filter(isComplaintPending).map(c => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => {
+                        onMarkReadNotification && onMarkReadNotification('complaint', c.id);
+                        setShowBellDropdown(false);
+                        navigateTo('pengaduan');
+                      }}
+                      className="p-3 rounded-2xl border cursor-pointer transition-all hover:scale-[0.99] bg-amber-50/90 border-amber-200 font-bold shadow-2xs"
+                    >
+                      <div className="flex justify-between items-center mb-1 gap-2">
+                        <span className="text-amber-900 font-extrabold truncate">Aduan Masuk: {c.title}</span>
+                        <span className="px-1.5 py-0.5 bg-rose-500 text-white rounded text-[9px] font-black shrink-0">Perlu Balasan</span>
+                      </div>
+                      <p className="text-[11px] text-amber-800 truncate">{c.waliName || 'Wali'} ({c.studentName}) • {c.content}</p>
+                      {c.date && <span className="text-[9.5px] text-amber-700/80 font-semibold mt-1 block">{formatDateIndo(c.date)}</span>}
+                    </div>
+                  ))}
+
+                  {/* Unread Transactions */}
+                  {transactions.filter(t => !t.isRead).map(t => (
+                    <div 
+                      key={t.id} 
+                      onClick={() => {
+                        onMarkReadNotification && onMarkReadNotification('transaction', t.id);
+                        setShowBellDropdown(false);
+                        onShowKuitansi(t);
+                      }}
+                      className="p-3 rounded-2xl border cursor-pointer transition-all hover:scale-[0.99] bg-emerald-50/90 border-emerald-200 font-bold shadow-2xs"
+                    >
+                      <div className="flex justify-between items-center mb-1 gap-2">
+                        <span className="text-emerald-900 font-extrabold truncate">Pembayaran SPP {t.month}</span>
+                        <span className="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-black shrink-0">Lunas</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-800">{t.studentName} • {formatRupiah(t.amount)}</p>
+                      {t.date && <span className="text-[9.5px] text-emerald-700/80 font-semibold mt-1 block">{formatDateIndo(t.date)}</span>}
+                    </div>
+                  ))}
+
+                  {/* Other recent complaints if any */}
+                  {complaints.filter(c => !isComplaintPending(c)).slice(0, 4).map(c => (
+                    <div 
+                      key={c.id} 
+                      onClick={() => {
+                        setShowBellDropdown(false);
+                        navigateTo('pengaduan');
+                      }}
+                      className="p-3 rounded-2xl border cursor-pointer transition-all hover:bg-slate-100 bg-slate-50/90 border-slate-200 text-slate-600"
+                    >
+                      <div className="flex justify-between items-center mb-0.5 gap-2">
+                        <span className="font-bold text-slate-800 truncate">Aduan: {c.title}</span>
+                        <span className="text-[10px] text-slate-400 font-semibold shrink-0">Selesai</span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-500 truncate">{c.waliName} ({c.studentName})</p>
+                      {c.date && <span className="text-[9.5px] text-slate-400 font-medium mt-0.5 block">{formatDateIndo(c.date)}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* GREETING & WAVING MASCOT BANNER FOR ADMIN */}
           <GreetingMascotBanner 
@@ -3744,34 +4862,29 @@ function ParentDashboardView({
             academicYear={settings?.academicYear} 
           />
 
-          <div className="relative rounded-[28px] sm:rounded-[32px] p-6 sm:p-8 bg-gradient-to-br from-[#0a1838] via-[#0d2250] to-[#07132e] text-white border border-white/15 shadow-2xl shadow-blue-950/40 flex flex-wrap items-center justify-between gap-5">
-            {/* Luminous Glow Orbs (contained safely so dropdown is not clipped) */}
-            <div className="absolute inset-0 overflow-hidden rounded-[28px] sm:rounded-[32px] pointer-events-none select-none">
-              <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-blue-500/20 blur-3xl"></div>
-              <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-cyan-400/15 blur-3xl"></div>
-            </div>
-
+          <div className="relative rounded-[28px] sm:rounded-[32px] p-6 sm:p-8 smurf-panel-glow text-slate-800 flex flex-wrap items-center justify-between gap-6">
             <div className="relative z-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/15 border border-cyan-400/30 text-cyan-300 text-xs font-black mb-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-100 border border-sky-300/80 text-sky-800 text-xs font-black mb-2 shadow-xs">
+                <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
                 <span>PANEL ADMINISTRATOR TU</span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">Pusat Kendali Administrasi</h2>
-              <p className="text-sm sm:text-base text-slate-300 mt-1 font-medium max-w-xl">Kelola data murid, pencatatan transaksi manual, broadcast pengumuman, dan respon aduan wali.</p>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Pusat Kendali Administrasi</h2>
+              <p className="text-sm sm:text-base text-slate-600 mt-1 font-semibold max-w-xl">Kelola data murid, pencatatan transaksi manual, broadcast pengumuman, dan respon aduan wali.</p>
             </div>
 
             <div className="flex items-center gap-3 relative z-10">
               <button
                 onClick={() => onRefresh(true)}
                 title="Refresh Data Baru"
-                className={`py-3 px-4 bg-white/10 hover:bg-white/20 active:scale-95 text-white rounded-2xl text-sm font-bold border border-white/15 backdrop-blur-md transition-all flex items-center gap-2 shadow-sm`}
+                className="py-3 px-4.5 bg-sky-50 hover:bg-sky-100 active:scale-95 text-sky-800 rounded-2xl text-sm font-black border border-sky-200 transition-all flex items-center gap-2 shadow-sm"
               >
-                <Icon name="refresh-cw" size={18} className={isRefreshing ? 'animate-spin text-emerald-300' : ''} />
+                <Icon name="refresh-cw" size={18} className={isRefreshing ? 'animate-spin text-sky-600' : 'text-sky-600'} />
                 <span className="hidden sm:inline">Refresh Data</span>
               </button>
 
               <div className="relative">
                 <button
+                  type="button"
                   onClick={() => {
                     const next = !showBellDropdown;
                     setShowBellDropdown(next);
@@ -3780,119 +4893,21 @@ function ParentDashboardView({
                       transactions.forEach(t => onMarkReadNotification && onMarkReadNotification('transaction', t.id));
                     }
                   }}
-                  className="p-3 bg-white/10 hover:bg-white/20 rounded-2xl text-white relative transition-colors border border-white/15 backdrop-blur-md shadow-sm"
+                  className="p-3 bg-sky-50 hover:bg-sky-100 rounded-2xl text-sky-800 relative transition-colors border border-sky-200 shadow-sm"
+                  title="Notifikasi Admin"
                 >
                   <Icon name="bell" size={20} />
                   {totalUnreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center border-2 border-emerald-700 animate-pulse">
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center border-2 border-white animate-pulse shadow-md">
                       {totalUnreadCount}
                     </span>
                   )}
                 </button>
-
-                {showBellDropdown && (
-                  <>
-                    {/* Backdrop Overlay for closing on outside click (Mobile & Desktop) */}
-                    <div 
-                      className="fixed inset-0 bg-slate-900/20 sm:bg-transparent z-40"
-                      onClick={() => setShowBellDropdown(false)}
-                    />
-                    <div className="fixed inset-x-3 top-20 sm:top-auto sm:inset-x-auto sm:absolute sm:right-0 sm:mt-3 w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 z-50 space-y-3 animate-in slide-in-from-top-2">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-extrabold text-xs uppercase text-slate-700">Notifikasi Admin</h4>
-                        {totalUnreadCount > 0 && (
-                          <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
-                            {totalUnreadCount} Baru
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {totalUnreadCount > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              complaints.forEach(c => onMarkReadNotification('complaint', c.id));
-                              transactions.forEach(t => onMarkReadNotification('transaction', t.id));
-                            }}
-                            className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            Tandai Dibaca
-                          </button>
-                        )}
-                        <button onClick={() => setShowBellDropdown(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Tutup</button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 max-h-72 overflow-y-auto text-xs">
-                      {complaints.length === 0 && transactions.length === 0 && (
-                        <p className="text-slate-400 text-center py-4 font-medium">Belum ada aktivitas notifikasi.</p>
-                      )}
-
-                      {/* Pending Complaints */}
-                      {complaints.filter(isComplaintPending).map(c => (
-                        <div 
-                          key={c.id} 
-                          onClick={() => {
-                            onMarkReadNotification('complaint', c.id);
-                            setShowBellDropdown(false);
-                            navigateTo('pengaduan');
-                          }}
-                          className="p-3 rounded-xl border cursor-pointer transition-all hover:scale-[0.99] bg-amber-50 border-amber-200 font-bold"
-                        >
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-amber-900 font-extrabold truncate">Aduan Masuk: {c.title}</span>
-                            <span className="px-1.5 py-0.5 bg-rose-500 text-white rounded text-[9px] font-black shrink-0">Perlu Balasan</span>
-                          </div>
-                          <p className="text-[11px] text-amber-800 truncate">{c.waliName || 'Wali'} ({c.studentName}) • {c.content}</p>
-                        </div>
-                      ))}
-
-                      {/* Unread Transactions */}
-                      {transactions.filter(t => !t.isRead).map(t => (
-                        <div 
-                          key={t.id} 
-                          onClick={() => {
-                            onMarkReadNotification('transaction', t.id);
-                            setShowBellDropdown(false);
-                            onShowKuitansi(t);
-                          }}
-                          className="p-3 rounded-xl border cursor-pointer transition-all hover:scale-[0.99] bg-emerald-50 border-emerald-200 font-bold"
-                        >
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-emerald-900 font-extrabold truncate">Pembayaran SPP {t.month}</span>
-                            <span className="px-1.5 py-0.5 bg-emerald-600 text-white rounded text-[9px] font-black shrink-0">Lunas</span>
-                          </div>
-                          <p className="text-[11px] text-emerald-800">{t.studentName} • {formatRupiah(t.amount)}</p>
-                        </div>
-                      ))}
-
-                      {/* Other recent complaints if any */}
-                      {complaints.filter(c => !isComplaintPending(c)).slice(0, 3).map(c => (
-                        <div 
-                          key={c.id} 
-                          onClick={() => {
-                            setShowBellDropdown(false);
-                            navigateTo('pengaduan');
-                          }}
-                          className="p-2.5 rounded-xl border cursor-pointer transition-all bg-slate-50 border-slate-200 text-slate-600 opacity-80"
-                        >
-                          <div className="flex justify-between items-center mb-0.5">
-                            <span className="font-bold text-slate-700 truncate">Aduan: {c.title}</span>
-                            <span className="text-[10px] text-slate-400">Selesai</span>
-                          </div>
-                          <p className="text-[10px] text-slate-500">{c.waliName} ({c.studentName})</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
               </div>
 
               <button 
                 onClick={() => navigateTo('siswa')}
-                className="py-3 px-5 bg-gradient-to-r from-blue-500 via-indigo-600 to-indigo-700 hover:from-blue-600 hover:to-indigo-800 text-white font-black rounded-2xl text-sm transition-all shadow-lg shadow-blue-600/35 flex items-center gap-2 border border-white/20 active:scale-95"
+                className="py-3 px-5 bg-gradient-to-r from-blue-600 via-sky-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600 text-white font-black rounded-2xl text-sm transition-all shadow-lg shadow-sky-500/35 flex items-center gap-2 border border-cyan-300/40 active:scale-95"
               >
                 <Icon name="user-plus" size={18} />
                 <span>Tambah Siswa</span>
@@ -4011,7 +5026,10 @@ function ParentDashboardView({
                       <td className="py-4 px-6 font-bold text-slate-800">{trx.kuitansiNo}</td>
                       <td className="py-4 px-6 font-bold text-slate-700">{trx.studentName}</td>
                       <td className="py-4 px-6 font-semibold">{trx.kelas}</td>
-                      <td className="py-4 px-6 font-extrabold text-emerald-700">{trx.month}</td>
+                      <td className="py-4 px-6">
+                        <div className="font-extrabold text-emerald-700">{trx.month}</div>
+                        {trx.date && <div className="text-[11px] font-bold text-slate-400 mt-0.5">{formatDateIndo(trx.date)}</div>}
+                      </td>
                       <td className="py-4 px-6 font-black text-slate-800">{formatRupiah(trx.amount)}</td>
                       <td className="py-4 px-6 font-medium">{trx.method}</td>
                       <td className="py-4 px-6 text-center">
@@ -4088,7 +5106,7 @@ function ParentDashboardView({
                             <tbody className="divide-y divide-slate-100">
                               {transactions.map(t => (
                                 <tr key={t.id} className="hover:bg-slate-50/70">
-                                  <td className="py-2.5 px-3 text-slate-600">{t.date}</td>
+                                  <td className="py-2.5 px-3 text-slate-600">{formatDateIndo(t.date)}</td>
                                   <td className="py-2.5 px-3 font-mono font-bold text-blue-700">{t.kuitansiNo}</td>
                                   <td className="py-2.5 px-3 font-bold text-slate-800">{t.studentName}</td>
                                   <td className="py-2.5 px-3 text-slate-600">{t.kelas}</td>
@@ -4128,7 +5146,7 @@ function ParentDashboardView({
     // ==========================================
     // 4. MANAJEMEN DATA MURID
     // ==========================================
-    function SiswaListView({ students, settings, onAddStudent, onUpdateStudent, onDeleteStudent }) {
+    function SiswaListView({ students, settings, transactions = [], onAddStudent, onUpdateStudent, onDeleteStudent, showToast }) {
       const [showModal, setShowModal] = useState(false);
       const [editingStudent, setEditingStudent] = useState(null);
       const [isKeringanan, setIsKeringanan] = useState(false);
@@ -4136,6 +5154,256 @@ function ParentDashboardView({
       const [waPhoneInput, setWaPhoneInput] = useState('');
       const [waSavePhone, setWaSavePhone] = useState(true);
       const [copiedWaMsg, setCopiedWaMsg] = useState(false);
+      const [selectedBiodataStudent, setSelectedBiodataStudent] = useState(null);
+      const [selectedHistoryStudent, setSelectedHistoryStudent] = useState(null);
+      const [viewTab, setViewTab] = useState('biodata'); // 'biodata' | 'history'
+      const [searchQuery, setSearchQuery] = useState('');
+      const [classFilter, setClassFilter] = useState('ALL');
+      const [matriksPage, setMatriksPage] = useState(1);
+      const MATRIKS_PER_PAGE = 10;
+
+      // Daftar kelas dinamis diambil langsung dari Pengaturan (settings.customClasses)
+      const classList = useMemo(() => {
+        if (Array.isArray(settings?.customClasses) && settings.customClasses.length > 0) {
+          const valid = settings.customClasses.filter(c => c && c.name && c.name.trim().length > 0);
+          if (valid.length > 0) return valid;
+        }
+        const studentClasses = Array.from(new Set((students || []).map(s => s.kelas).filter(Boolean)));
+        return studentClasses.map(clsName => ({ name: clsName, tarif: 0 }));
+      }, [settings?.customClasses, students]);
+
+      // Cek apakah siswa berstatus Lulus / Alumni
+      const isStudentLulus = (student) => {
+        if (!student) return false;
+        return (
+          student.statusAktif === false ||
+          (student.status || '').toLowerCase() === 'lulus' ||
+          (student.status || '').toLowerCase() === 'non-aktif' ||
+          (student.kelas || '').toLowerCase().includes('lulus') ||
+          (student.kelas || '').toLowerCase().includes('alumni')
+        );
+      };
+
+      // Cek apakah jenjang kelas tertentu telah ditempuh/aktif untuk siswa
+      const isClassCompleted = (student, clsName) => {
+        if (!student || !clsName) return false;
+        if (isStudentLulus(student)) return true;
+
+        const targetNameLower = clsName.trim().toLowerCase();
+        const currentClassLower = (student.kelas || '').trim().toLowerCase();
+
+        // 1. Cek manual override di completedLevels jika ada
+        const overrides = student.completedLevels || {};
+        if (overrides[clsName] !== undefined) {
+          return Boolean(overrides[clsName]);
+        }
+
+        // 2. Cek apakah kelas saat ini sama persis
+        if (currentClassLower === targetNameLower) return true;
+
+        // 3. Cek urutan jenjang dinamis berdasarkan posisi kelas di pengaturan
+        const targetIdx = classList.findIndex(c => c.name.trim().toLowerCase() === targetNameLower);
+        const currentIdx = classList.findIndex(c => c.name.trim().toLowerCase() === currentClassLower);
+        if (targetIdx !== -1 && currentIdx !== -1 && currentIdx >= targetIdx) {
+          return true;
+        }
+
+        // 4. Cek riwayat kelas sebelumnya di classHistory
+        const history = Array.isArray(student.classHistory) ? student.classHistory : [];
+        const inHistory = history.some(h => 
+          (h.fromClass && h.fromClass.trim().toLowerCase() === targetNameLower) ||
+          (h.toClass && h.toClass.trim().toLowerCase() === targetNameLower)
+        );
+        if (inHistory) return true;
+
+        return false;
+      };
+
+      // Helper status progres jenjang kelas dinamis tanpa hardcode
+      const getClassProgressionStatus = (student) => {
+        if (!student) return { lulus: false };
+        const isLulus = isStudentLulus(student);
+        const res = {
+          lulus: isLulus
+        };
+        classList.forEach(c => {
+          res[c.name] = isClassCompleted(student, c.name);
+        });
+        return res;
+      };
+
+      // Data murid terfilter berdasarkan input pencarian & filter kelas
+      const filteredStudents = useMemo(() => {
+        return (students || []).filter(s => {
+          if (!s) return false;
+          const q = searchQuery.toLowerCase().trim();
+          const matchQuery = !q || (
+            (s.name && s.name.toLowerCase().includes(q)) ||
+            (s.nis && String(s.nis).toLowerCase().includes(q)) ||
+            (s.nik && String(s.nik).toLowerCase().includes(q)) ||
+            (s.nipd && String(s.nipd).toLowerCase().includes(q)) ||
+            (s.wali && s.wali.toLowerCase().includes(q)) ||
+            (s.kelas && s.kelas.toLowerCase().includes(q))
+          );
+
+          let matchClass = true;
+          if (classFilter !== 'ALL') {
+            if (classFilter === 'LULUS') {
+              matchClass = isStudentLulus(s);
+            } else {
+              matchClass = Boolean(s.kelas && s.kelas.trim().toLowerCase() === classFilter.trim().toLowerCase());
+            }
+          }
+
+          return matchQuery && matchClass;
+        });
+      }, [students, searchQuery, classFilter]);
+
+      useEffect(() => {
+        setMatriksPage(1);
+      }, [searchQuery, classFilter]);
+
+      // Handler Toggle Checklist Jenjang Kelas (Ceklis / Unceklis) Realtime & Persisten
+      const handleToggleLevel = (student, clsName) => {
+        if (!student || !clsName) return;
+        const curChecked = isClassCompleted(student, clsName);
+        const todayDate = formatDateIndo(new Date());
+
+        let updatedStudent = { ...student };
+        let updatedOverrides = { ...(student.completedLevels || {}) };
+        const currentHistory = Array.isArray(student.classHistory) ? [...student.classHistory] : [];
+
+        const targetIdx = classList.findIndex(c => c.name.trim().toLowerCase() === clsName.trim().toLowerCase());
+        const targetCls = targetIdx !== -1 ? classList[targetIdx] : { name: clsName, tarif: student.tarif || 0 };
+
+        if (curChecked) {
+          // Aksi Unceklis: Batalkan jenjang ini
+          updatedOverrides[clsName] = false;
+
+          let prevClass = '-';
+          let prevTarif = 0;
+          if (targetIdx > 0) {
+            prevClass = classList[targetIdx - 1].name;
+            prevTarif = classList[targetIdx - 1].tarif || student.tarif;
+          }
+
+          const currentIdx = classList.findIndex(c => c.name.trim().toLowerCase() === (student.kelas || '').trim().toLowerCase());
+          if (currentIdx >= targetIdx) {
+            updatedStudent.kelas = prevClass;
+            if (prevTarif > 0) updatedStudent.tarif = prevTarif;
+            // Kembalikan juga tunggakan bawaan menjadi 0 agar tidak dobel/aneh di portal wali
+            updatedStudent.arrearsAmount = 0;
+            updatedStudent.arrearsNote = '';
+          }
+
+          currentHistory.push({
+            id: Date.now(),
+            type: 'Penyesuaian Jenjang (Batal Ceklis)',
+            fromClass: student.kelas,
+            toClass: prevClass,
+            date: todayDate,
+            note: `Membatalkan centang jenjang ${clsName}`
+          });
+
+          updatedStudent.completedLevels = updatedOverrides;
+          updatedStudent.classHistory = currentHistory;
+
+          onUpdateStudent(student.id, updatedStudent);
+          if (typeof showToast === 'function') {
+            showToast("Jenjang Diperbarui", `Jenjang ${clsName} untuk ${student.name} dibatalkan.`, "info");
+          }
+        } else {
+          // Aksi Ceklis: Tandai jenjang ini dan jenjang sebelumnya sebagai selesai
+          classList.forEach((c, i) => {
+            if (i <= targetIdx) {
+              updatedOverrides[c.name] = true;
+            }
+          });
+
+          updatedStudent.kelas = targetCls.name;
+          if (targetCls.tarif) updatedStudent.tarif = targetCls.tarif;
+          updatedStudent.statusAktif = true;
+          updatedStudent.status = 'Aktif';
+
+          currentHistory.push({
+            id: Date.now(),
+            type: 'Kenaikan Jenjang (Ceklis)',
+            fromClass: student.kelas,
+            toClass: targetCls.name,
+            date: todayDate,
+            note: `Ceklis jenjang ${clsName}`
+          });
+
+          updatedStudent.completedLevels = updatedOverrides;
+          updatedStudent.classHistory = currentHistory;
+
+          onUpdateStudent(student.id, updatedStudent);
+          if (typeof showToast === 'function') {
+            showToast("Jenjang Berhasil Dicentang!", `${student.name} kini berada di ${targetCls.name}.`, "success");
+          }
+        }
+      };
+
+      // Handler Toggle Kelulusan (Lulus / Belum Lulus)
+      const handleToggleLulus = (student) => {
+        if (!student) return;
+        const willBeLulus = !isStudentLulus(student);
+        const todayDate = formatDateIndo(new Date());
+        const currentHistory = Array.isArray(student.classHistory) ? [...student.classHistory] : [];
+
+        let updatedStudent = { ...student };
+        let updatedOverrides = { ...(student.completedLevels || {}) };
+
+        if (willBeLulus) {
+          classList.forEach(c => {
+            updatedOverrides[c.name] = true;
+          });
+          updatedOverrides['lulus'] = true;
+
+          currentHistory.push({
+            id: Date.now(),
+            type: 'Kelulusan (Alumni)',
+            fromClass: student.kelas,
+            toClass: 'Alumni (Lulus)',
+            date: todayDate,
+            note: 'Telah tamat / lulus dari PAUD'
+          });
+
+          updatedStudent.statusAktif = false;
+          updatedStudent.status = 'Lulus';
+          updatedStudent.completedLevels = updatedOverrides;
+          updatedStudent.classHistory = currentHistory;
+
+          onUpdateStudent(student.id, updatedStudent);
+          if (typeof showToast === 'function') {
+            showToast("Kelulusan Berhasil!", `${student.name} kini berstatus Lulus (Alumni).`, "success");
+          }
+        } else {
+          const lastClass = classList[classList.length - 1] || { name: student.kelas || 'Kelas', tarif: student.tarif || 0 };
+          updatedOverrides['lulus'] = false;
+
+          currentHistory.push({
+            id: Date.now(),
+            type: 'Pembatalan Kelulusan',
+            fromClass: 'Alumni (Lulus)',
+            toClass: lastClass.name,
+            date: todayDate,
+            note: 'Kelulusan dibatalkan, kembali aktif belajar'
+          });
+
+          updatedStudent.statusAktif = true;
+          updatedStudent.status = 'Aktif';
+          updatedStudent.kelas = lastClass.name;
+          if (lastClass.tarif) updatedStudent.tarif = lastClass.tarif;
+          updatedStudent.completedLevels = updatedOverrides;
+          updatedStudent.classHistory = currentHistory;
+
+          onUpdateStudent(student.id, updatedStudent);
+          if (typeof showToast === 'function') {
+            showToast("Kelulusan Dibatalkan", `${student.name} diaktifkan kembali di kelas ${lastClass.name}.`, "info");
+          }
+        }
+      };
 
       // State Naik / Pindah Kelas Siswa
       const [promotionStudent, setPromotionStudent] = useState(null);
@@ -4145,7 +5413,12 @@ function ParentDashboardView({
         targetTarif: 0,
         academicYear: settings.academicYear || '2026/2027',
         note: '',
-        keepExistingDiscount: true
+        keepExistingDiscount: true,
+        unpaidMonthsList: [],
+        curClassUnpaidDebt: 0,
+        existingArrears: 0,
+        totalAccumulated: 0,
+        carryOverDebt: false
       });
 
       const handleOpenPromotionModal = (student) => {
@@ -4159,13 +5432,46 @@ function ParentDashboardView({
         const stdTarif = nextCls ? nextCls.tarif : (student.tarif || 0);
         const hasDiscount = Boolean(student.keringanan_note);
 
+        // Hitung sisa tagihan yang belum lunas di kelas saat ini
+        const studentTrx = (transactions || []).filter(t => 
+          (t.studentId === student.id || (t.studentName && t.studentName.toLowerCase().trim() === student.name.toLowerCase().trim())) &&
+          (t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
+        );
+        const paidMonthNames = studentTrx.map(t => (t.month || '').trim().toLowerCase());
+        const allMonths = getStudentAllBillingMonths(student, settings);
+        const curDueDate = Number(settings?.dueDateDay) || 10;
+        const now = new Date();
+        const unpaidMonthsList = allMonths.filter(m => {
+          const mLower = m.trim().toLowerCase();
+          const isPaid = paidMonthNames.some(pm => pm === mLower || (pm && mLower.startsWith(pm)));
+          if (isPaid) return false;
+          return isMonthDueOrElapsed(m, now, curDueDate);
+        });
+
+        const curClassUnpaidDebt = unpaidMonthsList.length * (Number(student.tarif) || 0);
+        const existingArrears = Number(student.arrearsAmount) || 0;
+        const totalAccumulated = curClassUnpaidDebt + existingArrears;
+
+        const curMonthName = ALL_MONTHS[now.getMonth()] || 'Januari';
+        const curYearNum = now.getFullYear();
+        const todayIso = now.toISOString().split('T')[0];
+
         setPromotionForm({
-          type: 'naik',
-          targetClass: nextCls ? nextCls.name : 'Kelas A',
+          type: 'pindah',
+          targetClass: nextCls ? nextCls.name : (classList[0]?.name || student.kelas || ''),
           targetTarif: hasDiscount ? student.tarif : stdTarif,
-          academicYear: settings.academicYear || '2026/2027',
-          note: `Kenaikan dari ${student.kelas} ke ${nextCls ? nextCls.name : 'Kelas Baru'}`,
-          keepExistingDiscount: hasDiscount
+          academicYear: settings.academicYear || `${curYearNum}/${curYearNum + 1}`,
+          transferDate: todayIso,
+          effectiveMonth: curMonthName,
+          effectiveYear: curYearNum,
+          note: `Pindah rombel dari ${student.kelas} ke ${nextCls ? nextCls.name : (classList[0]?.name || 'Kelas Baru')}`,
+          keepExistingDiscount: hasDiscount,
+          unpaidMonthsList,
+          curClassUnpaidDebt,
+          existingArrears,
+          totalAccumulated,
+          carryOverDebt: totalAccumulated > 0,
+          excludePriorMonths: true
         });
       };
 
@@ -4173,29 +5479,122 @@ function ParentDashboardView({
         e.preventDefault();
         if (!promotionStudent) return;
         if (!promotionForm.targetClass) {
-          alert('Silakan pilih kelas tujuan siswa!');
-          return;
-        }
-        if (promotionForm.targetClass === promotionStudent.kelas) {
-          alert('Kelas tujuan harus berbeda dengan kelas saat ini!');
+          alert('Silakan pilih kelas atau status tujuan siswa!');
           return;
         }
 
         const fromClass = promotionStudent.kelas;
         const toClass = promotionForm.targetClass;
+        const transferDate = promotionForm.transferDate || new Date().toISOString().split('T')[0];
+        const effectiveMonth = promotionForm.effectiveMonth || ALL_MONTHS[new Date().getMonth()] || 'Januari';
+        const effectiveYear = parseInt(promotionForm.effectiveYear, 10) || new Date().getFullYear();
+        const todayDate = transferDate;
+        let formattedTransferDate = transferDate;
+        try {
+          const parts = transferDate.split('-');
+          if (parts.length === 3) {
+            const d = parseInt(parts[2], 10);
+            const m = ALL_MONTHS[parseInt(parts[1], 10) - 1] || parts[1];
+            const y = parts[0];
+            formattedTransferDate = `${d} ${m} ${y}`;
+          }
+        } catch (err) {}
+
+        // Akumulasi tunggakan dari kelas sebelumnya jika ada
+        const carryDebt = promotionForm.carryOverDebt ? (Number(promotionForm.totalAccumulated) || 0) : 0;
+        let newArrearsNote = '';
+        if (carryDebt > 0) {
+          if (promotionForm.unpaidMonthsList && promotionForm.unpaidMonthsList.length > 0) {
+            newArrearsNote = `Tunggakan ${fromClass}: ${promotionForm.unpaidMonthsList.length} bln (${promotionForm.unpaidMonthsList.join(', ')}) = ${formatRupiah(promotionForm.curClassUnpaidDebt)}`;
+            if (promotionForm.existingArrears > 0) {
+              newArrearsNote += ` + Bawaan: ${formatRupiah(promotionForm.existingArrears)}`;
+            }
+          } else if (promotionStudent.arrearsNote) {
+            newArrearsNote = promotionStudent.arrearsNote;
+          } else {
+            newArrearsNote = `Tunggakan dari ${fromClass}: ${formatRupiah(carryDebt)}`;
+          }
+        }
+
+        // KASUS KHUSUS: SISWA LULUS / KELUAR SEKOLAH (STATUS: OFF)
+        if (promotionForm.type === 'keluar') {
+          const isLulus = toClass.toLowerCase().includes('lulus') || toClass.toLowerCase().includes('alumni');
+          const finalStatus = isLulus ? 'Lulus' : 'Non-Aktif';
+          const newRecord = {
+            id: Date.now(),
+            type: isLulus ? 'Kelulusan (Alumni)' : 'Keluar Sekolah',
+            fromClass: fromClass,
+            toClass: toClass,
+            transferDate: transferDate,
+            effectiveMonth: effectiveMonth,
+            effectiveYear: effectiveYear,
+            previousTarif: promotionStudent.tarif,
+            newTarif: 0,
+            academicYear: promotionForm.academicYear,
+            unpaidMonthsFromPrevious: promotionForm.unpaidMonthsList || [],
+            unpaidAmountFromPrevious: promotionForm.curClassUnpaidDebt || 0,
+            carriedOverArrears: carryDebt,
+            note: promotionForm.note || (isLulus ? `Siswa telah lulus / tamat dari ${fromClass}` : `Siswa telah keluar / mutasi dari ${fromClass}`),
+            date: transferDate
+          };
+
+          const updatedHistory = [...(promotionStudent.classHistory || []), newRecord];
+          try {
+            localStorage.setItem('spp_class_history_' + promotionStudent.id, JSON.stringify(updatedHistory));
+            localStorage.setItem('spp_class_history_' + promotionStudent.nis, JSON.stringify(updatedHistory));
+          } catch (err) {}
+
+          onUpdateStudent(promotionStudent.id, {
+            ...promotionStudent,
+            kelas: toClass,
+            tarif: 0,
+            statusAktif: false,
+            status: finalStatus,
+            arrearsAmount: carryDebt,
+            arrearsNote: newArrearsNote,
+            classHistory: updatedHistory,
+            lastMutationDate: transferDate,
+            session_token: null
+          });
+
+          alert(
+            `Status Siswa Berhasil Diperbarui!\n\n` +
+            `Ananda ${promotionStudent.name} kini berstatus: "${toClass}".\n` +
+            `Tanggal Mutasi: ${formattedTransferDate}\n` +
+            `Status Akun: NON-AKTIF / OFF (Akses Login Ditutup).\n\n` +
+            `🔒 Username & password NIS ${promotionStudent.nis} tidak dapat digunakan lagi untuk login ke portal wali murid.\n` +
+            (carryDebt > 0 
+              ? `⚠️ Catatan Tunggakan: Sisa tagihan dari kelas sebelumnya sebesar ${formatRupiah(carryDebt)} tetap tersimpan di riwayat.\n` 
+              : `✅ Siswa bersih tanpa tunggakan.\n`)
+          );
+
+          setPromotionStudent(null);
+          return;
+        }
+
+        if (promotionForm.targetClass === promotionStudent.kelas) {
+          alert('Kelas tujuan harus berbeda dengan kelas saat ini!');
+          return;
+        }
+
         const newTarif = Number(promotionForm.targetTarif) || promotionStudent.tarif;
-        const todayDate = new Date().toLocaleDateString('id-ID');
 
         const newRecord = {
           id: Date.now(),
           type: promotionForm.type === 'naik' ? 'Kenaikan Kelas' : 'Pindah / Mutasi Rombel',
           fromClass: fromClass,
           toClass: toClass,
+          transferDate: transferDate,
+          effectiveMonth: effectiveMonth,
+          effectiveYear: effectiveYear,
           previousTarif: promotionStudent.tarif,
           newTarif: newTarif,
           academicYear: promotionForm.academicYear,
+          unpaidMonthsFromPrevious: promotionForm.unpaidMonthsList || [],
+          unpaidAmountFromPrevious: promotionForm.curClassUnpaidDebt || 0,
+          carriedOverArrears: carryDebt,
           note: promotionForm.note || (promotionForm.type === 'naik' ? `Kenaikan ke ${toClass}` : `Pindah ke ${toClass}`),
-          date: todayDate
+          date: transferDate
         };
 
         const updatedHistory = [...(promotionStudent.classHistory || []), newRecord];
@@ -4208,12 +5607,30 @@ function ParentDashboardView({
           ...promotionStudent,
           kelas: toClass,
           tarif: newTarif,
-          classHistory: updatedHistory
+          statusAktif: true,
+          status: 'Aktif',
+          startActiveMonth: effectiveMonth,
+          startActiveYear: effectiveYear,
+          arrearsAmount: carryDebt,
+          arrearsNote: newArrearsNote,
+          classHistory: updatedHistory,
+          lastMutationDate: transferDate
         });
 
         alert(
-          `Sukses!\n\nAnanda ${promotionStudent.name} berhasil dipindahkan ke kelas "${toClass}".\n\n` +
-          `Informasi: Seluruh riwayat transaksi & pembayaran SPP di kelas sebelumnya (${fromClass}) tetap tersimpan aman di sistem.`
+          `Sukses ${promotionForm.type === 'naik' ? 'Kenaikan Kelas' : 'Pindah Rombel'}!\n\n` +
+          `Ananda ${promotionStudent.name} berhasil dipindahkan ke rombel "${toClass}".\n` +
+          `Tanggal Pasti Pindah: ${formattedTransferDate}\n` +
+          `Mulai Efektif Tagihan: ${effectiveMonth} ${effectiveYear}\n` +
+          `Tarif SPP Baru: ${formatRupiah(newTarif)}/bulan.\n\n` +
+          `📌 Aturan Keuangan & Tunggakan:\n` +
+          `• Tagihan siswa dihitung mulai dari bulan ia masuk (${effectiveMonth} ${effectiveYear} dan seterusnya).\n` +
+          `• Bulan sebelum masuk (${fromClass}) tidak dihitung sebagai hutang atau tunggakan di rombel baru.\n` +
+          `• Tagihan untuk bulan berjalan & mendatang berstatus "Belum Jatuh Tempo". Status baru menunggak jika sudah melewati bulan saat ini.\n\n` +
+          (carryDebt > 0 
+            ? `⚠️ Catatan Tunggakan: Sisa tagihan dari kelas ${fromClass} sebesar ${formatRupiah(carryDebt)} telah otomatis diakumulasikan ke tagihan siswa di kelas baru.\n\n`
+            : `✅ Siswa bersih tanpa tunggakan dari kelas sebelumnya.\n\n`) +
+          `Seluruh riwayat jenjang kelas dan pembayaran terdahulu tersimpan rapi di sistem mutasi.`
         );
 
         setPromotionStudent(null);
@@ -4241,7 +5658,10 @@ function ParentDashboardView({
         statusAktif: true,
         keringanan_note: '',
         arrearsAmount: 0,
-        arrearsNote: ''
+        arrearsNote: '',
+        startActiveMonth: settings.startMonth || 'Januari',
+        startActiveYear: settings.startYear ? Number(settings.startYear) : new Date().getFullYear(),
+        classHistory: []
       });
 
       const openModal = (student = null) => {
@@ -4265,8 +5685,11 @@ function ParentDashboardView({
             rw: student.rw || '',
             password: student.password || (student.nis ? `Sb${student.nis}` : generateDefaultStudentPassword()),
             keringanan_note: student.keringanan_note || '',
-            arrearsAmount: 0,
-            arrearsNote: ''
+            arrearsAmount: Number(student.arrearsAmount) || 0,
+            arrearsNote: student.arrearsNote || '',
+            startActiveMonth: student.startActiveMonth || settings.startMonth || 'Januari',
+            startActiveYear: student.startActiveYear ? Number(student.startActiveYear) : (settings.startYear ? Number(settings.startYear) : new Date().getFullYear()),
+            classHistory: student.classHistory || []
           });
         } else {
           setEditingStudent(null);
@@ -4295,7 +5718,10 @@ function ParentDashboardView({
             statusAktif: true,
             keringanan_note: '',
             arrearsAmount: 0,
-            arrearsNote: ''
+            arrearsNote: '',
+            startActiveMonth: settings.startMonth || 'Januari',
+            startActiveYear: settings.startYear ? Number(settings.startYear) : new Date().getFullYear(),
+            classHistory: []
           });
         }
         setShowModal(true);
@@ -4303,16 +5729,63 @@ function ParentDashboardView({
 
       const handleSubmit = (e) => {
         e.preventDefault();
+
+        // VALIDASI SEMUA DATA DIRI WAJIB LENGKAP:
+        const missing = [];
+        if (!formData.name?.trim()) missing.push('Nama Lengkap Siswa');
+        if (!formData.nis?.toString().trim()) missing.push('NIS');
+        if (!formData.jk?.trim()) missing.push('Jenis Kelamin (L/P)');
+        if (!formData.tempatLahir?.trim()) missing.push('Tempat Lahir');
+        if (!formData.tanggalLahir?.trim()) missing.push('Tanggal Lahir');
+        if (!formData.nik?.toString().trim()) missing.push('NIK Siswa (16 Digit)');
+        if (!formData.agama?.trim()) missing.push('Agama');
+        if (!formData.alamat?.trim()) missing.push('Alamat Tempat Tinggal');
+        if (!formData.rt?.toString().trim()) missing.push('RT');
+        if (!formData.rw?.toString().trim()) missing.push('RW');
+        if (!formData.kelas?.trim()) missing.push('Kelas');
+        if (!formData.wali?.trim()) missing.push('Nama Orang Tua / Wali');
+        if (!formData.telepon?.trim()) missing.push('No. WhatsApp Wali');
+
+        if (missing.length > 0) {
+          alert(
+            `MOHON LENGKAPI SELURUH DATA DIRI SISWA:\n\n` +
+            missing.map((f, i) => `${i + 1}. ${f}`).join('\n') +
+            `\n\nSeluruh data diri dari Nama sampai RT/RW wajib diisi sebelum menyimpan data siswa!`
+          );
+          return;
+        }
+
         const effectivePassword = (formData.password && formData.password.trim().length > 0)
           ? formData.password.trim()
           : (formData.nis ? `Sb${formData.nis.toString().trim()}` : '123456');
+
         const payload = {
           ...formData,
+          name: formData.name.trim(),
+          nis: formData.nis.toString().trim(),
+          nipd: formData.nipd ? formData.nipd.toString().trim() : formData.nis.toString().trim(),
+          nisn: formData.nisn ? formData.nisn.toString().trim() : '',
+          jk: formData.jk || 'L',
+          tempatLahir: formData.tempatLahir.trim(),
+          tanggalLahir: formData.tanggalLahir.trim(),
+          nik: formData.nik.toString().trim(),
+          agama: formData.agama || 'Islam',
+          alamat: formData.alamat.trim(),
+          rt: formData.rt.toString().trim(),
+          rw: formData.rw.toString().trim(),
+          kelas: formData.kelas.trim(),
           tarif: Number(formData.tarif) || 0,
+          wali: formData.wali.trim(),
+          telepon: formData.telepon.trim(),
           password: effectivePassword,
+          status: formData.statusAktif ? 'Aktif' : 'Non-Aktif',
+          statusAktif: formData.statusAktif !== false,
           keringanan_note: isKeringanan ? (formData.keringanan_note || 'Diringankan') : '',
-          arrearsAmount: 0,
-          arrearsNote: ''
+          arrearsAmount: (formData.kelas && formData.arrearsNote && formData.arrearsNote.toLowerCase().includes(formData.kelas.toLowerCase())) ? 0 : (Number(formData.arrearsAmount) || 0),
+          arrearsNote: (formData.kelas && formData.arrearsNote && formData.arrearsNote.toLowerCase().includes(formData.kelas.toLowerCase())) ? '' : (formData.arrearsNote || ''),
+          startActiveMonth: formData.startActiveMonth || settings.startMonth || 'Januari',
+          startActiveYear: formData.startActiveYear ? Number(formData.startActiveYear) : (settings.startYear ? Number(settings.startYear) : new Date().getFullYear()),
+          classHistory: formData.classHistory || []
         };
         if (editingStudent) {
           onUpdateStudent(editingStudent.id, payload);
@@ -4437,22 +5910,120 @@ function ParentDashboardView({
             </button>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          {/* Tab Navigasi: Data Pokok Murid vs Matriks Riwayat & Jenjang Kelas */}
+          <div className="flex flex-wrap items-center gap-2.5 border-b border-slate-200 pb-2">
+            <button
+              type="button"
+              onClick={() => setViewTab('biodata')}
+              className={`px-5 py-3 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all ${
+                viewTab === 'biodata'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-[1.02]'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Icon name="users" size={17} />
+              <span>Data Pokok & Biodata Murid</span>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${viewTab === 'biodata' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                {students.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setViewTab('history')}
+              className={`px-5 py-3 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 transition-all ${
+                viewTab === 'history'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-500/25 scale-[1.02]'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+              }`}
+            >
+              <Icon name="check-square" size={17} />
+              <span>Tabel Riwayat & Jenjang Kelas (Checklist)</span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black ${viewTab === 'history' ? 'bg-white/20 text-white' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'}`}>
+                {classList.map(c => c.name).join(' ➔ ')} ➔ Lulus
+              </span>
+            </button>
+          </div>
+
+          {/* SEARCH & FILTER TOOLBAR (Buku Induk & Matriks Riwayat) */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="relative flex-1">
+              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Icon name="search" size={17} />
+              </span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={viewTab === 'history' ? "Cari nama murid atau NIS pada tabel jenjang kelas..." : "Cari nama murid, NIS, NIK, atau wali..."}
+                className="w-full pl-10 pr-9 py-2.5 sm:py-3 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all shadow-inner"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  title="Hapus pencarian"
+                >
+                  <Icon name="x" size={16} />
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              <div className="relative min-w-[150px] sm:min-w-[180px]">
+                <select
+                  value={classFilter}
+                  onChange={(e) => setClassFilter(e.target.value)}
+                  className="w-full py-2.5 sm:py-3 pl-3.5 pr-8 bg-slate-50 border border-slate-200 rounded-2xl font-black text-xs sm:text-sm text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all cursor-pointer shadow-2xs"
+                >
+                  <option value="ALL">Semua Kelas ({students.length})</option>
+                  {classList.map(c => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({students.filter(s => s.kelas === c.name).length})
+                    </option>
+                  ))}
+                  <option value="LULUS">Alumni / Lulus ({students.filter(isStudentLulus).length})</option>
+                </select>
+              </div>
+
+              {(searchQuery || classFilter !== 'ALL') && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setClassFilter('ALL'); }}
+                  className="px-3.5 py-2.5 sm:py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition-colors"
+                  title="Reset filter & pencarian"
+                >
+                  Reset
+                </button>
+              )}
+
+              <span className="hidden md:inline-flex items-center gap-1.5 px-3 py-2 rounded-2xl bg-blue-50 text-blue-700 text-xs font-black border border-blue-100">
+                <span>{filteredStudents.length}</span>
+                <span className="font-semibold text-blue-600/80">Murid</span>
+              </span>
+            </div>
+          </div>
+
+          {viewTab === 'biodata' && (
+            <div className="pastel-table-card">
+            <div className="overflow-x-auto p-3 sm:p-4">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-xs sm:text-sm font-extrabold text-slate-500 uppercase border-b border-slate-200 tracking-wider">
-                    <th className="py-4 px-6">Foto & Nama</th>
-                    <th className="py-4 px-6">NIS</th>
-                    <th className="py-4 px-6">Kelas</th>
-                    <th className="py-4 px-6">Tarif SPP</th>
-                    <th className="py-4 px-6">Wali & Informasi Login WA</th>
-                    <th className="py-4 px-6">Status Siswa</th>
-                    <th className="py-4 px-6 text-center">Aksi</th>
+                  <tr className="text-[11px] sm:text-xs font-black uppercase tracking-wider">
+                    <th className="py-3.5 px-4 pastel-th-orange rounded-l-2xl text-left whitespace-nowrap">Foto & Nama</th>
+                    <th className="py-3.5 px-4 pastel-th-sky text-left whitespace-nowrap">NIS / NIK</th>
+                    <th className="py-3.5 px-4 pastel-th-yellow text-left whitespace-nowrap">Data Diri & Alamat</th>
+                    <th className="py-3.5 px-4 pastel-th-mint text-left whitespace-nowrap">Kelas</th>
+                    <th className="py-3.5 px-4 pastel-th-teal text-left whitespace-nowrap">Tarif SPP</th>
+                    <th className="py-3.5 px-4 pastel-th-purple text-left whitespace-nowrap">Wali & Login WA</th>
+                    <th className="py-3.5 px-4 pastel-th-coral text-center whitespace-nowrap">Status Akun</th>
+                    <th className="py-3.5 px-4 pastel-th-blue text-center rounded-r-2xl whitespace-nowrap">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm font-medium">
-                  {students.map((s) => (
+                  {filteredStudents.length > 0 ? (
+                    filteredStudents.map((s) => (
                     <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-4 px-6">
                         <div className="flex items-center gap-3.5">
@@ -4469,17 +6040,86 @@ function ParentDashboardView({
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 px-6 font-black font-mono text-slate-800">{s.nis}</td>
+                      <td className="py-4 px-6 font-mono text-slate-800">
+                        <span className="font-black text-sm block">{s.nis}</span>
+                        {s.nik && <span className="text-[11px] text-slate-500 font-medium block">NIK: {s.nik}</span>}
+                      </td>
+                      <td className="py-4 px-6 text-xs">
+                        <div className="space-y-1 max-w-[220px]">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded-md font-black text-[10px] ${
+                              s.jk === 'P' ? 'bg-pink-100 text-pink-700 border border-pink-200' : 'bg-blue-100 text-blue-700 border border-blue-200'
+                            }`}>
+                              {s.jk === 'P' ? 'Perempuan (P)' : 'Laki-laki (L)'}
+                            </span>
+                            {s.agama && (
+                              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold">
+                                {s.agama}
+                              </span>
+                            )}
+                          </div>
+                          {(s.tempatLahir || s.tanggalLahir) && (
+                            <p className="text-slate-600 font-semibold text-[11px] truncate" title={`${s.tempatLahir || '-'}, ${s.tanggalLahir || '-'}`}>
+                              📍 {s.tempatLahir || '-'}{s.tanggalLahir ? `, ${s.tanggalLahir}` : ''}
+                            </p>
+                          )}
+                          <p className="text-slate-700 font-bold text-[11px] truncate" title={`${s.alamat || '-'} RT ${s.rt || '-'}/RW ${s.rw || '-'}`}>
+                            🏠 {s.alamat || '-'} {(s.rt || s.rw) ? <span className="font-mono text-blue-800 font-extrabold">(RT {s.rt || '0'}/RW {s.rw || '0'})</span> : null}
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedBiodataStudent(s)}
+                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-black hover:underline pt-0.5"
+                          >
+                            <Icon name="id-card" size={12} />
+                            <span>Lihat Biodata Lengkap</span>
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-4 px-6">
                         <span className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-xl border border-blue-200 font-extrabold text-xs sm:text-sm">
                           {s.kelas}
                         </span>
-                        {s.classHistory && s.classHistory.length > 0 && (
-                          <div className="text-[10px] text-indigo-700 font-bold mt-1.5 flex items-center gap-1 bg-indigo-50/90 px-2 py-0.5 rounded-lg border border-indigo-200 w-fit" title={`Riwayat: ${s.classHistory.map(h => `${h.fromClass} ➔ ${h.toClass}`).join(', ')}`}>
-                            <Icon name="history" size={11} />
-                            <span>{s.classHistory[s.classHistory.length - 1].fromClass} ➔ {s.kelas}</span>
-                          </div>
-                        )}
+                        <div className="text-[10px] text-emerald-700 font-bold mt-1 flex items-center gap-1">
+                          <Icon name="calendar" size={11} />
+                          <span>Mulai: {s.startActiveMonth || settings.startMonth || 'Jan'} {s.startActiveYear || settings.startYear || ''}</span>
+                        </div>
+                        {/* Mini Checklist Progress Indikator */}
+                        {(() => {
+                          const isLulus = isStudentLulus(s);
+                          return (
+                            <div className="flex items-center gap-1 mt-1.5 flex-wrap" title={`Progres Jenjang: ${classList.map(c => c.name).join(' ➔ ')} ➔ Lulus`}>
+                              {classList.map((c, cIdx) => {
+                                const completed = isClassCompleted(s, c.name);
+                                return (
+                                  <React.Fragment key={c.name || cIdx}>
+                                    {cIdx > 0 && <span className="text-slate-300 text-[9px]">➔</span>}
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black ${completed ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-slate-100 text-slate-400'}`}>
+                                      {c.name}{completed ? ' ✓' : ''}
+                                    </span>
+                                  </React.Fragment>
+                                );
+                              })}
+                              {isLulus && (
+                                <>
+                                  <span className="text-slate-300 text-[9px]">➔</span>
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-purple-100 text-purple-800 border border-purple-300">
+                                    Lulus ✓
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })()}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHistoryStudent(s)}
+                          className="mt-1.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-900 border border-indigo-200 text-[10px] font-bold transition-all shadow-2xs group cursor-pointer"
+                          title="Klik untuk membuka Tabel Riwayat Jenjang Kelas & Mutasi Siswa"
+                        >
+                          <Icon name="history" size={11} className="group-hover:rotate-45 transition-transform" />
+                          <span>Riwayat Jenjang ({Array.isArray(s.classHistory) ? s.classHistory.length : 0})</span>
+                        </button>
                       </td>
                       <td className="py-4 px-6">
                         <div className="font-black text-blue-700 text-sm sm:text-base">{formatRupiah(s.tarif)}</div>
@@ -4487,6 +6127,12 @@ function ParentDashboardView({
                           <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 bg-amber-100 text-amber-900 text-xs font-black rounded-lg border border-amber-200">
                             <Icon name="tag" size={12} /> {s.keringanan_note}
                           </span>
+                        )}
+                        {Number(s.arrearsAmount) > 0 && (
+                          <div className="mt-1 px-2 py-0.5 bg-rose-50 text-rose-700 rounded-md text-[10px] font-black border border-rose-200 flex items-center gap-1" title={s.arrearsNote}>
+                            <Icon name="alert-triangle" size={10} />
+                            <span>Tunggakan Lama: {formatRupiah(s.arrearsAmount)}</span>
+                          </div>
                         )}
                       </td>
                       <td className="py-4 px-6 text-slate-600">
@@ -4552,17 +6198,68 @@ function ParentDashboardView({
                         </div>
                       </td>
                       <td className="py-4 px-6">
-                        <button
-                          onClick={() => onUpdateStudent(s.id, { ...s, statusAktif: !s.statusAktif })}
-                          className={`px-3 py-1.5 rounded-full text-xs font-black flex items-center gap-1.5 ${
-                            s.statusAktif ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'
-                          }`}
-                        >
-                          <span className={`w-2 h-2 rounded-full ${s.statusAktif ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                          {s.statusAktif ? 'AKTIF' : 'NON-AKTIF'}
-                        </button>
+                        <div className="flex flex-col items-start gap-1.5">
+                          {/* Tombol Modern Switch Toggle ON / OFF */}
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newStatus = !s.statusAktif;
+                                const confirmMsg = newStatus
+                                  ? `Aktifkan kembali akun siswa "${s.name}" (ON)?\n\n- Akses login portal dibuka kembali.\n- Siswa dapat login dengan NIS (${s.nis}) dan password.`
+                                  : `Nonaktifkan akun siswa "${s.name}" (OFF - Keluar / Lulus)?\n\nSetelah dinonaktifkan (OFF):\n- Akses login portal DITUTUP!\n- Sesi aktif wali murid otomatis diakhiri.\n- Siswa tidak akan bisa login lagi ke portal.`;
+                                if (confirm(confirmMsg)) {
+                                  onUpdateStudent(s.id, {
+                                    ...s,
+                                    statusAktif: newStatus,
+                                    status: newStatus ? 'Aktif' : 'Non-Aktif'
+                                  });
+                                }
+                              }}
+                              className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-sm ${
+                                s.statusAktif ? 'bg-emerald-600 shadow-emerald-500/25 ring-2 ring-emerald-500/20' : 'bg-slate-300 ring-2 ring-slate-400/20'
+                              }`}
+                              title={s.statusAktif ? 'Klik untuk mematikan akun (OFF: Keluar / Lulus)' : 'Klik untuk menyalakan akun (ON: Aktif)'}
+                            >
+                              <span
+                                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out flex items-center justify-center font-black text-[9px] ${
+                                  s.statusAktif ? 'translate-x-7 text-emerald-700' : 'translate-x-0 text-slate-500'
+                                }`}
+                              >
+                                {s.statusAktif ? 'ON' : 'OFF'}
+                              </span>
+                            </button>
+
+                            <span className={`text-[11px] font-black px-2 py-0.5 rounded-lg border ${
+                              s.statusAktif 
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                                : 'bg-rose-50 text-rose-800 border-rose-300'
+                            }`}>
+                              {s.statusAktif ? 'ON (Aktif)' : 'OFF (Keluar/Lulus)'}
+                            </span>
+                          </div>
+
+                          {s.statusAktif ? (
+                            <span className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                              Bisa Login Portal
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-rose-600 flex items-center gap-1 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                              <Icon name="lock" size={10} /> Akses Login Terkunci
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-4 px-6 text-center space-x-1.5 whitespace-nowrap">
+                        <button 
+                          type="button"
+                          onClick={() => setSelectedBiodataStudent(s)} 
+                          className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                          title="Lihat Kartu Biodata Murid Lengkap (Format Resmi)"
+                        >
+                          <Icon name="id-card" size={18} />
+                        </button>
                         <button 
                           type="button"
                           onClick={() => handleOpenPromotionModal(s)} 
@@ -4597,15 +6294,595 @@ function ParentDashboardView({
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  ))) : (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400 font-medium">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Icon name="search" size={28} className="text-slate-300" />
+                          <p className="text-sm font-bold text-slate-600">Tidak ada murid yang cocok dengan pencarian</p>
+                          <p className="text-xs text-slate-400">Coba ubah kata kunci pencarian atau reset filter kelas.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
+        )}
 
-          {showModal && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-              <div className="bg-white rounded-3xl max-w-3xl w-full my-auto shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border border-slate-100 animate-in zoom-in-95 duration-200">
+        {/* TAB 2: MATRIKS RIWAYAT & JENJANG KELAS (CHECKLIST) */}
+        {viewTab === 'history' && (
+          <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Stat Cards Jenjang Kelas Dinamis dari Pengaturan */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 sm:gap-4">
+              {classList.map((cls, cIdx) => {
+                const count = students.filter(s => {
+                  const isL = !s.statusAktif || (s.status || '').toLowerCase() === 'lulus' || (s.kelas || '').toLowerCase().includes('lulus');
+                  return !isL && (s.kelas || '').trim().toLowerCase() === cls.name.trim().toLowerCase();
+                }).length;
+                const icons = ['baby', 'book-open', 'school', 'sparkles', 'graduation-cap'];
+                const colors = [
+                  { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
+                  { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+                  { bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
+                  { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' },
+                  { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' }
+                ];
+                const theme = colors[cIdx % colors.length];
+
+                return (
+                  <div key={cls.name || cIdx} className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+                    <div className="min-w-0 flex-1 pr-2">
+                      <p className="text-[11px] sm:text-xs font-black uppercase text-slate-400 tracking-wider truncate">{cls.name}</p>
+                      <p className="text-xl sm:text-2xl font-black text-slate-800 mt-1">
+                        {count}
+                        <span className="text-xs font-semibold text-slate-400 ml-1">Siswa</span>
+                      </p>
+                    </div>
+                    <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl ${theme.bg} ${theme.text} border ${theme.border} flex items-center justify-center font-black shadow-2xs shrink-0`}>
+                      <Icon name={icons[cIdx % icons.length]} size={20} />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Card Kelulusan / Alumni */}
+              <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-purple-200 bg-purple-50/30 shadow-sm flex items-center justify-between hover:shadow-md transition-all">
+                <div className="min-w-0 flex-1 pr-2">
+                  <p className="text-[11px] sm:text-xs font-black uppercase text-purple-600 tracking-wider truncate">Lulus / Alumni</p>
+                  <p className="text-xl sm:text-2xl font-black text-purple-900 mt-1">
+                    {students.filter(isStudentLulus).length}
+                    <span className="text-xs font-semibold text-purple-400 ml-1">Siswa</span>
+                  </p>
+                </div>
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-purple-100 text-purple-700 border border-purple-300 flex items-center justify-center font-black shadow-2xs shrink-0">
+                  <Icon name="award" size={20} />
+                </div>
+              </div>
+            </div>
+
+            {/* Matriks Checklist Table */}
+            <div className="pastel-table-card">
+              <div className="p-4 sm:p-5 border-b border-slate-100 bg-amber-50/40 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <h3 className="font-black text-slate-800 text-base flex items-center gap-2">
+                    <span className="text-amber-500">📖</span>
+                    <span>Matriks Riwayat & Jenjang Kelas Murid</span>
+                  </h3>
+                  <p className="text-xs text-slate-600 font-medium mt-0.5">
+                    Kolom kelas mengikuti Pengaturan Aplikasi secara otomatis. Klik tombol checklist untuk menaikkan jenjang atau membatalkan secara realtime.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-3.5 py-1.5 rounded-2xl border border-amber-200 shadow-2xs">
+                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                  <span>(✓) = Jenjang Terselesaikan / Sedang Aktif</span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto p-3 sm:p-4">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="text-[11px] sm:text-xs font-black uppercase tracking-wider">
+                      <th className="py-3.5 px-4 pastel-th-slate w-12 text-center rounded-l-2xl whitespace-nowrap">#</th>
+                      <th className="py-3.5 px-4 pastel-th-orange whitespace-nowrap">Nama Murid & NIS</th>
+                      <th className="py-3.5 px-4 pastel-th-yellow whitespace-nowrap">Kelas Saat Ini</th>
+                      {classList.map((cls, cIdx) => (
+                        <th key={cls.name || cIdx} className="py-3.5 px-4 text-center pastel-th-mint whitespace-nowrap">
+                          {cls.name}
+                        </th>
+                      ))}
+                      <th className="py-3.5 px-4 text-center pastel-th-teal whitespace-nowrap">Kelulusan (Lulus)</th>
+                      <th className="py-3.5 px-4 pastel-th-coral whitespace-nowrap">Catatan Riwayat / Mutasi</th>
+                      <th className="py-3.5 px-4 text-center pastel-th-blue rounded-r-2xl whitespace-nowrap">Aksi Cepat</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm font-medium">
+                    {(() => {
+                      const totalMatriksPages = Math.ceil(filteredStudents.length / MATRIKS_PER_PAGE) || 1;
+                      const currentMatriksPage = Math.min(Math.max(1, matriksPage), totalMatriksPages);
+                      const startIdx = (currentMatriksPage - 1) * MATRIKS_PER_PAGE;
+                      const paginatedStudents = filteredStudents.slice(startIdx, startIdx + MATRIKS_PER_PAGE);
+
+                      if (paginatedStudents.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={classList.length + 5} className="py-12 text-center text-slate-400 font-medium">
+                              <div className="flex flex-col items-center justify-center gap-2">
+                                <Icon name="search" size={28} className="text-slate-300" />
+                                <p className="text-sm font-bold text-slate-600">Tidak ada murid yang sesuai dengan filter pencarian</p>
+                                <p className="text-xs text-slate-400">Coba cari dengan nama murid atau NIS lain.</p>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return paginatedStudents.map((s, localIdx) => {
+                        const idx = startIdx + localIdx;
+                        const isLulus = isStudentLulus(s);
+                        return (
+                          <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-4 px-5 text-center text-xs font-black text-slate-400">
+                            {idx + 1}
+                          </td>
+                          <td className="py-4 px-5">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center font-black text-indigo-700 text-xs overflow-hidden shrink-0 shadow-2xs">
+                                {s.fotoUrl ? (
+                                  <img src={s.fotoUrl} alt={s.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{s.name ? s.name.charAt(0).toUpperCase() : 'M'}</span>
+                                )}
+                              </div>
+                              <div>
+                                <h4 className="font-black text-slate-900 text-sm leading-tight hover:text-blue-600 transition-colors">
+                                  {s.name}
+                                </h4>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[11px] font-bold text-slate-500">NIS: {s.nis}</span>
+                                  <span className="text-[10px] text-slate-300">•</span>
+                                  <span className="text-[11px] font-semibold text-slate-500">{s.jk === 'P' ? 'Perempuan' : 'Laki-laki'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 px-5 whitespace-nowrap">
+                            <span className="px-3 py-1 rounded-xl text-xs font-black bg-slate-100 text-slate-800 border border-slate-200 shadow-2xs">
+                              {s.kelas || 'Belum Diatur'}
+                            </span>
+                            <div className="mt-1">
+                              {isLulus ? (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                                  <Icon name="award" size={12} /> ALUMNI / LULUS
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> AKTIF BELAJAR
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* CHECKLIST TIAP KELAS DINAMIS */}
+                          {classList.map((cls, cIdx) => {
+                            const isDone = isClassCompleted(s, cls.name);
+                            return (
+                              <td key={cls.name || cIdx} className="py-4 px-5 text-center bg-blue-50/10">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleLevel(s, cls.name)}
+                                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs transition-all shadow-2xs cursor-pointer active:scale-95 ${
+                                    isDone
+                                      ? 'bg-emerald-100 hover:bg-rose-100 text-emerald-800 hover:text-rose-700 border border-emerald-300 hover:border-rose-300 ring-2 ring-emerald-500/20'
+                                      : 'bg-white hover:bg-emerald-50 text-slate-400 hover:text-emerald-700 border border-dashed border-slate-300 hover:border-emerald-400'
+                                  }`}
+                                  title={isDone ? `Jenjang ${cls.name} Aktif/Selesai (Klik untuk Batalkan)` : `Belum Ceklis (Klik untuk Naik/Ceklis ${cls.name})`}
+                                >
+                                  <Icon name={isDone ? "check" : "plus"} size={14} className={isDone ? "stroke-[3]" : ""} />
+                                  <span>{isDone ? 'Ceklis (✓)' : '+ Ceklis'}</span>
+                                </button>
+                              </td>
+                            );
+                          })}
+
+                          {/* CHECKLIST KELULUSAN */}
+                          <td className="py-4 px-5 text-center bg-purple-50/20">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLulus(s)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-black text-xs transition-all shadow-2xs cursor-pointer active:scale-95 ${
+                                isLulus
+                                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-rose-600 hover:to-red-600 text-white shadow-xs ring-2 ring-purple-500/30'
+                                  : 'bg-slate-100 hover:bg-purple-50 text-slate-500 hover:text-purple-700 border border-dashed border-slate-300 hover:border-purple-400'
+                              }`}
+                              title={isLulus ? 'Sudah Lulus (Klik untuk Batalkan Kelulusan)' : 'Belum Lulus (Klik untuk Tandai Lulus/Alumni)'}
+                            >
+                              <Icon name={isLulus ? "award" : "plus"} size={14} />
+                              <span>{isLulus ? 'LULUS (✓)' : 'Belum Lulus'}</span>
+                            </button>
+                          </td>
+
+                          {/* CATATAN RIWAYAT / MUTASI (TAMPIL PAS DIKLIK BIAR GA GANGGU) */}
+                          <td className="py-4 px-5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedHistoryStudent(s)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 shadow-2xs hover:shadow-xs transition-all active:scale-95 group cursor-pointer"
+                              title="Klik untuk membuka Tabel Riwayat Jenjang Kelas & Mutasi Siswa"
+                            >
+                              <Icon name="history" size={13} className="text-indigo-600 group-hover:rotate-45 transition-transform" />
+                              <span>Lihat Riwayat ({Array.isArray(s.classHistory) ? s.classHistory.length : 0})</span>
+                            </button>
+                          </td>
+
+                          {/* AKSI CEPAT */}
+                          <td className="py-4 px-5 text-center whitespace-nowrap">
+                            <div className="inline-flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleOpenPromotionModal(s)}
+                                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs transition-colors border border-indigo-200 flex items-center gap-1.5 shadow-2xs active:scale-95"
+                                title="Kenaikan / Pindah Kelas Siswa"
+                              >
+                                <Icon name="arrow-up-right" size={14} />
+                                <span>Naik Kelas</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleToggleLulus(s)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs active:scale-95 ${
+                                  isLulus
+                                    ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                                }`}
+                                title={isLulus ? 'Batalkan status lulus dan aktifkan kembali' : 'Tandai siswa ini telah lulus dari PAUD'}
+                              >
+                                <Icon name={isLulus ? 'rotate-ccw' : 'award'} size={14} />
+                                <span>{isLulus ? 'Batal Lulus' : 'Set Lulus'}</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Controls */}
+            {filteredStudents.length > MATRIKS_PER_PAGE && (() => {
+              const totalPages = Math.ceil(filteredStudents.length / MATRIKS_PER_PAGE) || 1;
+              const currentMatriksPage = Math.min(Math.max(1, matriksPage), totalPages);
+              const startIdx = (currentMatriksPage - 1) * MATRIKS_PER_PAGE;
+              const endIdx = Math.min(startIdx + MATRIKS_PER_PAGE, filteredStudents.length);
+              return (
+                <div className="p-4 border-t border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <p className="text-xs font-bold text-slate-500">
+                    Menampilkan <span className="font-extrabold text-slate-800">{startIdx + 1} - {endIdx}</span> dari <span className="font-extrabold text-slate-800">{filteredStudents.length}</span> murid
+                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button
+                      type="button"
+                      disabled={currentMatriksPage <= 1}
+                      onClick={() => setMatriksPage(p => Math.max(1, p - 1))}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        currentMatriksPage <= 1
+                          ? 'text-slate-300 bg-slate-100 cursor-not-allowed'
+                          : 'text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs cursor-pointer active:scale-95'
+                      }`}
+                    >
+                      Prev
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => (
+                      <button
+                        key={pageNum}
+                        type="button"
+                        onClick={() => setMatriksPage(pageNum)}
+                        className={`min-w-[32px] h-8 px-2 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 ${
+                          currentMatriksPage === pageNum
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      disabled={currentMatriksPage >= totalPages}
+                      onClick={() => setMatriksPage(p => Math.min(totalPages, p + 1))}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                        currentMatriksPage >= totalPages
+                          ? 'text-slate-300 bg-slate-100 cursor-not-allowed'
+                          : 'text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 shadow-2xs cursor-pointer active:scale-95'
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+        )}
+
+        {/* MODAL TABEL RIWAYAT JENJANG KELAS & MUTASI ROMBEL */}
+        {selectedHistoryStudent && (() => {
+          const existingHist = Array.isArray(selectedHistoryStudent.classHistory) ? selectedHistoryStudent.classHistory : [];
+          const hasInitial = existingHist.some(h => {
+            const t = (h.type || '').toLowerCase();
+            return t.includes('pendaftaran') || t.includes('awal');
+          });
+
+          const initialRecord = {
+            id: 'init_entry',
+            type: 'Pendaftaran Awal',
+            date: selectedHistoryStudent.createdAt ? new Date(selectedHistoryStudent.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Awal Masuk',
+            transferDate: selectedHistoryStudent.createdAt || '',
+            fromClass: '-',
+            toClass: existingHist.length > 0 ? (existingHist[0].fromClass || selectedHistoryStudent.kelas) : selectedHistoryStudent.kelas,
+            effectiveMonth: selectedHistoryStudent.startActiveMonth || settings.startMonth || 'Januari',
+            effectiveYear: selectedHistoryStudent.startActiveYear || settings.startYear || 2026,
+            newTarif: selectedHistoryStudent.tarif,
+            carriedOverArrears: 0,
+            note: 'Pendaftaran pertama siswa di PAUD Setia Bhakti'
+          };
+
+          const fullHistoryList = hasInitial ? existingHist : [initialRecord, ...existingHist];
+
+          const formatMutationDate = (h) => {
+            if (h.transferDate) {
+              try {
+                const parts = String(h.transferDate).split('-');
+                if (parts.length === 3) {
+                  const d = parseInt(parts[2], 10);
+                  const m = ALL_MONTHS[parseInt(parts[1], 10) - 1] || parts[1];
+                  const y = parts[0];
+                  return `${d} ${m} ${y}`;
+                }
+              } catch (e) {}
+              return h.transferDate;
+            }
+            return h.date || h.academicYear || '-';
+          };
+
+          return (
+            <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+              <div className="modal-portal-card bg-white rounded-3xl max-w-4xl w-full p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] sm:max-h-[90vh] flex flex-col border border-slate-200 m-auto relative">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-12 h-12 bg-gradient-to-tr from-indigo-600 to-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                      <Icon name="history" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-900 text-lg sm:text-xl">Tabel Riwayat Jenjang Kelas & Mutasi Rombel</h3>
+                      <p className="text-xs sm:text-sm text-slate-500 font-bold mt-0.5">
+                        {selectedHistoryStudent.name} • NIS: <span className="font-mono text-indigo-700">{selectedHistoryStudent.nis}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedHistoryStudent(null)} 
+                    className="p-2.5 text-slate-400 hover:text-slate-700 font-black rounded-xl hover:bg-slate-100 transition-colors"
+                    title="Tutup Modal"
+                  >
+                    <Icon name="x" size={20} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
+                  {/* Status Overview Cards */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Rombel Terkini</span>
+                      <span className="font-black text-slate-900 text-sm mt-0.5 block">{selectedHistoryStudent.kelas}</span>
+                    </div>
+                    <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Tarif SPP Saat Ini</span>
+                      <span className="font-black text-indigo-900 text-sm mt-0.5 block">{formatRupiah(selectedHistoryStudent.tarif)}/bln</span>
+                    </div>
+                    <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Status Siswa</span>
+                      <span className="font-black text-emerald-800 text-sm mt-0.5 block">
+                        {isStudentLulus(selectedHistoryStudent) ? 'Alumni (Lulus)' : (selectedHistoryStudent.status || 'Aktif')}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Akumulasi Tunggakan</span>
+                      <span className={`font-black text-sm mt-0.5 block ${Number(selectedHistoryStudent.arrearsAmount) > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
+                        {formatRupiah(selectedHistoryStudent.arrearsAmount || 0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Financial & Mutation Calculation Rule Banner */}
+                  <div className="p-3.5 bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 border border-blue-200 rounded-2xl flex items-start gap-3 shadow-2xs">
+                    <Icon name="shield-check" size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div className="text-[11px] text-blue-950 leading-relaxed space-y-1">
+                      <p className="font-black text-blue-900 text-xs">Aturan Sistem Finansial & Mutasi Rombel:</p>
+                      <p>
+                        1. <strong>Perhitungan Tagihan Saat Pindah Rombel:</strong> Tagihan dihitung mulai dari bulan siswa masuk ke rombel baru. Bulan-bulan sebelum ia masuk <strong>TIDAK dihitung</strong> sebagai hutang atau tunggakan di rombel tersebut.
+                      </p>
+                      <p>
+                        2. <strong>Status Tagihan & Jatuh Tempo:</strong> Tagihan bulan berjalan dan bulan ke depan berstatus <strong>"Belum Jatuh Tempo"</strong>. Tagihan baru dianggap <strong>"Menunggak"</strong> secara sistem jika sudah melewati bulan saat ini.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* TABEL RIWAYAT JENJANG KELAS */}
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+                    <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+                      <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2">
+                        <Icon name="table" size={14} className="text-indigo-600" />
+                        <span>Tabel Riwayat Mutasi & Jenjang Kelas ({fullHistoryList.length} Catatan)</span>
+                      </h4>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-100/80 text-slate-600 font-black uppercase tracking-wider text-[10px] border-b border-slate-200">
+                            <th className="py-3 px-3 text-center w-10">No</th>
+                            <th className="py-3 px-3.5 whitespace-nowrap">Tanggal Pasti Pindah</th>
+                            <th className="py-3 px-3.5 whitespace-nowrap">Jenis Mutasi</th>
+                            <th className="py-3 px-4 whitespace-nowrap">Perubahan Rombel</th>
+                            <th className="py-3 px-3.5 whitespace-nowrap">Mulai Efektif Tagihan</th>
+                            <th className="py-3 px-3.5 whitespace-nowrap">Tarif SPP Baru</th>
+                            <th className="py-3 px-3.5 whitespace-nowrap">Tunggakan Terbawa</th>
+                            <th className="py-3 px-4">Catatan Mutasi</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {fullHistoryList.map((h, idx) => {
+                            const isPendaftaran = (h.type || '').toLowerCase().includes('pendaftaran') || (h.type || '').toLowerCase().includes('awal');
+                            const isPindah = (h.type || '').toLowerCase().includes('pindah');
+                            const isLulus = (h.type || '').toLowerCase().includes('lulus') || (h.type || '').toLowerCase().includes('keluar');
+
+                            return (
+                              <tr key={h.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                                <td className="py-3 px-3 text-center font-bold text-slate-400 text-[11px]">{idx + 1}</td>
+                                <td className="py-3 px-3.5 whitespace-nowrap font-bold text-slate-800">
+                                  {formatMutationDate(h)}
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap">
+                                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black ${
+                                    isPendaftaran
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                      : isPindah
+                                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                                        : isLulus
+                                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                                          : 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  }`}>
+                                    {h.type || 'Mutasi Rombel'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 whitespace-nowrap font-black text-slate-800">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-md text-[11px] text-slate-700">
+                                      {h.fromClass || '-'}
+                                    </span>
+                                    <span className="text-indigo-600 font-bold">➔</span>
+                                    <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 rounded-md text-[11px] text-emerald-900 font-black">
+                                      {h.toClass || '-'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap">
+                                  <div className="font-black text-indigo-950">
+                                    {h.effectiveMonth || '-'} {h.effectiveYear || ''}
+                                  </div>
+                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100 block w-fit mt-0.5">
+                                    Bulan sebelum masuk bersih
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap font-black text-blue-700 font-mono">
+                                  {h.newTarif ? formatRupiah(h.newTarif) : '-'}
+                                </td>
+                                <td className="py-3 px-3.5 whitespace-nowrap">
+                                  {Number(h.carriedOverArrears) > 0 ? (
+                                    <span className="font-bold text-rose-600 font-mono">
+                                      {formatRupiah(h.carriedOverArrears)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-emerald-700 font-bold">Rp 0 (Bersih)</span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4 text-slate-600 text-[11px] max-w-xs">
+                                  {h.note || '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const studentTarget = selectedHistoryStudent;
+                        setSelectedHistoryStudent(null);
+                        handleOpenPromotionModal(studentTarget);
+                      }}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 active:scale-95 transition-all"
+                    >
+                      <Icon name="shuffle" size={15} />
+                      <span>Pindah / Mutasi Rombel Siswa Ini</span>
+                    </button>
+
+                    {existingHist.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const lastRec = existingHist[existingHist.length - 1];
+                          const prevCls = lastRec.fromClass || lastRec.previousClass || '';
+                          if (!prevCls) {
+                            alert('Tidak dapat mendeteksi kelas sebelumnya dari riwayat mutasi.');
+                            return;
+                          }
+                          if (!confirm(`Batalkan kenaikan/mutasi terakhir dan kembalikan ananda ${selectedHistoryStudent.name} ke kelas "${prevCls}"?\n\nTunggakan bawaan kelas sebelumnya akan otomatis direset menjadi Rp 0.`)) {
+                            return;
+                          }
+                          const updatedHist = [...existingHist, {
+                            id: Date.now(),
+                            type: 'Pembatalan Kenaikan (Revert)',
+                            fromClass: selectedHistoryStudent.kelas,
+                            toClass: prevCls,
+                            date: new Date().toLocaleDateString('id-ID'),
+                            note: `Admin membatalkan kenaikan kelas dan mengembalikan siswa ke ${prevCls}`
+                          }];
+                          const matchCls = (settings?.customClasses || []).find(c => c.name === prevCls);
+                          const revertedTarif = lastRec.previousTarif || (matchCls ? matchCls.tarif : selectedHistoryStudent.tarif);
+                          const reverted = {
+                            ...selectedHistoryStudent,
+                            kelas: prevCls,
+                            tarif: revertedTarif,
+                            arrearsAmount: 0,
+                            arrearsNote: '',
+                            classHistory: updatedHist
+                          };
+                          onUpdateStudent(selectedHistoryStudent.id, reverted);
+                          setSelectedHistoryStudent(null);
+                          if (typeof showToast === 'function') {
+                            showToast("Kenaikan Dibatalkan", `${selectedHistoryStudent.name} dikembalikan ke ${prevCls} dan tunggakan bawaan direset ke Rp 0.`, "success");
+                          }
+                        }}
+                        className="w-full sm:w-auto px-4 py-2.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white font-black rounded-xl text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                        title="Batalkan kenaikan terakhir jika salah klik dan kembalikan ke kelas sebelumnya"
+                      >
+                        <Icon name="rotate-ccw" size={15} />
+                        <span>Batal Kenaikan & Kembalikan Kelas</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedHistoryStudent(null)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors"
+                  >
+                    Tutup
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {showModal && (
+            <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+              <div className="modal-portal-card bg-white rounded-3xl max-w-3xl w-full m-auto shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[88vh] border border-slate-200 animate-in zoom-in-95 duration-200 relative">
                 {/* Modal Header */}
                 <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/80 backdrop-blur-md flex items-center justify-between sticky top-0 z-10">
                   <div className="flex items-center gap-3">
@@ -4691,16 +6968,52 @@ function ParentDashboardView({
                           value={formData.kelas}
                           onChange={(e) => {
                             const k = e.target.value;
-                            const matchCls = (settings.customClasses || []).find(c => c.name === k);
+                            const matchCls = classList.find(c => c.name === k);
                             let t = matchCls ? matchCls.tarif : 0;
                             setFormData(prev => ({ ...prev, kelas: k, tarif: isKeringanan ? prev.tarif : t }));
                           }}
                           className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-black text-slate-900 focus:ring-2 focus:ring-blue-500"
                         >
-                          {(settings.customClasses || []).map(cls => (
+                          {classList.map(cls => (
                             <option key={cls.name} value={cls.name}>{cls.name} (Tarif: {formatRupiah(cls.tarif)})</option>
                           ))}
                         </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/70 p-4 rounded-xl border border-blue-200">
+                      <div>
+                        <label className="block font-black text-blue-900 uppercase mb-1 flex items-center gap-1.5">
+                          <Icon name="calendar" size={13} className="text-blue-600" />
+                          Bulan Mulai Aktif / Masuk *
+                        </label>
+                        <select
+                          value={formData.startActiveMonth || settings.startMonth || 'Januari'}
+                          onChange={(e) => setFormData({ ...formData, startActiveMonth: e.target.value })}
+                          className="w-full px-3.5 py-2.5 bg-white border border-blue-200 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                        >
+                          {ALL_MONTHS.map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <p className="text-[10px] text-blue-700 font-semibold mt-1">
+                          Tagihan SPP & tunggakan hanya dihitung mulai dari bulan ini.
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block font-black text-blue-900 uppercase mb-1 flex items-center gap-1.5">
+                          <Icon name="clock" size={13} className="text-blue-600" />
+                          Tahun Mulai Aktif *
+                        </label>
+                        <input
+                          type="number"
+                          value={formData.startActiveYear || (settings.startYear ? Number(settings.startYear) : new Date().getFullYear())}
+                          onChange={(e) => setFormData({ ...formData, startActiveYear: parseInt(e.target.value, 10) || new Date().getFullYear() })}
+                          className="w-full px-3.5 py-2.5 bg-white border border-blue-200 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-[10px] text-blue-700 font-semibold mt-1">
+                          Tahun ajaran masuk siswa (contoh: 2026).
+                        </p>
                       </div>
                     </div>
 
@@ -4734,8 +7047,11 @@ function ParentDashboardView({
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">Jenis Kelamin (JK)</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          Jenis Kelamin (JK) <span className="text-rose-500">*</span>
+                        </label>
                         <select
+                          required
                           value={formData.jk || 'L'}
                           onChange={(e) => setFormData({ ...formData, jk: e.target.value })}
                           className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500"
@@ -4746,9 +7062,12 @@ function ParentDashboardView({
                       </div>
 
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">NIK Siswa / No. KTP</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          NIK Siswa / No. KTP <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           placeholder="Nomor Induk Kependudukan (16 Digit)"
                           value={formData.nik || ''}
                           onChange={(e) => setFormData({ ...formData, nik: e.target.value })}
@@ -4757,8 +7076,11 @@ function ParentDashboardView({
                       </div>
 
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">Agama</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          Agama <span className="text-rose-500">*</span>
+                        </label>
                         <select
+                          required
                           value={formData.agama || 'Islam'}
                           onChange={(e) => setFormData({ ...formData, agama: e.target.value })}
                           className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500"
@@ -4776,9 +7098,12 @@ function ParentDashboardView({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">Tempat Lahir</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          Tempat Lahir <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           placeholder="Kota / Kabupaten Tempat Lahir"
                           value={formData.tempatLahir || ''}
                           onChange={(e) => setFormData({ ...formData, tempatLahir: e.target.value })}
@@ -4787,9 +7112,12 @@ function ParentDashboardView({
                       </div>
 
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">Tanggal Lahir</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          Tanggal Lahir <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="date"
+                          required
                           value={formData.tanggalLahir || ''}
                           onChange={(e) => setFormData({ ...formData, tanggalLahir: e.target.value })}
                           className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500"
@@ -4799,9 +7127,12 @@ function ParentDashboardView({
 
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="md:col-span-2">
-                        <label className="block font-black text-slate-700 uppercase mb-1">Alamat Tempat Tinggal</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          Alamat Tempat Tinggal <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           placeholder="Dusun / Jalan / Perumahan"
                           value={formData.alamat || ''}
                           onChange={(e) => setFormData({ ...formData, alamat: e.target.value })}
@@ -4809,9 +7140,12 @@ function ParentDashboardView({
                         />
                       </div>
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">RT</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          RT <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           placeholder="Contoh: 05"
                           value={formData.rt || ''}
                           onChange={(e) => setFormData({ ...formData, rt: e.target.value })}
@@ -4819,9 +7153,12 @@ function ParentDashboardView({
                         />
                       </div>
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">RW</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          RW <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           placeholder="Contoh: 02"
                           value={formData.rw || ''}
                           onChange={(e) => setFormData({ ...formData, rw: e.target.value })}
@@ -4924,6 +7261,35 @@ function ParentDashboardView({
                     );
                   })()}
 
+                  {/* STATUS TUNGGAKAN BAWAAN KELAS SEBELUMNYA */}
+                  {Number(formData.arrearsAmount) > 0 && (
+                    <div className="bg-rose-50/80 p-4 rounded-2xl border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in">
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-rose-800 tracking-wider flex items-center gap-1.5">
+                          <Icon name="alert-triangle" size={13} className="text-rose-600" />
+                          Tunggakan Bawaan Kelas Sebelumnya
+                        </span>
+                        <p className="text-sm font-black text-rose-700 mt-0.5">
+                          {formatRupiah(formData.arrearsAmount)}
+                        </p>
+                        {formData.arrearsNote && (
+                          <p className="text-[11px] font-semibold text-slate-600 mt-0.5">{formData.arrearsNote}</p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({ ...prev, arrearsAmount: 0, arrearsNote: '' }));
+                        }}
+                        className="px-3.5 py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-bold text-xs rounded-xl transition-all shadow-xs shrink-0 flex items-center gap-1.5 cursor-pointer"
+                        title="Hapus tunggakan bawaan jika salah klik mutasi/kenaikan kelas"
+                      >
+                        <Icon name="trash-2" size={14} />
+                        <span>Hapus / Reset Tunggakan Bawaan (Rp 0)</span>
+                      </button>
+                    </div>
+                  )}
+
                   {/* SECTION 4: DATA WALI & KREDENSIAL */}
                   <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
                     <h4 className="font-black text-emerald-900 uppercase tracking-wider text-xs flex items-center gap-2">
@@ -4933,9 +7299,12 @@ function ParentDashboardView({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">Nama Wali Murid</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          Nama Orang Tua / Wali Murid <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           placeholder="Nama Ayah / Ibu / Wali"
                           value={formData.wali}
                           onChange={(e) => setFormData({ ...formData, wali: e.target.value })}
@@ -4944,9 +7313,12 @@ function ParentDashboardView({
                       </div>
 
                       <div>
-                        <label className="block font-black text-slate-700 uppercase mb-1">No. WhatsApp Wali Murid</label>
+                        <label className="block font-black text-slate-700 uppercase mb-1">
+                          No. WhatsApp Wali Murid <span className="text-rose-500">*</span>
+                        </label>
                         <input
                           type="text"
+                          required
                           placeholder="Contoh: 081234567890"
                           value={formData.telepon}
                           onChange={(e) => setFormData({ ...formData, telepon: e.target.value })}
@@ -5072,6 +7444,64 @@ function ParentDashboardView({
                     )}
                   </div>
 
+                  {/* SECTION 5: STATUS AKUN SISWA & IZIN LOGIN (TOMBOL ON / OFF) */}
+                  <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="space-y-0.5">
+                        <h4 className="font-black text-slate-800 uppercase tracking-wider text-xs flex items-center gap-2">
+                          <Icon name="power" size={16} className={formData.statusAktif ? "text-emerald-600" : "text-rose-600"} />
+                          5. Status Akun Siswa & Izin Login (ON / OFF)
+                        </h4>
+                        <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                          {formData.statusAktif 
+                            ? "Akun AKTIF (ON) — Siswa & wali murid dapat login menggunakan NIS dan password." 
+                            : "Akun NON-AKTIF / KELUAR / LULUS (OFF) — Akses login portal ditutup total dan sesi login dinonaktifkan."}
+                        </p>
+                      </div>
+
+                      {/* Tombol Modern Switch Toggle ON / OFF */}
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextStatus = !formData.statusAktif;
+                            setFormData(prev => ({
+                              ...prev,
+                              statusAktif: nextStatus,
+                              status: nextStatus ? 'Aktif' : 'Non-Aktif'
+                            }));
+                          }}
+                          className={`relative inline-flex h-8 w-16 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none shadow-sm ${
+                            formData.statusAktif ? 'bg-emerald-600 ring-2 ring-emerald-500/20' : 'bg-slate-300 ring-2 ring-slate-400/20'
+                          }`}
+                          title="Klik untuk mengubah status ON / OFF"
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out flex items-center justify-center font-black text-[10px] ${
+                              formData.statusAktif ? 'translate-x-8 text-emerald-700' : 'translate-x-0 text-slate-500'
+                            }`}
+                          >
+                            {formData.statusAktif ? 'ON' : 'OFF'}
+                          </span>
+                        </button>
+                        <span className={`text-xs font-black px-2.5 py-1 rounded-xl border ${
+                          formData.statusAktif 
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300' 
+                            : 'bg-rose-100 text-rose-800 border-rose-300'
+                        }`}>
+                          {formData.statusAktif ? 'ON (Aktif)' : 'OFF (Keluar/Lulus)'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {!formData.statusAktif && (
+                      <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-[11px] font-bold flex items-center gap-2">
+                        <Icon name="lock" size={15} className="text-rose-600 shrink-0" />
+                        <span>Perhatian: Akun yang diatur ke status OFF tidak akan bisa login ke portal wali murid sama sekali.</span>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Modal Sticky Footer Actions */}
                   <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
                     <button 
@@ -5096,8 +7526,8 @@ function ParentDashboardView({
 
           {/* MODAL KIRIM INFORMASI AKUN LOGIN KE WHATSAPP */}
           {waModalStudent && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-              <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col border border-slate-200">
+            <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+              <div className="modal-portal-card bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] sm:max-h-[88vh] flex flex-col border border-slate-200 m-auto relative">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center shadow-inner">
@@ -5211,8 +7641,8 @@ function ParentDashboardView({
 
           {/* MODAL PENGATURAN NAIK / PINDAH KELAS SISWA */}
           {promotionStudent && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-              <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col border border-slate-200">
+            <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+              <div className="modal-portal-card bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] sm:max-h-[88vh] flex flex-col border border-slate-200 m-auto relative">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-3">
                     <div className="w-11 h-11 bg-indigo-100 text-indigo-700 rounded-2xl flex items-center justify-center shadow-inner">
@@ -5256,99 +7686,248 @@ function ParentDashboardView({
                     <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
                       Jenis Perubahan Kelas
                     </label>
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
-                        onClick={() => setPromotionForm(prev => ({ ...prev, type: 'naik' }))}
-                        className={`p-3 rounded-2xl border font-bold flex items-center gap-2 transition-all ${
+                        onClick={() => {
+                          const target = (promotionForm.targetClass && !promotionForm.targetClass.includes('Alumni') && !promotionForm.targetClass.includes('Keluar'))
+                            ? promotionForm.targetClass
+                            : (classList.find(c => c.name !== promotionStudent.kelas)?.name || classList[0]?.name || '');
+                          const matchCls = classList.find(c => c.name === target);
+                          setPromotionForm(prev => ({
+                            ...prev,
+                            type: 'naik',
+                            targetClass: target,
+                            targetTarif: prev.keepExistingDiscount ? prev.targetTarif : (matchCls ? matchCls.tarif : prev.targetTarif),
+                            note: `Kenaikan kelas dari ${promotionStudent.kelas} ke ${target} (TA ${prev.academicYear || settings.academicYear || ''})`
+                          }));
+                        }}
+                        className={`p-2.5 sm:p-3 rounded-2xl border font-bold flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 transition-all ${
                           promotionForm.type === 'naik'
                             ? 'bg-blue-50 border-blue-400 text-blue-800 shadow-xs ring-2 ring-blue-500/20'
                             : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
                         <Icon name="arrow-up-circle" size={17} className={promotionForm.type === 'naik' ? 'text-blue-600' : 'text-slate-400'} />
-                        <div className="text-left">
+                        <div className="text-center sm:text-left">
                           <p className="text-xs font-black">Naik Kelas</p>
-                          <p className="text-[10px] text-slate-500 font-normal">Tahun Ajaran Baru</p>
+                          <p className="text-[9px] text-slate-500 font-normal">Tahun Ajaran Baru</p>
                         </div>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => setPromotionForm(prev => ({ ...prev, type: 'pindah' }))}
-                        className={`p-3 rounded-2xl border font-bold flex items-center gap-2 transition-all ${
+                        onClick={() => {
+                          const target = (promotionForm.targetClass && !promotionForm.targetClass.includes('Alumni') && !promotionForm.targetClass.includes('Keluar'))
+                            ? promotionForm.targetClass
+                            : (classList.find(c => c.name !== promotionStudent.kelas)?.name || classList[0]?.name || '');
+                          const matchCls = classList.find(c => c.name === target);
+                          setPromotionForm(prev => ({
+                            ...prev,
+                            type: 'pindah',
+                            targetClass: target,
+                            targetTarif: prev.keepExistingDiscount ? prev.targetTarif : (matchCls ? matchCls.tarif : prev.targetTarif),
+                            note: `Pindah rombel dari ${promotionStudent.kelas} ke ${target}`
+                          }));
+                        }}
+                        className={`p-2.5 sm:p-3 rounded-2xl border font-bold flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 transition-all ${
                           promotionForm.type === 'pindah'
                             ? 'bg-indigo-50 border-indigo-400 text-indigo-800 shadow-xs ring-2 ring-indigo-500/20'
                             : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                         }`}
                       >
                         <Icon name="shuffle" size={17} className={promotionForm.type === 'pindah' ? 'text-indigo-600' : 'text-slate-400'} />
-                        <div className="text-left">
+                        <div className="text-center sm:text-left">
                           <p className="text-xs font-black">Pindah Rombel</p>
-                          <p className="text-[10px] text-slate-500 font-normal">Mutasi Rombongan Belajar</p>
+                          <p className="text-[9px] text-slate-500 font-normal">Mutasi Rombel</p>
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setPromotionForm(prev => ({ 
+                          ...prev, 
+                          type: 'keluar',
+                          targetClass: 'Alumni (Lulus)',
+                          targetTarif: 0,
+                          note: `Kelulusan / Keluar dari ${promotionStudent.kelas}`
+                        }))}
+                        className={`p-2.5 sm:p-3 rounded-2xl border font-bold flex flex-col sm:flex-row items-center gap-1.5 sm:gap-2 transition-all ${
+                          promotionForm.type === 'keluar'
+                            ? 'bg-purple-50 border-purple-400 text-purple-900 shadow-xs ring-2 ring-purple-500/20'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon name="award" size={17} className={promotionForm.type === 'keluar' ? 'text-purple-600' : 'text-slate-400'} />
+                        <div className="text-center sm:text-left">
+                          <p className="text-xs font-black">Lulus / Keluar</p>
+                          <p className="text-[9px] text-slate-500 font-normal">Set Akun OFF</p>
                         </div>
                       </button>
                     </div>
                   </div>
 
-                  {/* Destination Class Selector */}
-                  <div>
-                    <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
-                      Pindah / Naik ke Kelas Tujuan
-                    </label>
-                    <select
-                      required
-                      value={promotionForm.targetClass}
-                      onChange={(e) => {
-                        const target = e.target.value;
-                        const matchCls = (settings.customClasses || []).find(c => c.name === target);
-                        const stdTarif = matchCls ? matchCls.tarif : 0;
-                        setPromotionForm(prev => ({
-                          ...prev,
-                          targetClass: target,
-                          targetTarif: prev.keepExistingDiscount ? prev.targetTarif : stdTarif,
-                          note: `Kenaikan dari ${promotionStudent.kelas} ke ${target}`
-                        }));
-                      }}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      <option value="">-- Pilih Kelas Tujuan --</option>
-                      {(settings.customClasses || []).map(c => (
-                        <option key={c.name} value={c.name} disabled={c.name === promotionStudent.kelas}>
-                          {c.name} {c.name === promotionStudent.kelas ? '(Kelas Saat Ini)' : `(Tarif: ${formatRupiah(c.tarif)}/bln)`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {/* Destination Class / Status Selector */}
+                  {promotionForm.type === 'keluar' ? (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                          Status Kelulusan / Keluar Siswa
+                        </label>
+                        <select
+                          required
+                          value={promotionForm.targetClass}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPromotionForm(prev => ({
+                              ...prev,
+                              targetClass: val,
+                              targetTarif: 0,
+                              note: `Status ${val} dari ${promotionStudent.kelas}`
+                            }));
+                          }}
+                          className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900 focus:bg-white focus:ring-2 focus:ring-purple-500 text-sm"
+                        >
+                          <option value="Alumni (Lulus)">Alumni (Lulus / Tamat PAUD)</option>
+                          <option value="Keluar / Pindah Sekolah">Keluar / Pindah Sekolah</option>
+                          <option value="Non-Aktif (Berhenti)">Non-Aktif (Berhenti)</option>
+                        </select>
+                      </div>
 
-                  {/* New SPP Tariff */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="font-black text-slate-700 uppercase tracking-wider text-[11px]">
-                        Tarif SPP di Kelas Baru (Rp / Bulan)
+                      <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl flex items-start gap-3">
+                        <Icon name="lock" size={18} className="text-purple-700 shrink-0 mt-0.5" />
+                        <div className="text-[11px] text-purple-900 leading-relaxed">
+                          <p className="font-black">Otomatis Tutup Akses Login Portal (Status OFF):</p>
+                          <p className="font-medium text-purple-800 mt-0.5">
+                            Siswa yang dinyatakan Lulus atau Keluar akan otomatis dinonaktifkan (OFF). Sesi login wali murid langsung diakhiri dan akun tidak dapat digunakan lagi untuk login.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                        Pindah / Naik ke Kelas Tujuan
                       </label>
-                      {promotionStudent.keringanan_note && (
-                        <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                          Status: {promotionStudent.keringanan_note}
-                        </span>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 font-black">
-                        Rp
-                      </span>
-                      <input
-                        type="number"
+                      <select
                         required
-                        value={promotionForm.targetTarif}
-                        onChange={(e) => setPromotionForm(prev => ({ ...prev, targetTarif: Number(e.target.value) }))}
-                        className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
+                        value={promotionForm.targetClass}
+                        onChange={(e) => {
+                          const target = e.target.value;
+                          const matchCls = classList.find(c => c.name === target);
+                          const stdTarif = matchCls ? matchCls.tarif : 0;
+                          const autoNote = promotionForm.type === 'naik'
+                            ? `Kenaikan kelas dari ${promotionStudent.kelas} ke ${target} (TA ${promotionForm.academicYear || settings.academicYear || ''})`
+                            : `Pindah rombel dari ${promotionStudent.kelas} ke ${target}`;
+                          setPromotionForm(prev => ({
+                            ...prev,
+                            targetClass: target,
+                            targetTarif: prev.keepExistingDiscount ? prev.targetTarif : stdTarif,
+                            note: autoNote
+                          }));
+                        }}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm"
+                      >
+                        <option value="">-- Pilih Kelas Tujuan --</option>
+                        {classList.map(c => (
+                          <option key={c.name} value={c.name} disabled={c.name === promotionStudent.kelas}>
+                            {c.name} {c.name === promotionStudent.kelas ? '(Kelas Saat Ini)' : `(Tarif: ${formatRupiah(c.tarif)}/bln)`}
+                          </option>
+                        ))}
+                      </select>
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-1 font-medium">
-                      * Nominal tarif dapat disesuaikan otomatis atau diberikan keringanan khusus untuk murid ini.
-                    </p>
-                  </div>
+                  )}
+
+                  {/* New SPP Tariff - Only if not keluar */}
+                  {promotionForm.type !== 'keluar' && (
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="font-black text-slate-700 uppercase tracking-wider text-[11px]">
+                          Tarif SPP di Kelas Baru (Rp / Bulan)
+                        </label>
+                        {promotionStudent.keringanan_note && (
+                          <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            Status: {promotionStudent.keringanan_note}
+                          </span>
+                        )}
+                      </div>
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 font-black">
+                          Rp
+                        </span>
+                        <input
+                          type="number"
+                          required
+                          value={promotionForm.targetTarif}
+                          onChange={(e) => setPromotionForm(prev => ({ ...prev, targetTarif: Number(e.target.value) }))}
+                          className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                        * Nominal tarif dapat disesuaikan otomatis atau diberikan keringanan khusus untuk murid ini.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Tanggal Pindah Rombel & Bulan Mulai Efektif Masuk - TAMPIL HANYA JIKA PINDAH ROMBEL */}
+                  {promotionForm.type === 'pindah' && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                            Tanggal Pasti Pindah Rombel
+                          </label>
+                          <input
+                            type="date"
+                            required={promotionForm.type === 'pindah'}
+                            value={promotionForm.transferDate || ''}
+                            onChange={(e) => setPromotionForm(prev => ({ ...prev, transferDate: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                            Mulai Efektif di Rombel Baru
+                          </label>
+                          <select
+                            value={promotionForm.effectiveMonth || 'Januari'}
+                            onChange={(e) => setPromotionForm(prev => ({ ...prev, effectiveMonth: e.target.value }))}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm"
+                          >
+                            {ALL_MONTHS.map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                            Tahun Kalender Efektif
+                          </label>
+                          <input
+                            type="number"
+                            value={promotionForm.effectiveYear || new Date().getFullYear()}
+                            onChange={(e) => setPromotionForm(prev => ({ ...prev, effectiveYear: parseInt(e.target.value, 10) || new Date().getFullYear() }))}
+                            className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500 text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Penjelasan Perhitungan Keuangan & Tunggakan Saat Pindah Rombel */}
+                      <div className="p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50/70 border border-blue-200 rounded-2xl flex items-start gap-3 shadow-2xs">
+                        <Icon name="info" size={18} className="text-blue-600 shrink-0 mt-0.5" />
+                        <div className="text-xs text-blue-950 leading-relaxed">
+                          <p className="font-black text-blue-900">Perhitungan Tagihan & Tunggakan Saat Pindah Rombel:</p>
+                          <ul className="text-[11px] text-blue-800 mt-1 space-y-1 list-disc list-inside">
+                            <li>Tagihan siswa dihitung mulai dari bulan ia masuk (<strong>{promotionForm.effectiveMonth} {promotionForm.effectiveYear}</strong> dan seterusnya).</li>
+                            <li>Bulan sebelum ia masuk ke rombel ini <strong>TIDAK dihitung</strong> sebagai hutang atau tunggakan.</li>
+                            <li>Tagihan untuk bulan berjalan dan bulan ke depannya berstatus <strong>"Belum Jatuh Tempo"</strong>. Status hanya dianggap menunggak jika sudah melewati bulan saat ini.</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {/* Academic Year & Note */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -5367,16 +7946,69 @@ function ParentDashboardView({
 
                     <div>
                       <label className="block font-black text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
-                        Catatan Kenaikan
+                        Catatan Mutasi / Kenaikan
                       </label>
                       <input
                         type="text"
                         value={promotionForm.note}
                         onChange={(e) => setPromotionForm(prev => ({ ...prev, note: e.target.value }))}
-                        placeholder="Contoh: Lulus PG ke Kelas A"
+                        placeholder="Contoh: Pindah rombel / mutasi kelas"
                         className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
+                  </div>
+
+                  {/* Kotak Akumulasi Tunggakan Kelas Sebelumnya */}
+                  <div className={`p-4 rounded-2xl border transition-all ${
+                    promotionForm.totalAccumulated > 0
+                      ? 'bg-amber-50/90 border-amber-300 text-amber-950'
+                      : 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
+                  }`}>
+                    <div className="flex items-start gap-2.5">
+                      <Icon 
+                        name={promotionForm.totalAccumulated > 0 ? "alert-triangle" : "check-circle"} 
+                        size={18} 
+                        className={`shrink-0 mt-0.5 ${promotionForm.totalAccumulated > 0 ? 'text-amber-600' : 'text-emerald-600'}`} 
+                      />
+                      <div className="flex-1">
+                        <p className="font-black text-xs">
+                          {promotionForm.totalAccumulated > 0 
+                            ? `Terdapat Tagihan / Tunggakan di ${promotionStudent.kelas}`
+                            : `Tagihan Bersih: Tidak Ada Tunggakan di ${promotionStudent.kelas}`}
+                        </p>
+                        {promotionForm.totalAccumulated > 0 ? (
+                          <div className="text-[11px] text-amber-900 mt-1 space-y-1">
+                            <p>
+                              Tunggakan kelas {promotionStudent.kelas}: <strong>{promotionForm.unpaidMonthsList.length} bulan</strong> {promotionForm.unpaidMonthsList.length > 0 && `(${promotionForm.unpaidMonthsList.join(', ')})`} = <strong>{formatRupiah(promotionForm.curClassUnpaidDebt)}</strong>
+                              {promotionForm.existingArrears > 0 && (
+                                <span> + Saldo tunggakan sebelumnya: <strong>{formatRupiah(promotionForm.existingArrears)}</strong></span>
+                              )}
+                            </p>
+                            <p className="font-extrabold text-amber-950">
+                              Total Akumulasi Tagihan Tertunggak: {formatRupiah(promotionForm.totalAccumulated)}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-emerald-800 mt-0.5">
+                            Siswa telah melunasi seluruh kewajiban SPP yang jatuh tempo di kelas saat ini.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {promotionForm.totalAccumulated > 0 && (
+                      <label className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={promotionForm.carryOverDebt}
+                          onChange={(e) => setPromotionForm(prev => ({ ...prev, carryOverDebt: e.target.checked }))}
+                          className="w-4 h-4 text-amber-600 rounded border-amber-300 focus:ring-amber-500"
+                        />
+                        <span className="text-xs font-black text-amber-950">
+                          Akumulasikan sisa tagihan ({formatRupiah(promotionForm.totalAccumulated)}) ke tagihan siswa di kelas baru
+                        </span>
+                      </label>
+                    )}
                   </div>
 
                   {/* Preservation Guarantee Box */}
@@ -5404,10 +8036,214 @@ function ParentDashboardView({
                       className="flex-1 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-2xl text-sm shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2 hover:scale-[1.02]"
                     >
                       <Icon name="check-circle" size={17} />
-                      <span>Simpan Kenaikan Kelas</span>
+                      <span>{promotionForm.type === 'naik' ? 'Simpan Kenaikan Kelas' : (promotionForm.type === 'keluar' ? 'Simpan Status Keluar' : 'Simpan Pindah Rombel')}</span>
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL LIHAT BIODATA LENGKAP SISWA (FORMAT RESMI) */}
+          {selectedBiodataStudent && (
+            <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+              <div className="modal-portal-card bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] sm:max-h-[88vh] flex flex-col border border-slate-200 m-auto relative">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-2xl flex items-center justify-center shadow-inner">
+                      <Icon name="id-card" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="font-black text-slate-800 text-lg sm:text-xl">Biodata Lengkap Murid</h3>
+                      <p className="text-xs text-slate-500 font-semibold">Format Buku Induk & Data Pokok Kesiswaan Resmi</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedBiodataStudent(null)} 
+                    className="p-2 text-slate-400 hover:text-slate-600 font-black rounded-xl hover:bg-slate-100 transition-colors"
+                  >
+                    <Icon name="x" size={20} />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-5 text-xs pr-1">
+                  {/* Kop & Profil Utama */}
+                  <div className="p-4 sm:p-5 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-teal-50/50 rounded-2xl border border-blue-100 flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+                    <div className="w-20 h-20 rounded-2xl bg-white border-2 border-blue-200 flex items-center justify-center font-black text-blue-800 text-2xl shrink-0 overflow-hidden shadow-md">
+                      {selectedBiodataStudent.fotoUrl ? (
+                        <img src={selectedBiodataStudent.fotoUrl} alt={selectedBiodataStudent.name} className="w-full h-full object-cover" />
+                      ) : (
+                        selectedBiodataStudent.name.charAt(0)
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                        <h4 className="font-black text-slate-900 text-lg">{selectedBiodataStudent.name}</h4>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+                          selectedBiodataStudent.statusAktif ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-rose-100 text-rose-800 border border-rose-300'
+                        }`}>
+                          {selectedBiodataStudent.statusAktif ? 'AKTIF' : 'LULUS / NON-AKTIF'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-1.5 text-xs">
+                        <span className="font-mono bg-white px-2.5 py-0.5 rounded-md border border-slate-200 font-black text-blue-700">NIS: {selectedBiodataStudent.nis}</span>
+                        {selectedBiodataStudent.nipd && <span className="font-mono bg-white px-2.5 py-0.5 rounded-md border border-slate-200 font-bold text-slate-700">NIPD: {selectedBiodataStudent.nipd}</span>}
+                        {selectedBiodataStudent.nisn && <span className="font-mono bg-white px-2.5 py-0.5 rounded-md border border-slate-200 font-bold text-slate-700">NISN: {selectedBiodataStudent.nisn}</span>}
+                        <span className="bg-blue-600 text-white px-2.5 py-0.5 rounded-md font-extrabold">Kelas: {selectedBiodataStudent.kelas}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Rincian Tabel Data Diri Sesuai Format Excel Sekolah */}
+                  <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 font-black text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                      <Icon name="user-check" size={14} className="text-blue-600" />
+                      <span>Data Identitas Siswa (Buku Induk)</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Nama Lengkap</span>
+                        <span className="font-black text-slate-900 text-sm">{selectedBiodataStudent.name}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Jenis Kelamin</span>
+                        <span className="font-black text-slate-900">
+                          {selectedBiodataStudent.jk === 'P' ? 'Perempuan (P)' : 'Laki-laki (L)'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">NIK Siswa (16 Digit)</span>
+                        <span className="font-mono font-black text-slate-900 text-sm tracking-wider">
+                          {selectedBiodataStudent.nik || '-'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Agama</span>
+                        <span className="font-black text-slate-900">{selectedBiodataStudent.agama || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Tempat Lahir</span>
+                        <span className="font-bold text-slate-800">{selectedBiodataStudent.tempatLahir || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Tanggal Lahir</span>
+                        <span className="font-bold text-slate-800">{selectedBiodataStudent.tanggalLahir || '-'}</span>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Alamat Domisili</span>
+                        <span className="font-black text-slate-900">{selectedBiodataStudent.alamat || '-'}</span>
+                        <span className="font-mono font-bold text-blue-700 ml-2">RT {selectedBiodataStudent.rt || '0'} / RW {selectedBiodataStudent.rw || '0'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Informasi Orang Tua / Wali & Kontak */}
+                  <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+                    <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 font-black text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                      <Icon name="users" size={14} className="text-emerald-600" />
+                      <span>Data Orang Tua / Wali & Akses Login</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Nama Wali Murid</span>
+                        <span className="font-black text-slate-900 text-sm">{selectedBiodataStudent.wali || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">No. WhatsApp Wali</span>
+                        {selectedBiodataStudent.telepon ? (
+                          <a 
+                            href={getWaLink(selectedBiodataStudent.telepon)} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="font-bold text-emerald-700 hover:underline flex items-center gap-1.5"
+                          >
+                            <Icon name="phone" size={13} /> {selectedBiodataStudent.telepon}
+                          </a>
+                        ) : (
+                          <span className="text-amber-600 font-bold">- Belum diisi -</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Password Login Wali</span>
+                        <span className="font-mono font-black text-blue-700 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {selectedBiodataStudent.password || (selectedBiodataStudent.nis ? `Sb${selectedBiodataStudent.nis}` : '-')}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Tarif SPP Bulanan</span>
+                        <span className="font-black text-blue-800 text-sm">{formatRupiah(selectedBiodataStudent.tarif)}/bln</span>
+                        {selectedBiodataStudent.keringanan_note && (
+                          <span className="ml-2 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            {selectedBiodataStudent.keringanan_note}
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-semibold block text-[10px] uppercase">Mulai Aktif / Terdaftar</span>
+                        <span className="font-black text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200 inline-flex items-center gap-1.5">
+                          <Icon name="calendar" size={12} className="text-emerald-600" />
+                          {selectedBiodataStudent.startActiveMonth || settings.startMonth || 'Januari'} {selectedBiodataStudent.startActiveYear || settings.startYear || ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Status Tunggakan & Riwayat Mutasi / Naik Kelas */}
+                  {((Number(selectedBiodataStudent.arrearsAmount) > 0) || (selectedBiodataStudent.classHistory && selectedBiodataStudent.classHistory.length > 0)) && (
+                    <div className="bg-slate-50 rounded-2xl border border-slate-200 overflow-hidden">
+                      <div className="px-4 py-2.5 bg-slate-100 border-b border-slate-200 font-black text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-2">
+                        <Icon name="history" size={14} className="text-indigo-600" />
+                        <span>Riwayat Kenaikan Kelas & Tunggakan Akumulasi</span>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {Number(selectedBiodataStudent.arrearsAmount) > 0 && (
+                          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-900">
+                            <p className="font-black">Tunggakan Bawaan Kelas Sebelumnya: {formatRupiah(selectedBiodataStudent.arrearsAmount)}</p>
+                            {selectedBiodataStudent.arrearsNote && (
+                              <p className="text-[11px] text-rose-700 mt-0.5">{selectedBiodataStudent.arrearsNote}</p>
+                            )}
+                          </div>
+                        )}
+                        {selectedBiodataStudent.classHistory && selectedBiodataStudent.classHistory.length > 0 && (
+                          <div className="space-y-1.5">
+                            <span className="text-[10px] font-black uppercase text-slate-500">Log Mutasi Kelas:</span>
+                            {selectedBiodataStudent.classHistory.map((hist, i) => (
+                              <div key={i} className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center justify-between text-xs">
+                                <div>
+                                  <span className="font-black text-slate-900">{hist.fromClass} ➔ {hist.toClass}</span>
+                                  <span className="text-slate-400 ml-2">({hist.date || '-'})</span>
+                                </div>
+                                <span className="font-mono font-bold text-blue-700">{formatRupiah(hist.newTarif)}/bln</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedBiodataStudent(null)}
+                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-2xl text-xs transition-colors"
+                  >
+                    Tutup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const st = selectedBiodataStudent;
+                      setSelectedBiodataStudent(null);
+                      openModal(st);
+                    }}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl text-xs shadow-md shadow-blue-500/25 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Icon name="edit" size={16} />
+                    <span>Edit Data Siswa Ini</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -5426,20 +8262,23 @@ function ParentDashboardView({
         title: '',
         content: '',
         imageUrl: '',
-        date: new Date().toLocaleDateString('id-ID')
+        date: formatDateIndo(new Date())
       });
 
       const openModal = (ann = null) => {
         if (ann) {
           setEditingAnn(ann);
-          setFormData({ ...ann });
+          setFormData({
+            ...ann,
+            date: formatDateIndo(ann.date)
+          });
         } else {
           setEditingAnn(null);
           setFormData({
             title: '',
             content: '',
             imageUrl: '',
-            date: new Date().toLocaleDateString('id-ID')
+            date: formatDateIndo(new Date())
           });
         }
         setShowModal(true);
@@ -5447,10 +8286,14 @@ function ParentDashboardView({
 
       const handleSubmit = async (e) => {
         e.preventDefault();
+        const payload = {
+          ...formData,
+          date: formatDateIndo(formData.date) || formatDateIndo(new Date())
+        };
         if (editingAnn) {
-          await onUpdateAnnouncement(editingAnn.id, formData);
+          await onUpdateAnnouncement(editingAnn.id, payload);
         } else {
-          await onAddAnnouncement(formData);
+          await onAddAnnouncement(payload);
         }
         setShowModal(false);
       };
@@ -5528,7 +8371,7 @@ function ParentDashboardView({
                       <div className="flex items-center justify-between gap-2 mb-2 text-xs">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-lg text-[11px] border border-blue-100">
                           <Icon name="calendar" size={12} />
-                          {ann.date}
+                          {formatDateIndo(ann.date)}
                         </span>
                       </div>
 
@@ -5627,13 +8470,23 @@ function ParentDashboardView({
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 uppercase mb-1">Tanggal Terbit</label>
-                    <input
-                      type="text"
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"
-                    />
+                    <label className="block font-bold text-slate-700 uppercase mb-1">Tanggal Terbit (Pilih Kalender)</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={dateToYyyyMmDd(formData.date)}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setFormData({ ...formData, date: formatDateIndo(e.target.value) });
+                          }
+                        }}
+                        className="px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 cursor-pointer shadow-2xs"
+                      />
+                      <div className="flex-1 px-3.5 py-2.5 bg-blue-50 border border-blue-200 rounded-xl font-black text-blue-900 text-xs flex items-center gap-2 shadow-2xs">
+                        <Icon name="calendar" size={15} className="text-blue-600 shrink-0" />
+                        <span className="truncate">{formData.date || formatDateIndo(new Date())}</span>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="flex gap-2 pt-2">
@@ -5649,14 +8502,238 @@ function ParentDashboardView({
     }
 
     // ==========================================
+    // REUSABLE SEARCHABLE STUDENT SELECTOR
+    // Replaces raw <select> with searchable dropdown
+    // ==========================================
+    function SearchableStudentSelect({
+      students = [],
+      value = '',
+      onChange,
+      placeholder = '-- Pilih Siswa --',
+      required = false,
+      theme = 'blue'
+    }) {
+      const [isOpen, setIsOpen] = useState(false);
+      const [search, setSearch] = useState('');
+      const containerRef = useRef(null);
+      const searchInputRef = useRef(null);
+
+      const selectedStudent = useMemo(() => {
+        if (!value) return null;
+        return students.find(s => String(s.id) === String(value) || s.name === value || s.nis === value) || null;
+      }, [students, value]);
+
+      const filteredStudents = useMemo(() => {
+        if (!search.trim()) return students;
+        const q = search.toLowerCase().trim();
+        return students.filter(s => 
+          (s.name && s.name.toLowerCase().includes(q)) ||
+          (s.nis && String(s.nis).toLowerCase().includes(q)) ||
+          (s.kelas && s.kelas.toLowerCase().includes(q))
+        );
+      }, [students, search]);
+
+      useEffect(() => {
+        const handleClickOutside = (e) => {
+          if (containerRef.current && !containerRef.current.contains(e.target)) {
+            setIsOpen(false);
+          }
+        };
+        if (isOpen) {
+          document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+      }, [isOpen]);
+
+      const handleSelect = (s) => {
+        onChange({ target: { value: s.id } });
+        setIsOpen(false);
+        setSearch('');
+      };
+
+      const handleClear = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        onChange({ target: { value: '' } });
+        setSearch('');
+        setIsOpen(false);
+      };
+
+      const themeClasses = {
+        sky: 'border-2 border-sky-200/90 focus-within:border-sky-500 focus-within:ring-2 focus-within:ring-sky-400/20',
+        blue: 'border border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-400/20',
+        teal: 'border border-slate-300 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-400/20'
+      }[theme] || 'border border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-400/20';
+
+      return (
+        <div ref={containerRef} className={`relative w-full ${isOpen ? 'z-[999]' : 'z-20'}`}>
+          {required && (
+            <input
+              type="text"
+              required={required}
+              value={value || ''}
+              onChange={() => {}}
+              tabIndex={-1}
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                opacity: 0,
+                width: 1,
+                height: 1,
+                bottom: 0,
+                left: 10,
+                pointerEvents: 'none'
+              }}
+            />
+          )}
+
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              const next = !isOpen;
+              setIsOpen(next);
+              setSearch('');
+              if (next) {
+                setTimeout(() => {
+                  if (searchInputRef.current) searchInputRef.current.focus({ preventScroll: true });
+                }, 10);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsOpen(!isOpen);
+              }
+            }}
+            className={`w-full min-h-[42px] px-3.5 py-2 bg-white rounded-xl sm:rounded-2xl flex items-center justify-between gap-2 text-left font-bold text-xs sm:text-sm text-slate-800 shadow-2xs transition-all cursor-pointer select-none ${themeClasses}`}
+          >
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {selectedStudent ? (
+                <>
+                  <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-[11px] shrink-0 overflow-hidden">
+                    {selectedStudent.fotoUrl ? (
+                      <img src={selectedStudent.fotoUrl} alt={selectedStudent.name} className="w-full h-full object-cover" />
+                    ) : (
+                      (selectedStudent.name || 'M').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <span className="truncate text-slate-900 font-extrabold">{selectedStudent.name}</span>
+                  <span className="shrink-0 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black uppercase">
+                    {selectedStudent.nis ? `${selectedStudent.nis} • ` : ''}{selectedStudent.kelas}
+                  </span>
+                </>
+              ) : (
+                <span className="text-slate-400 font-medium truncate">{placeholder}</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0 text-slate-400">
+              {selectedStudent && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="p-1 hover:text-rose-600 rounded-full hover:bg-rose-50 transition-colors cursor-pointer"
+                  title="Hapus Pilihan Siswa"
+                >
+                  <Icon name="x" size={13} />
+                </button>
+              )}
+              <Icon name="chevron-down" size={15} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-600' : ''}`} />
+            </div>
+          </div>
+
+          {isOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-slate-200 shadow-2xl z-[999] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="p-2.5 border-b border-slate-100 bg-slate-50/80">
+                <div className="relative flex items-center">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Icon name="search" size={14} />
+                  </div>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Ketik untuk mencari nama, NIS, atau kelas..."
+                    className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      className="absolute right-2.5 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mt-1.5 px-1">
+                  <span>{filteredStudents.length} dari {students.length} murid</span>
+                  {search && <span className="text-blue-600 font-extrabold">Hasil Pencarian</span>}
+                </div>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 text-xs">
+                {filteredStudents.length === 0 ? (
+                  <div className="p-5 text-center text-slate-400 font-medium">
+                    <Icon name="search-x" size={20} className="mx-auto mb-1 text-slate-300" />
+                    Tidak ada murid yang cocok dengan "{search}"
+                  </div>
+                ) : (
+                  filteredStudents.map(s => {
+                    const isSelected = String(s.id) === String(value);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => handleSelect(s)}
+                        className={`w-full px-3.5 py-2.5 flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer ${
+                          isSelected 
+                            ? 'bg-blue-50/80 text-blue-900 font-black' 
+                            : 'hover:bg-slate-50 text-slate-700 font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
+                            {s.fotoUrl ? (
+                              <img src={s.fotoUrl} alt={s.name} className="w-full h-full object-cover" />
+                            ) : (
+                              (s.name || 'M').charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-slate-800 truncate">{s.name}</p>
+                            <p className="text-[10px] text-slate-400 font-semibold truncate">
+                              {s.nis ? `NIS: ${s.nis} • ` : ''}Kelas {s.kelas}
+                            </p>
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Icon name="check" size={15} className="text-blue-600 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+          
     // 6. CATAT PEMBAYARAN MANUAL
     // ==========================================
     function LaporanView({ students, transactions, settings }) {
       const [filterType, setFilterType] = useState('all');
-      const [filterClass, setFilterClass] = useState('Playgroup');
+      const [filterClass, setFilterClass] = useState(() => (settings?.customClasses && settings.customClasses.length > 0) ? settings.customClasses[0].name : '');
       const [filterStudent, setFilterStudent] = useState('');
       const [filterSemester, setFilterSemester] = useState('all'); // 'all', '1', '2'
       const [viewMode, setViewMode] = useState('all'); // 'all', 'rekap', 'transaksi'
+      const [filterTrxScope, setFilterTrxScope] = useState('all'); // 'all' (Termasuk Riwayat Kelas Sebelumnya) | 'current_only' (Hanya Transaksi di Kelas Terpilih)
 
       // Daftar periode pembayaran SPP yang tersedia dari pengaturan
       const periodsList = useMemo(() => {
@@ -5715,12 +8792,7 @@ function ParentDashboardView({
         return activePeriod ? String(activePeriod.id) : 'all';
       });
 
-      // Sinkronisasi otomatis default student ketika filterType berubah ke student
-      useEffect(() => {
-        if (filterType === 'student' && !filterStudent && students.length > 0) {
-          setFilterStudent(students[0].id);
-        }
-      }, [filterType, filterStudent, students]);
+      // Filter student dibiarkan kosong jika user menekan tombol [x] (clear)
 
       // Sinkronisasi default periode jika awalnya kosong
       useEffect(() => {
@@ -5736,6 +8808,13 @@ function ParentDashboardView({
         return periodsList.find(p => String(p.id) === String(curId)) || null;
       }, [filterPeriod, activePeriod, periodsList]);
 
+      // Sinkronisasi otomatis semester saat periode terpilih berubah
+      useEffect(() => {
+        if (selectedPeriodObj) {
+          setFilterSemester(detectSemesterFromPeriod(selectedPeriodObj, 'all'));
+        }
+      }, [selectedPeriodObj]);
+
       // Objek murid yang dipilih saat filter student aktif
       const selectedStudentObj = useMemo(() => {
         if (!filterStudent) return null;
@@ -5744,7 +8823,24 @@ function ParentDashboardView({
 
       // Rangkaian bulan untuk cakupan periode & semester yang dipilih
       const scopeMonths = useMemo(() => {
-        const baseMonths = selectedPeriodObj ? getMonthsList(selectedPeriodObj) : getMonthsList(settings);
+        if (selectedPeriodObj) {
+          const pStartM = selectedPeriodObj.startMonth || 'Juli';
+          const pStartY = parseInt(selectedPeriodObj.startYear) || 2026;
+          const pEndM = selectedPeriodObj.endMonth || 'Juni';
+          const pEndY = parseInt(selectedPeriodObj.endYear) || pStartY;
+
+          const pMonths = getMonthsList(pStartM, '', pEndM, pStartY, pEndY);
+          if (pMonths.length > 6 && filterSemester !== 'all') {
+            return getSemesterMonths(pMonths, filterSemester);
+          }
+          return pMonths;
+        }
+
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const endM = settings?.endMonth || 'Juni';
+        const endY = parseInt(settings?.endYear) || (sysEarliest.year + 1);
+
+        const baseMonths = getMonthsList(sysEarliest.month, '', endM, sysEarliest.year, endY);
         return getSemesterMonths(baseMonths, filterSemester);
       }, [selectedPeriodObj, filterSemester, settings]);
 
@@ -5770,6 +8866,11 @@ function ParentDashboardView({
         if (!trx) return false;
         const trxMonth = (trx.month || '').trim().toLowerCase();
         if (!trxMonth) return false;
+
+        // Sertakan transaksi pelunasan tunggakan bawaan / kelas sebelumnya
+        if (trxMonth.includes('tunggakan') || trxMonth.includes('kelas sebelumnya')) {
+          return true;
+        }
 
         if (scopeMonths.some(m => m.trim().toLowerCase() === trxMonth)) {
           return true;
@@ -5799,7 +8900,9 @@ function ParentDashboardView({
           list = list.filter(s => (s.kelas || '').toLowerCase().trim() === (filterClass || '').toLowerCase().trim());
         } else if (filterType === 'student') {
           if (filterStudent) {
-            list = list.filter(s => s.id === filterStudent || s.name === filterStudent);
+            list = list.filter(s => String(s.id) === String(filterStudent) || s.name === filterStudent);
+          } else {
+            return []; // Jika pilihan siswa dihapus (kosong), tampilkan tabel kosong tanpa memilih acak
           }
         }
         return list;
@@ -5816,8 +8919,13 @@ function ParentDashboardView({
             return isMatch && isPaid;
           });
 
+          // Filter scope, due, dan future months agar HANYA menghitung bulan saat siswa aktif
+          const studentScopeMonths = scopeMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+          const studentDueMonths = dueMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+          const studentFutureMonths = futureMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+
           // Bulan apa saja yang sudah dibayar oleh siswa ini di scope ini
-          const paidMonths = scopeMonths.filter(m => {
+          const paidMonths = studentScopeMonths.filter(m => {
             const mLower = m.trim().toLowerCase();
             return studentTrx.some(t => {
               const tMonth = (t.month || '').trim().toLowerCase();
@@ -5830,15 +8938,16 @@ function ParentDashboardView({
 
           // Bulan apa saja yang BELUM DIBAYAR dan SUDAH JATUH TEMPO s/d bulan sekarang (Tunggakan Aktif)
           // Kalo belum kelewat bulan jangan terhitung!
-          const unpaidDueMonths = dueMonths.filter(m => !paidMonths.includes(m));
+          const unpaidDueMonths = studentDueMonths.filter(m => !paidMonths.includes(m));
 
           // Bulan mendatang yang belum dibayar (belum jatuh tempo)
-          const futureUnpaidMonths = futureMonths.filter(m => !paidMonths.includes(m));
+          const futureUnpaidMonths = studentFutureMonths.filter(m => !paidMonths.includes(m));
 
           const tarif = Number(student.tarif) || 350000;
           const totalPaidAmount = paidMonths.length * tarif;
-          const totalDebtAmount = unpaidDueMonths.length * tarif;
-          const isLunas = unpaidDueMonths.length === 0;
+          const previousArrears = Number(student.arrearsAmount) || 0;
+          const totalDebtAmount = (unpaidDueMonths.length * tarif) + previousArrears;
+          const isLunas = unpaidDueMonths.length === 0 && previousArrears === 0;
 
           return {
             student,
@@ -5851,7 +8960,7 @@ function ParentDashboardView({
             isLunas
           };
         });
-      }, [filteredStudents, transactions, scopeMonths, dueMonths, futureMonths]);
+      }, [filteredStudents, transactions, scopeMonths, dueMonths, futureMonths, settings]);
 
       // Total agregat statistik
       const grandTotalPaid = useMemo(() => {
@@ -5878,20 +8987,33 @@ function ParentDashboardView({
         });
 
         if (filterType === 'class') {
-          res = res.filter(t => (t.kelas || '').toLowerCase().trim() === (filterClass || '').toLowerCase().trim());
+          if (filterTrxScope === 'current_only') {
+            res = res.filter(t => (t.kelas || '').toLowerCase().trim() === (filterClass || '').toLowerCase().trim());
+          } else {
+            // 'all': Termasuk transaksi murid rombel ini saat di kelas sebelumnya
+            const studentIdsInClass = new Set(filteredStudents.map(s => String(s.id)));
+            const studentNamesInClass = new Set(filteredStudents.map(s => (s.name || '').toLowerCase().trim()));
+            res = res.filter(t => 
+              (t.kelas || '').toLowerCase().trim() === (filterClass || '').toLowerCase().trim() ||
+              (t.studentId && studentIdsInClass.has(String(t.studentId))) ||
+              (t.studentName && studentNamesInClass.has((t.studentName || '').toLowerCase().trim()))
+            );
+          }
         } else if (filterType === 'student') {
           if (filterStudent) {
             res = res.filter(t => 
-              t.studentId === filterStudent || 
+              String(t.studentId) === String(filterStudent) || 
               (selectedStudentObj && t.studentName && t.studentName.toLowerCase().trim() === selectedStudentObj.name.toLowerCase().trim()) ||
-              (t.studentName && t.studentName.toLowerCase().trim() === filterStudent.toLowerCase().trim())
+              (t.studentName && t.studentName.toLowerCase().trim() === String(filterStudent).toLowerCase().trim())
             );
+          } else {
+            return []; // Jika belum ada siswa yang dipilih, transaksi kosong
           }
         }
 
         res = res.filter(t => isTrxInScope(t));
         return res;
-      }, [transactions, filterType, filterClass, filterStudent, selectedStudentObj, isTrxInScope]);
+      }, [transactions, filterType, filterClass, filterStudent, selectedStudentObj, isTrxInScope, filterTrxScope, filteredStudents]);
 
       const totalReceiptAmount = filteredTransactions.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
 
@@ -6013,16 +9135,13 @@ function ParentDashboardView({
               {filterType === 'student' && (
                 <div>
                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pilih Siswa</label>
-                  <select 
+                  <SearchableStudentSelect 
+                    students={students}
                     value={filterStudent} 
                     onChange={e => setFilterStudent(e.target.value)} 
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">-- Pilih Siswa --</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} – {s.kelas}</option>
-                    ))}
-                  </select>
+                    placeholder="-- Cari & Pilih Siswa --"
+                    theme="blue"
+                  />
                 </div>
               )}
 
@@ -6031,7 +9150,12 @@ function ParentDashboardView({
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Periode Pembayaran SPP</label>
                 <select 
                   value={filterPeriod || (activePeriod ? String(activePeriod.id) : 'all')} 
-                  onChange={e => setFilterPeriod(e.target.value)} 
+                  onChange={e => {
+                    const newId = e.target.value;
+                    setFilterPeriod(newId);
+                    const matchP = periodsList.find(p => String(p.id) === String(newId));
+                    setFilterSemester(detectSemesterFromPeriod(matchP, 'all'));
+                  }} 
                   className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">Semua Periode</option>
@@ -6073,6 +9197,24 @@ function ParentDashboardView({
                   <option value="transaksi">Hanya Riwayat Kuitansi Masuk</option>
                 </select>
               </div>
+
+              {/* 6. Cakupan Riwayat Kelas (Untuk memastikan pembayaran kelas sebelumnya terlacak) */}
+              {filterType === 'class' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
+                    <span>Riwayat Kelas</span>
+                    <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[9px] font-black">Pelacakan</span>
+                  </label>
+                  <select 
+                    value={filterTrxScope} 
+                    onChange={e => setFilterTrxScope(e.target.value)} 
+                    className="w-full px-3.5 py-2.5 bg-emerald-50/60 border border-emerald-300 rounded-xl font-bold text-xs text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="all">Semua Rombel (Termasuk Kelas Sebelumnya)</option>
+                    <option value="current_only">Hanya Kelas {filterClass} Saja</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* Info Badge Ringkas Status Filter */}
@@ -6117,7 +9259,7 @@ function ParentDashboardView({
                   <span>CAKUPAN: <strong className="text-slate-900">{
                     filterType === 'all' ? 'SEMUA SISWA' : 
                     filterType === 'class' ? `KELAS ${filterClass}` : 
-                    (selectedStudentObj ? `${selectedStudentObj.name} (${selectedStudentObj.kelas})` : 'SISWA')
+                    (selectedStudentObj ? `${selectedStudentObj.name} (${selectedStudentObj.kelas})` : 'BELUM ADA SISWA DIPILIH')
                   }</strong></span>
                   <span>•</span>
                   <span>PERIODE: <strong className="text-slate-900">{selectedPeriodObj ? selectedPeriodObj.name : 'SEMUA PERIODE'}</strong></span>
@@ -6191,7 +9333,9 @@ function ParentDashboardView({
                       {studentReportData.length === 0 ? (
                         <tr>
                           <td colSpan="8" className="py-8 text-center text-slate-500 font-bold">
-                            Tidak ada siswa yang sesuai kriteria filter.
+                            {filterType === 'student' && !filterStudent
+                              ? 'Belum Ada Siswa yang Dipilih. Silakan cari dan pilih nama siswa pada kolom filter di atas.'
+                              : 'Tidak ada data siswa yang sesuai kriteria filter.'}
                           </td>
                         </tr>
                       ) : (
@@ -6336,20 +9480,41 @@ function ParentDashboardView({
                       {filteredTransactions.length === 0 ? (
                         <tr>
                           <td colSpan="8" className="py-8 text-center text-slate-500 font-bold">
-                            Tidak ada riwayat kuitansi pembayaran pada periode & semester ini.
+                            {filterType === 'student' && !filterStudent
+                              ? 'Belum ada siswa yang dipilih. Silakan pilih siswa pada filter di atas.'
+                              : 'Tidak ada riwayat kuitansi pembayaran pada periode & semester ini.'}
                           </td>
                         </tr>
                       ) : (
                         filteredTransactions.map((trx, idx) => (
                           <tr key={trx.id || idx} className="hover:bg-slate-50">
                             <td className="py-2.5 px-3 border-r border-slate-200 text-center font-bold text-slate-600">{idx + 1}</td>
-                            <td className="py-2.5 px-3 border-r border-slate-200 font-semibold">{trx.date}</td>
+                            <td className="py-2.5 px-3 border-r border-slate-200 font-semibold">{formatDateIndo(trx.date)}</td>
                             <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-slate-800">{trx.kuitansiNo || '-'}</td>
                             <td className="py-2.5 px-3 border-r border-slate-200 font-black text-slate-900">{trx.studentName}</td>
-                            <td className="py-2.5 px-3 border-r border-slate-200">{trx.kelas}</td>
-                            <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-emerald-800">{trx.month}</td>
+                            <td className="py-2.5 px-3 border-r border-slate-200">
+                              <span className="font-semibold">{trx.kelas}</span>
+                              {filterType === 'class' && trx.kelas && (trx.kelas || '').toLowerCase().trim() !== (filterClass || '').toLowerCase().trim() && (
+                                <span className="block text-[10px] text-amber-700 font-bold">(Kelas Sebelumnya)</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-emerald-800">
+                              <span>{trx.month}</span>
+                              {Boolean(trx.keringananNote) && (
+                                <span className="block text-[10px] font-black text-emerald-700 italic">
+                                  * Diringankan ({trx.keringananNote})
+                                </span>
+                              )}
+                            </td>
                             <td className="py-2.5 px-3 border-r border-slate-200 text-slate-600">{trx.method || 'Tunai (di TU)'}</td>
-                            <td className="py-2.5 px-3 text-right font-black text-emerald-700">{formatRupiah(trx.amount)}</td>
+                            <td className="py-2.5 px-3 text-right font-black text-emerald-700">
+                              <div>{formatRupiah(trx.amount)}</div>
+                              {Boolean(trx.keringananNote) && (
+                                <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1 py-0.5 rounded border border-emerald-300">
+                                  * Keringanan
+                                </span>
+                              )}
+                            </td>
                           </tr>
                         ))
                       )}
@@ -6393,7 +9558,7 @@ function ParentDashboardView({
       );
     }
 
-    function TransaksiView({ students, transactions, settings, onAddTransaction, onShowKuitansi }) {
+    function TransaksiView({ students, transactions, settings, onAddTransaction, onShowKuitansi, onUpdateStudent }) {
       const [selectedStudentId, setSelectedStudentId] = useState('');
       const [selectedMonth, setSelectedMonth] = useState('');
       const [payMethod, setPayMethod] = useState('Tunai (di TU)');
@@ -6436,20 +9601,14 @@ function ParentDashboardView({
         return activePeriod ? String(activePeriod.id) : 'all';
       });
 
-      // Semester otomatis terisi berdasarkan pengaturan aplikasi (settings.semester)
+      // Semester otomatis terisi dari periode pembayaran yang dipilih atau pengaturan
       const defaultSemester = useMemo(() => {
-        const s = (settings?.semester || '').toLowerCase();
-        if (s.includes('1') || s.includes('ganjil')) return '1';
-        if (s.includes('2') || s.includes('genap')) return '2';
-        return 'all';
-      }, [settings?.semester]);
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      }, [activePeriod, settings?.semester]);
 
-      const [filterSemester, setFilterSemester] = useState(defaultSemester);
-
-      // Sinkronisasi otomatis saat pengaturan semester sekolah berubah
-      useEffect(() => {
-        setFilterSemester(defaultSemester);
-      }, [defaultSemester]);
+      const [filterSemester, setFilterSemester] = useState(() => {
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      });
 
       useEffect(() => {
         if (activePeriod && (!filterPeriod || filterPeriod === 'all')) {
@@ -6463,15 +9622,42 @@ function ParentDashboardView({
         return periodsList.find(p => String(p.id) === String(curId)) || null;
       }, [filterPeriod, activePeriod, periodsList]);
 
+      // Sinkronisasi otomatis saat periode pembayaran berubah
+      useEffect(() => {
+        if (selectedPeriodObj) {
+          setFilterSemester(detectSemesterFromPeriod(selectedPeriodObj, defaultSemester));
+        } else {
+          setFilterSemester(defaultSemester);
+        }
+      }, [selectedPeriodObj, defaultSemester]);
+
       const activeStudents = useMemo(() => students.filter(s => s.statusAktif !== false), [students]);
 
       const selectedStudent = useMemo(() => {
         return students.find(s => s.id.toString() === selectedStudentId.toString());
       }, [students, selectedStudentId]);
 
-      // Rangkaian bulan untuk cakupan periode & semester yang dipilih
+      // Rangkaian bulan untuk cakupan periode & semester yang dipilih (diambil langsung dari periode pilihan)
       const scopeMonths = useMemo(() => {
-        const baseMonths = selectedPeriodObj ? getMonthsList(selectedPeriodObj) : getMonthsList(settings);
+        if (selectedPeriodObj) {
+          const pStartM = selectedPeriodObj.startMonth || 'Juli';
+          const pStartY = parseInt(selectedPeriodObj.startYear) || 2026;
+          const pEndM = selectedPeriodObj.endMonth || 'Juni';
+          const pEndY = parseInt(selectedPeriodObj.endYear) || pStartY;
+
+          const pMonths = getMonthsList(pStartM, '', pEndM, pStartY, pEndY);
+          // Jika periode mencakup lebih dari 1 semester (> 6 bulan) dan filterSemester disetel bukan 'all'
+          if (pMonths.length > 6 && filterSemester !== 'all') {
+            return getSemesterMonths(pMonths, filterSemester);
+          }
+          return pMonths;
+        }
+
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const endM = settings?.endMonth || 'Juni';
+        const endY = parseInt(settings?.endYear) || (sysEarliest.year + 1);
+
+        const baseMonths = getMonthsList(sysEarliest.month, '', endM, sysEarliest.year, endY);
         return getSemesterMonths(baseMonths, filterSemester);
       }, [selectedPeriodObj, filterSemester, settings]);
 
@@ -6482,42 +9668,84 @@ function ParentDashboardView({
 
       // Status pembayaran siswa pada bulan-bulan dalam semester & periode ini
       const paymentSummary = useMemo(() => {
-        if (!selectedStudent) return { paidMonths: [], unpaidMonths: [], dueUnpaidMonths: [], futureUnpaidMonths: [] };
+        if (!selectedStudent) return { paidMonths: [], unpaidMonths: [], dueUnpaidMonths: [], futureUnpaidMonths: [], pastUnpaidDueMonths: [] };
         const studentTrx = transactions.filter(t => 
           (t.studentId === selectedStudent.id || (t.studentName && t.studentName.toLowerCase().trim() === selectedStudent.name.toLowerCase().trim())) &&
           (t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
         );
-        const paidMonths = scopeMonths.filter(m => {
+
+        // Cakupan bulan yang dihitung hanya yang jatuh pada masa aktif siswa
+        const studentScopeMonths = scopeMonths.filter(m => isMonthOnOrAfterStudentStart(m, selectedStudent, settings));
+
+        // Cari juga bulan lampau sejak murid masuk s/d awal periode ini yang belum lunas (sisa tunggakan sebelum semester sekarang)
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const studentStart = getStudentEffectiveStart(selectedStudent, settings);
+        let pastUnpaidDueMonths = [];
+        if (scopeMonths.length > 0) {
+          const firstMonthInScope = scopeMonths[0];
+          const parts = firstMonthInScope.split(' ');
+          const fMonth = parts[0];
+          const fYear = parseInt(parts[1]) || sysEarliest.year;
+          const fIdx = ALL_MONTHS.indexOf(fMonth);
+
+          const priorMonths = getMonthsList(studentStart.month, '', ALL_MONTHS[(fIdx - 1 + 12) % 12], studentStart.year, (fIdx === 0 ? fYear - 1 : fYear));
+          if (priorMonths.length > 0 && priorMonths[0] !== firstMonthInScope) {
+            pastUnpaidDueMonths = priorMonths.filter(m => {
+              if (!isMonthOnOrAfterStudentStart(m, selectedStudent, settings)) return false;
+              if (!isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10)) return false;
+              const mLower = m.trim().toLowerCase();
+              return !studentTrx.some(t => {
+                const tMonth = (t.month || '').trim().toLowerCase();
+                return tMonth === mLower || (tMonth && mLower.startsWith(tMonth));
+              });
+            });
+          }
+        }
+
+        const paidMonths = studentScopeMonths.filter(m => {
           const mLower = m.trim().toLowerCase();
           return studentTrx.some(t => {
             const tMonth = (t.month || '').trim().toLowerCase();
             return tMonth === mLower || (tMonth && mLower.startsWith(tMonth));
           });
         });
-        const allUnpaidMonths = scopeMonths.filter(m => !paidMonths.includes(m));
+        const allUnpaidMonths = studentScopeMonths.filter(m => !paidMonths.includes(m));
         
         // Pemisahan akurat: HANYA bulan yang telah berjalan s/d saat ini yang dihitung menunggak
         const dueUnpaidMonths = allUnpaidMonths.filter(m => isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10));
         const futureUnpaidMonths = allUnpaidMonths.filter(m => !isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10));
 
+        const combinedDueUnpaid = [...pastUnpaidDueMonths, ...dueUnpaidMonths.filter(m => !pastUnpaidDueMonths.includes(m))];
+        const combinedAllUnpaid = [...pastUnpaidDueMonths, ...allUnpaidMonths.filter(m => !pastUnpaidDueMonths.includes(m))];
+
         return { 
           paidMonths, 
-          unpaidMonths: allUnpaidMonths, 
-          dueUnpaidMonths, 
-          futureUnpaidMonths 
+          unpaidMonths: combinedAllUnpaid, 
+          dueUnpaidMonths: combinedDueUnpaid, 
+          futureUnpaidMonths,
+          pastUnpaidDueMonths
         };
-      }, [selectedStudent, transactions, scopeMonths, settings?.dueDateDay]);
+      }, [selectedStudent, transactions, scopeMonths, settings?.dueDateDay, settings]);
 
       useEffect(() => {
         if (selectedStudent) {
-          setCustomAmount(selectedStudent.tarif || 350000);
+          if (selectedMonth && selectedMonth.startsWith('Tunggakan')) {
+            setCustomAmount(selectedStudent.arrearsAmount || 0);
+          } else {
+            setCustomAmount(selectedStudent.tarif || 350000);
+          }
           if (paymentSummary.dueUnpaidMonths.length > 0) {
             setSelectedMonth(paymentSummary.dueUnpaidMonths[0]);
+          } else if (Number(selectedStudent.arrearsAmount || 0) > 0) {
+            setSelectedMonth(selectedStudent.arrearsNote ? `Tunggakan (${selectedStudent.arrearsNote})` : 'Tunggakan Kelas Sebelumnya');
+            setCustomAmount(Number(selectedStudent.arrearsAmount));
           } else if (paymentSummary.futureUnpaidMonths.length > 0) {
             setSelectedMonth(paymentSummary.futureUnpaidMonths[0]);
           } else {
             setSelectedMonth('');
           }
+        } else {
+          setSelectedMonth('');
         }
       }, [selectedStudent, paymentSummary.dueUnpaidMonths, paymentSummary.futureUnpaidMonths]);
 
@@ -6532,48 +9760,78 @@ function ParentDashboardView({
           return;
         }
 
-        const currentDate = new Date().toLocaleDateString('id-ID');
+        const currentDate = formatDateIndo(new Date());
         const kuitansiNo = `K-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}-${Math.floor(100+Math.random()*900)}`;
+
+        const isArrears = selectedMonth.startsWith('Tunggakan') || selectedMonth.includes('Kelas Sebelumnya');
 
         const newTrx = {
           studentId: selectedStudent.id,
           studentName: selectedStudent.name,
           kelas: selectedStudent.kelas,
           month: selectedMonth,
-          amount: Number(customAmount) || selectedStudent.tarif,
+          amount: Number(customAmount) || (isArrears ? selectedStudent.arrearsAmount : selectedStudent.tarif),
           method: payMethod,
           status: 'Lunas',
           isRead: false,
           date: currentDate,
-          kuitansiNo: kuitansiNo
+          kuitansiNo: kuitansiNo,
+          keringananNote: selectedStudent.keringanan_note || selectedStudent.keringananNote || ''
         };
 
         onAddTransaction(newTrx);
+
+        if (isArrears && typeof onUpdateStudent === 'function') {
+          onUpdateStudent(selectedStudent.id, {
+            ...selectedStudent,
+            arrearsAmount: 0,
+            arrearsNote: `Lunas via Manual TU (${currentDate})`
+          });
+        }
+
         alert(`Pembayaran SPP Bulan ${selectedMonth} untuk ${selectedStudent.name} (${formatRupiah(newTrx.amount)}) berhasil dicatat!`);
       };
 
       return (
         <div className="space-y-6">
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-            <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 text-blue-800 rounded-full text-[11px] font-black uppercase mb-2 border border-blue-200">
-                <Icon name="credit-card" size={13} className="text-blue-600" />
-                Catat Pembayaran SPP Manual
+          {/* Card 1: Catat Pembayaran SPP (Manual TU) - Nuansa Buku Ledger Pastel */}
+          <div className="pastel-ledger-card p-6 sm:p-8 space-y-5 relative">
+            {/* Subtle Stationery Motifs (Clean, Academic & Non-childish) */}
+            <div className="absolute top-4 right-5 hidden sm:flex items-center gap-2 pointer-events-none opacity-40 select-none text-base">
+              <span title="Buku Akademik">📖</span>
+              <span title="Penggaris Pembukuan">📐</span>
+              <span title="Catatan">✈️</span>
+            </div>
+
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-amber-100/80 text-amber-900 rounded-full text-xs font-black uppercase mb-2 border border-amber-300/80 shadow-2xs">
+                <span>📖</span>
+                <span>Buku Catat Pembayaran SPP (Manual TU)</span>
               </div>
-              <h2 className="text-2xl font-black text-slate-800 tracking-tight">Catat Pembayaran SPP (Manual TU)</h2>
-              <p className="text-xs text-slate-500 font-medium mt-1">
-                Pencatatan langsung saat wali murid membayar tunai atau transfer di TU dengan filter periode & semester otomatis.
+              <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                Catat Pembayaran SPP (Manual TU)
+              </h2>
+              <p className="text-xs text-slate-600 font-medium mt-1">
+                Pencatatan langsung saat wali murid membayar tunai atau transfer TU dengan nomor periode & semester otomatis.
               </p>
             </div>
 
             {/* Filter Scope Periode & Semester (Sinkron Otomatis dari Pengaturan) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-slate-50/80 rounded-2xl border border-slate-200/80 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-amber-50/40 rounded-2xl border border-amber-200/70 text-xs">
               <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1">Periode Pembayaran</label>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>PERIODE PEMBAYARAN</span>
+                </label>
                 <select
                   value={filterPeriod || (activePeriod ? String(activePeriod.id) : 'all')}
-                  onChange={(e) => setFilterPeriod(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setFilterPeriod(newId);
+                    const matchP = periodsList.find(p => String(p.id) === String(newId));
+                    setFilterSemester(detectSemesterFromPeriod(matchP, defaultSemester));
+                  }}
+                  className="w-full px-4 py-2.5 bg-white border-2 border-emerald-200/90 rounded-2xl font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/20 shadow-2xs"
                 >
                   <option value="all">Semua Periode</option>
                   {periodsList.map(p => (
@@ -6585,14 +9843,24 @@ function ParentDashboardView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-600 uppercase mb-1 flex items-center justify-between">
-                  <span>Semester</span>
-                  <span className="text-[10px] text-blue-600 font-extrabold uppercase">Otomatis Terisi dari Pengaturan</span>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>SEMESTER</span>
+                  </span>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${Boolean(filterPeriod && filterPeriod !== 'all') ? 'text-amber-800 bg-amber-100 border border-amber-200' : 'text-blue-700 bg-blue-100/60'}`}>
+                    {Boolean(filterPeriod && filterPeriod !== 'all') ? '🔒 Terkunci (Sesuai Periode)' : 'Otomatis Terisi'}
+                  </span>
                 </label>
                 <select
                   value={filterSemester}
+                  disabled={Boolean(filterPeriod && filterPeriod !== 'all')}
                   onChange={(e) => setFilterSemester(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-blue-300 rounded-xl font-bold text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-4 py-2.5 rounded-2xl font-bold border-2 shadow-2xs transition-all ${
+                    Boolean(filterPeriod && filterPeriod !== 'all')
+                      ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed opacity-90'
+                      : 'bg-white border-rose-200/90 text-slate-800 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-400/20'
+                  }`}
                 >
                   <option value="all">Semua Semester (1 Tahun Penuh)</option>
                   <option value="1">Semester 1 (Ganjil)</option>
@@ -6602,36 +9870,67 @@ function ParentDashboardView({
             </div>
 
             <form onSubmit={handleManualPaymentSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Pilih Siswa</label>
-                <select
+              <div className="relative z-30">
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1">
+                  <span>PILIH MURID</span>
+                </label>
+                <SearchableStudentSelect
                   required
+                  students={activeStudents}
                   value={selectedStudentId}
                   onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- Pilih Murid --</option>
-                  {activeStudents.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.nis} - {s.kelas})</option>
-                  ))}
-                </select>
+                  placeholder="-- Cari & Pilih Murid --"
+                  theme="sky"
+                />
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Bulan SPP ({scopeMonths.length} Bulan Scope)</label>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center justify-between">
+                  <span>PILIH KAS / BULAN SPP</span>
+                  <span className="text-[10px] font-extrabold text-purple-700">{scopeMonths.length} Bln</span>
+                </label>
                 <select
                   required
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedMonth(val);
+                    if (val.startsWith('Tunggakan') && selectedStudent) {
+                      setCustomAmount(selectedStudent.arrearsAmount || 0);
+                    } else if (selectedStudent) {
+                      setCustomAmount(selectedStudent.tarif || 350000);
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 bg-white border-2 border-purple-200/90 rounded-2xl font-bold text-slate-800 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-400/20 shadow-2xs"
                 >
-                  {paymentSummary.unpaidMonths.length === 0 ? (
+                  {!selectedStudent ? (
+                    <>
+                      <option value="">-- Pilih Murid Terlebih Dahulu --</option>
+                      {scopeMonths.map(m => (
+                        <option key={m} value={m} disabled>{m} ({selectedPeriodObj?.name || 'Scope Periode'})</option>
+                      ))}
+                    </>
+                  ) : paymentSummary.unpaidMonths.length === 0 && Number(selectedStudent.arrearsAmount || 0) === 0 ? (
                     <option value="">Semua Bulan di Semester Ini Sudah Lunas</option>
                   ) : (
                     <>
-                      {paymentSummary.dueUnpaidMonths.length > 0 && (
-                        <optgroup label="[Jatuh Tempo] Tagihan Menunggak">
-                          {paymentSummary.dueUnpaidMonths.map(m => (
+                      {Number(selectedStudent.arrearsAmount || 0) > 0 && (
+                        <optgroup label="[Tunggakan Bawaan] Kelas Sebelumnya">
+                          <option value={selectedStudent.arrearsNote ? `Tunggakan (${selectedStudent.arrearsNote})` : 'Tunggakan Kelas Sebelumnya'}>
+                            {selectedStudent.arrearsNote ? `Tunggakan (${selectedStudent.arrearsNote})` : 'Tunggakan Kelas Sebelumnya'} - {formatRupiah(selectedStudent.arrearsAmount)}
+                          </option>
+                        </optgroup>
+                      )}
+                      {paymentSummary.pastUnpaidDueMonths && paymentSummary.pastUnpaidDueMonths.length > 0 && (
+                        <optgroup label="[Sisa Tunggakan Sebelumnya] Periode Lampau">
+                          {paymentSummary.pastUnpaidDueMonths.map(m => (
+                            <option key={m} value={m}>{m} (Menunggak Lampau)</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {paymentSummary.dueUnpaidMonths.filter(m => !paymentSummary.pastUnpaidDueMonths?.includes(m)).length > 0 && (
+                        <optgroup label="[Jatuh Tempo] Tagihan Periode Ini">
+                          {paymentSummary.dueUnpaidMonths.filter(m => !paymentSummary.pastUnpaidDueMonths?.includes(m)).map(m => (
                             <option key={m} value={m}>{m} (Menunggak)</option>
                           ))}
                         </optgroup>
@@ -6649,11 +9948,13 @@ function ParentDashboardView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Metode Bayar</label>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1">
+                  <span>METODE BAYAR</span>
+                </label>
                 <select
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 bg-white border-2 border-emerald-200/90 rounded-2xl font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/20 shadow-2xs"
                 >
                   <option value="Tunai (di TU)">Tunai (di TU)</option>
                   <option value="Transfer Bank Manual">Transfer Bank Manual</option>
@@ -6662,24 +9963,26 @@ function ParentDashboardView({
               </div>
 
               <div>
-                <label className="block font-bold text-slate-700 uppercase mb-1">Nominal SPP (Rp)</label>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1">
+                  <span>NOMINAL SPP</span>
+                </label>
                 <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-extrabold text-slate-500">Rp</span>
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-black text-slate-400 text-xs">Rp</span>
                   <input
                     type="text"
                     required
                     value={formatInputNumber(customAmount)}
                     onChange={(e) => setCustomAmount(parseNumberOnly(e.target.value))}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-extrabold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-amber-200/90 rounded-2xl font-black text-slate-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20 shadow-2xs"
                   />
                 </div>
               </div>
 
               {selectedStudent && (
-                <div className="md:col-span-2 lg:col-span-4 p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2 text-xs">
+                <div className="md:col-span-2 lg:col-span-4 p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2 text-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="font-black text-blue-950 text-sm">{selectedStudent.name}</span>
+                      <span className="font-black text-slate-900 text-sm">{selectedStudent.name}</span>
                       <span className="text-slate-400">•</span>
                       <span className="font-bold text-slate-600">Kelas: <strong className="text-slate-800">{selectedStudent.kelas}</strong></span>
                       <span className="text-slate-400">•</span>
@@ -6719,7 +10022,7 @@ function ParentDashboardView({
                 <button
                   type="submit"
                   disabled={paymentSummary.unpaidMonths.length === 0}
-                  className="py-3 px-6 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none text-white font-extrabold shadow-md shadow-blue-500/25 rounded-xl text-xs transition-all flex items-center gap-2"
+                  className="py-3 px-6 bg-gradient-to-r from-orange-400 via-amber-500 to-orange-500 hover:from-orange-500 hover:to-amber-600 disabled:opacity-50 disabled:pointer-events-none text-white font-black shadow-md shadow-orange-300/40 rounded-2xl text-xs sm:text-sm transition-all flex items-center gap-2"
                 >
                   <Icon name="check-circle" size={16} />
                   <span>Simpan Pembayaran & Terbitkan Kuitansi</span>
@@ -6728,45 +10031,77 @@ function ParentDashboardView({
             </form>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-800 text-base">Riwayat Transaksi Pembayaran</h3>
+          {/* Card 2: Riwayat Transaksi - Table Header Chip Pastel Matching Screenshot 1 */}
+          <div className="pastel-table-card">
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-500 text-base">⭐</span>
+                <h3 className="font-black text-slate-800 text-base sm:text-lg">Riwayat Transaksi</h3>
+              </div>
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                {transactions.length} Data Tersimpan
+              </span>
             </div>
 
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto p-3 sm:p-4">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">
-                    <th className="py-4 px-6">No Kuitansi</th>
-                    <th className="py-4 px-6">Nama Siswa</th>
-                    <th className="py-4 px-6">Kelas</th>
-                    <th className="py-4 px-6">Bulan SPP</th>
-                    <th className="py-4 px-6">Nominal</th>
-                    <th className="py-4 px-6">Metode</th>
-                    <th className="py-4 px-6">Tanggal</th>
-                    <th className="py-4 px-6 text-center">Aksi</th>
+                  <tr className="text-[11px] sm:text-xs font-black uppercase tracking-wider">
+                    <th className="py-3.5 px-4 pastel-th-sky rounded-l-2xl text-left whitespace-nowrap">No Kuitansi</th>
+                    <th className="py-3.5 px-4 pastel-th-orange text-left whitespace-nowrap">Nama Siswa</th>
+                    <th className="py-3.5 px-4 pastel-th-yellow text-left whitespace-nowrap">Kelas</th>
+                    <th className="py-3.5 px-4 pastel-th-mint text-left whitespace-nowrap">Bulan SPP</th>
+                    <th className="py-3.5 px-4 pastel-th-teal text-left whitespace-nowrap">Nominal</th>
+                    <th className="py-3.5 px-4 pastel-th-coral text-left whitespace-nowrap">Metode</th>
+                    <th className="py-3.5 px-4 pastel-th-mint text-center whitespace-nowrap">Status</th>
+                    <th className="py-3.5 px-4 pastel-th-purple text-left whitespace-nowrap">Tanggal</th>
+                    <th className="py-3.5 px-4 pastel-th-blue text-center rounded-r-2xl whitespace-nowrap">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs font-medium">
-                  {transactions.map((trx) => (
-                    <tr key={trx.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-4 px-6 font-bold text-slate-800">{trx.kuitansiNo}</td>
-                      <td className="py-4 px-6 font-semibold text-slate-800">{trx.studentName}</td>
-                      <td className="py-4 px-6">{trx.kelas}</td>
-                      <td className="py-4 px-6 font-bold text-emerald-700">{trx.month}</td>
-                      <td className="py-4 px-6 font-extrabold text-slate-900">{formatRupiah(trx.amount)}</td>
-                      <td className="py-4 px-6">{trx.method}</td>
-                      <td className="py-4 px-6 text-slate-500">{trx.date}</td>
-                      <td className="py-4 px-6 text-center">
-                        <button
-                          onClick={() => onShowKuitansi(trx)}
-                          className="py-1.5 px-3 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-bold rounded-xl text-xs border border-emerald-200"
-                        >
-                          Cetak Kuitansi
-                        </button>
+                  {transactions.length > 0 ? (
+                    transactions.map((trx) => {
+                      const isLunas = (trx.status || 'Lunas').toLowerCase().includes('lunas') || (trx.status || '').toLowerCase().includes('berhasil') || (trx.status || '').toLowerCase().includes('sukses');
+                      return (
+                        <tr key={trx.id} className="hover:bg-amber-50/40 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">{trx.kuitansiNo}</td>
+                          <td className="py-3.5 px-4 font-extrabold text-slate-800 whitespace-nowrap">{trx.studentName}</td>
+                          <td className="py-3.5 px-4 font-bold text-slate-700 whitespace-nowrap">{trx.kelas}</td>
+                          <td className="py-3.5 px-4 font-extrabold text-emerald-800 whitespace-nowrap">{trx.month}</td>
+                          <td className="py-3.5 px-4 font-black text-slate-900 whitespace-nowrap">{formatRupiah(trx.amount)}</td>
+                          <td className="py-3.5 px-4 text-slate-700 font-semibold whitespace-nowrap">{trx.method}</td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {isLunas ? (
+                              <span className="status-pill-lunas">
+                                <Icon name="check" size={11} /> Lunas
+                              </span>
+                            ) : (
+                              <span className="status-pill-menunggu">
+                                <Icon name="clock" size={11} /> Menunggu
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 font-bold whitespace-nowrap">{formatDateIndo(trx.date)}</td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <button
+                              onClick={() => onShowKuitansi(trx)}
+                              className="btn-print-kuitansi"
+                              title="Cetak Kuitansi Sah"
+                            >
+                              <Icon name="printer" size={13} />
+                              <span>Cetak Kuitansi</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="9" className="text-center py-8 text-slate-400 font-bold">
+                        Belum ada riwayat transaksi pembayaran tercatat.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -6905,7 +10240,7 @@ function ParentDashboardView({
                             <span className="flex items-center gap-1 text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-full font-mono font-bold">
                               <Icon name="clock" size={10} /> Sisa {remainingMinutes} mnt
                             </span>
-                            <span>{c.date}</span>
+                            <span>{formatDateIndo(c.date)}</span>
                           </div>
                         </div>
                       );
@@ -6996,7 +10331,7 @@ function ParentDashboardView({
                                           {c.title}
                                         </p>
                                         <span className={`text-[9px] font-bold shrink-0 ml-1.5 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
-                                          {c.date}
+                                          {formatDateIndo(c.date)}
                                         </span>
                                       </div>
 
@@ -7065,7 +10400,7 @@ function ParentDashboardView({
                 <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-[#f0f4f8] space-y-4">
                   <div className="text-center my-3">
                     <span className="bg-white/80 backdrop-blur-sm text-slate-500 text-[10px] font-black uppercase px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm">
-                      Sesi Obrolan Dibuka: {activeChat.date}
+                      Sesi Obrolan Dibuka: {formatDateIndo(activeChat.date)}
                     </span>
                   </div>
 
@@ -7094,7 +10429,7 @@ function ParentDashboardView({
                              </div>
                            )}
                          </div>
-                         <span className="text-[10px] text-slate-400 font-bold mt-1 px-1">{msg.time || '-'}</span>
+                         <span className="text-[10px] text-slate-500 font-bold mt-1 px-1">{formatDateTimeIndo(msg.time, activeChat.date)}</span>
                       </div>
                     );
                   })}
@@ -7395,87 +10730,126 @@ function ParentDashboardView({
       };
 
       return (
-        <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-          <div>
-            <h2 className="text-xl font-extrabold text-slate-800">Pengaturan Aplikasi & Periode SPP</h2>
-            <p className="text-xs text-slate-500 mt-1">Atur nama sekolah, tahun ajaran, nama periode aktif, kredensial admin, integrasi Midtrans, dan daftar kelas serta nominalnya.</p>
+        <div className="bg-white p-4 sm:p-7 md:p-9 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm space-y-6 sm:space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0">
+                <Icon name="sliders" size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Pengaturan Aplikasi & Periode SPP</h2>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Konfigurasi identitas sekolah, periode aktif ajaran, kredensial login admin, gateway pembayaran, serta rombel kelompok kelas.</p>
+              </div>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6 text-xs">
             {/* 1. Informasi Sekolah & Administrator */}
-            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-4">
-              <h3 className="font-extrabold text-slate-800 text-sm flex items-center gap-2">
-                <Icon name="school" size={18} className="text-emerald-600" />
-                Informasi Sekolah & Kredensial Admin
-              </h3>
+            <div className="p-4 sm:p-6 bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl sm:rounded-3xl border border-slate-200/90 space-y-4 sm:space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200/70">
+                <h3 className="font-black text-slate-800 text-sm sm:text-base flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-inner">
+                    <Icon name="school" size={17} />
+                  </span>
+                  <span>Identitas Sekolah & Akun Admin TU</span>
+                </h3>
+                <span className="text-[11px] font-extrabold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-full">
+                  Konfigurasi Utama
+                </span>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Nama Sekolah</label>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="building" size={13} className="text-blue-600" />
+                    <span>Nama Lembaga / Sekolah</span>
+                  </label>
                   <input
                     type="text"
                     required
                     value={formData.schoolName || ''}
                     onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, schoolName: e.target.value }); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Contoh: PAUD SETIA BHAKTI"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Tahun Ajaran Default</label>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="calendar" size={13} className="text-blue-600" />
+                    <span>Tahun Ajaran Default</span>
+                  </label>
                   <input
                     type="text"
                     required
                     value={formData.academicYear || ''}
                     onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, academicYear: e.target.value }); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Contoh: 2025/2026"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Alamat Sekolah</label>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="map-pin" size={13} className="text-blue-600" />
+                    <span>Alamat Lengkap Sekolah</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.address || ''}
                     onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, address: e.target.value }); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Alamat sekolah..."
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">No. Kontak TU / WA</label>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="phone" size={13} className="text-emerald-600" />
+                    <span>No. Kontak Resmi TU / WhatsApp</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.phone || ''}
                     onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, phone: e.target.value }); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="08123456789"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Nama Admin / Kasir TU</label>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="user-check" size={13} className="text-indigo-600" />
+                    <span>Nama Admin / Kasir TU</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.adminName || ''}
                     onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, adminName: e.target.value }); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Nama Admin TU"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Username Admin</label>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="user" size={13} className="text-indigo-600" />
+                    <span>Username Login Admin</span>
+                  </label>
                   <input
                     type="text"
                     value={formData.adminUsername || ''}
                     onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, adminUsername: e.target.value }); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Username login"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block font-bold text-slate-700 uppercase">
-                      Ganti Password Admin <span className="normal-case text-slate-400 font-normal">(Opsional)</span>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      <Icon name="lock" size={13} className="text-amber-600" />
+                      <span>Ganti Password Admin <span className="normal-case text-slate-400 font-normal">(Opsional)</span></span>
                     </label>
                     <button
                       type="button"
@@ -7495,19 +10869,22 @@ function ParentDashboardView({
                     placeholder="Kosongkan jika tidak mau mengubah password"
                     value={newAdminPassword}
                     onChange={(e) => { isDirtyRef.current = true; setNewAdminPassword(e.target.value); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 uppercase mb-1">Tanggal Jatuh Tempo SPP (Tiap Bulan)</label>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="clock" size={13} className="text-purple-600" />
+                    <span>Tanggal Jatuh Tempo SPP (Tiap Bulan)</span>
+                  </label>
                   <input
                     type="number"
                     min="1"
                     max="31"
                     value={formData.dueDateDay || 10}
                     onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, dueDateDay: parseInt(e.target.value) || 10 }); }}
-                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
                   />
                 </div>
               </div>
@@ -7963,9 +11340,9 @@ function ParentDashboardView({
                         <div className="relative flex items-center">
                           <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-black text-slate-500 text-xs">Rp</span>
                           <input
-                            type="number"
-                            value={cls.tarif || ''}
-                            onChange={(e) => handleUpdateClass(idx, 'tarif', e.target.value)}
+                            type="text"
+                            value={formatInputNumber(cls.tarif)}
+                            onChange={(e) => handleUpdateClass(idx, 'tarif', parseNumberOnly(e.target.value))}
                             placeholder="0"
                             className="w-36 pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-emerald-700 text-right focus:bg-white focus:border-teal-500 focus:outline-none text-xs"
                           />
@@ -8001,10 +11378,10 @@ function ParentDashboardView({
                     Rp
                   </span>
                   <input
-                    type="number"
+                    type="text"
                     placeholder="1.200.000"
-                    value={newClassTarif}
-                    onChange={(e) => setNewClassTarif(e.target.value)}
+                    value={formatInputNumber(newClassTarif)}
+                    onChange={(e) => setNewClassTarif(parseNumberOnly(e.target.value))}
                     className="w-40 pl-11 pr-3.5 py-2 bg-white border border-slate-300 rounded-xl font-black text-slate-900 text-right focus:border-teal-500 focus:outline-none shadow-inner"
                   />
                 </div>
@@ -8087,7 +11464,7 @@ function ParentDashboardView({
 
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-medium">Order Time</span>
-                <span className="font-semibold text-slate-800">: {transaction.date || '-'}</span>
+                <span className="font-semibold text-slate-800">: {formatDateIndo(transaction.date || '-')}</span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -8107,7 +11484,15 @@ function ParentDashboardView({
 
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-medium">Amount</span>
-                <span className="font-black text-slate-900 text-sm">: {formatRupiah(transaction.amount)}</span>
+                <div className="flex items-center gap-1.5 text-right">
+                  <span className="text-slate-800">:</span>
+                  <span className="font-black text-slate-900 text-sm">{formatRupiah(transaction.amount)}</span>
+                  {Boolean(transaction.keringananNote) && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      *keringanan
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -8124,8 +11509,20 @@ function ParentDashboardView({
 
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-medium truncate max-w-[160px]">SPP {transaction.studentName}</span>
-                <span className="font-bold text-slate-800">: {formatRupiah(transaction.amount)}</span>
+                <div className="flex items-center gap-1.5 text-right">
+                  <span className="font-bold text-slate-800">: {formatRupiah(transaction.amount)}</span>
+                  {Boolean(transaction.keringananNote) && (
+                    <span className="text-[10px] font-black text-emerald-700 italic">*keringanan</span>
+                  )}
+                </div>
               </div>
+
+              {Boolean(transaction.keringananNote) && (
+                <div className="flex items-start justify-between text-[11px] bg-emerald-50/80 p-2 rounded-xl border border-emerald-200">
+                  <span className="text-emerald-700 font-bold">Keterangan:</span>
+                  <span className="font-extrabold text-emerald-800 text-right">{transaction.keringananNote}</span>
+                </div>
+              )}
 
               <div className="flex items-center justify-between">
                 <span className="text-slate-500 font-medium">Kelas & Bulan</span>
@@ -8295,22 +11692,59 @@ function ParentDashboardView({
     
     function AdminNoteCardItem({ n, onDeleteNote }) {
       const hasReplies = Boolean(n.comments && n.comments.length > 0);
-      // Per request 4: jika sudah pernah dibalas langsung tertutup, harus diklik baru terbuka
       const [isOpen, setIsOpen] = useState(!hasReplies);
+      const [readCommentCount, setReadCommentCount] = useState(() => {
+        try {
+          const map = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+          return map[n.id] || 0;
+        } catch (e) {
+          return 0;
+        }
+      });
+
+      const unreadCount = Math.max(0, (n.comments?.length || 0) - readCommentCount);
+
+      const markAsRead = () => {
+        try {
+          const map = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+          map[n.id] = n.comments ? n.comments.length : 0;
+          localStorage.setItem('spp_admin_read_note_replies', JSON.stringify(map));
+          setReadCommentCount(map[n.id]);
+          window.dispatchEvent(new Event('spp_note_read_updated'));
+        } catch (e) {}
+      };
+
+      const handleToggle = () => {
+        const next = !isOpen;
+        setIsOpen(next);
+        if (next && unreadCount > 0) {
+          markAsRead();
+        }
+      };
+
+      useEffect(() => {
+        if (isOpen && unreadCount > 0) {
+          markAsRead();
+        }
+      }, [isOpen, n.comments]);
 
       return (
         <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all">
           <button
             type="button"
-            onClick={() => setIsOpen(prev => !prev)}
-            className="w-full p-4 sm:p-5 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center text-left hover:bg-slate-100/70 transition-colors"
+            onClick={handleToggle}
+            className="w-full p-4 sm:p-5 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center text-left hover:bg-slate-100/70 transition-colors cursor-pointer"
           >
             <div className="flex-1 min-w-0 pr-3">
               <div className="flex flex-wrap items-center gap-2 mb-1.5">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-teal-100 text-teal-800 rounded-lg text-[10px] font-black uppercase">
                   <Icon name="tag" size={11} /> {n.category || 'Catatan TU'}
                 </span>
-                {hasReplies ? (
+                {unreadCount > 0 ? (
+                  <span className="px-2.5 py-0.5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center gap-1 animate-pulse">
+                    <Icon name="message-circle" size={11} /> {unreadCount} Balasan Baru
+                  </span>
+                ) : hasReplies ? (
                   <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black flex items-center gap-1">
                     <Icon name="message-circle" size={11} /> {n.comments.length} Balasan Masuk
                   </span>
@@ -8322,7 +11756,7 @@ function ParentDashboardView({
               </div>
               <h4 className="font-black text-slate-800 text-sm sm:text-base truncate">Siswa: {n.studentName}</h4>
               <p className="text-xs text-slate-500 font-bold mt-0.5 flex items-center gap-1">
-                <Icon name="calendar" size={12} /> {n.date}
+                <Icon name="calendar" size={12} className="text-teal-600" /> {formatDateTimeIndo(n.date)}
                 {hasReplies && (
                   <span className="text-blue-600 font-bold ml-2 text-[11px]">
                     • {isOpen ? 'Tutup percakapan' : 'Klik untuk buka riwayat percakapan'}
@@ -8364,7 +11798,7 @@ function ParentDashboardView({
                             <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
                             {cm.sender}
                           </p>
-                          <span className="text-[10px] text-slate-400 font-medium">{cm.time || 'Wali'}</span>
+                          <span className="text-[10px] text-slate-500 font-bold">{formatDateTimeIndo(cm.time, n.date)}</span>
                         </div>
                         <p className="text-xs text-slate-600 font-medium leading-relaxed">{cm.text}</p>
                       </div>
@@ -8389,14 +11823,15 @@ function ParentDashboardView({
         if (!selectedStudent || !content.trim()) return;
         const student = students.find(s => s.id === selectedStudent);
         if (!student) return;
-        
+        const now = new Date();
+        const clockStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
         onAddNote({
           studentId: student.id,
           studentName: student.name,
           category: 'Catatan TU',
           title: `Catatan Tata Usaha (TU)`,
           content: content.trim(),
-          date: new Date().toLocaleDateString('id-ID'),
+          date: `${formatDateIndo(now)} • ${clockStr} WIB`,
           comments: []
         });
         setContent('');
@@ -8422,17 +11857,14 @@ function ParentDashboardView({
                 
                 <div className="space-y-2">
                   <label className="block text-xs font-black text-slate-700 uppercase">Pilih Siswa</label>
-                  <select 
+                  <SearchableStudentSelect 
                     required 
+                    students={students}
                     value={selectedStudent} 
                     onChange={e => setSelectedStudent(e.target.value)} 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-teal-500"
-                  >
-                    <option value="">-- Pilih Siswa --</option>
-                    {students.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.nis} - {s.kelas})</option>
-                    ))}
-                  </select>
+                    placeholder="-- Cari & Pilih Siswa --"
+                    theme="teal"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -8527,22 +11959,38 @@ function ParentDashboardView({
         return parseInt(settings?.startYear) || 2026;
       }, [selectedPeriodObj, settings?.startYear]);
 
-      // Semester otomatis terisi dari pengaturan (settings.semester)
+      // Semester otomatis terisi dari pengaturan (settings.semester) atau periode terpilih
       const defaultSemester = useMemo(() => {
-        const s = (settings?.semester || '').toLowerCase();
-        if (s.includes('1') || s.includes('ganjil')) return '1';
-        if (s.includes('2') || s.includes('genap')) return '2';
-        return 'all';
-      }, [settings?.semester]);
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      }, [activePeriod, settings?.semester]);
 
-      const [filterSemester, setFilterSemester] = useState(defaultSemester);
+      const [filterSemester, setFilterSemester] = useState(() => {
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      });
 
+      // Sinkronisasi otomatis semester saat periode ajaran berubah
       useEffect(() => {
-        setFilterSemester(defaultSemester);
-      }, [defaultSemester]);
+        if (selectedPeriodObj) {
+          setFilterSemester(detectSemesterFromPeriod(selectedPeriodObj, defaultSemester));
+        } else {
+          setFilterSemester(defaultSemester);
+        }
+      }, [selectedPeriodObj, defaultSemester]);
 
       const baseAcademicMonths = useMemo(() => {
-        return selectedPeriodObj ? getMonthsList(selectedPeriodObj) : getMonthsList(settings);
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const targetEndObj = selectedPeriodObj || settings;
+        const endM = targetEndObj?.endMonth || settings?.endMonth || 'Juni';
+        const endY = parseInt(targetEndObj?.endYear || settings?.endYear) || (sysEarliest.year + 1);
+
+        let startM = sysEarliest.month;
+        let startY = sysEarliest.year;
+        if (selectedPeriodObj && !selectedPeriodObj.isActive && selectedPeriodObj.startMonth && selectedPeriodObj.startYear) {
+          startM = selectedPeriodObj.startMonth;
+          startY = parseInt(selectedPeriodObj.startYear, 10);
+        }
+
+        return getMonthsList(startM, '', endM, startY, endY);
       }, [selectedPeriodObj, settings]);
       const academicMonths = useMemo(() => getSemesterMonths(baseAcademicMonths, filterSemester), [baseAcademicMonths, filterSemester]);
       const activeStudents = useMemo(() => students.filter(s => s.statusAktif !== false), [students]);
@@ -8561,18 +12009,24 @@ function ParentDashboardView({
           );
           const paidMonths = studentTrx.map(t => (t.month || '').trim().toLowerCase());
           
+          // Bulan yang masuk perhitungan SPP & tunggakan HANYA yang jatuh pada masa aktif siswa
+          const studentDueMonths = dueAcademicMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+          const studentAcademicMonths = academicMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+
           // Yang menunggak HANYA bulan yang telah jatuh tempo/berjalan s/d saat ini yang belum dibayar
-          const unpaidMonths = dueAcademicMonths.filter(m => {
+          const unpaidMonths = studentDueMonths.filter(m => {
             const mLower = m.trim().toLowerCase();
             return !paidMonths.some(pm => pm === mLower || (pm && mLower.startsWith(pm)));
           });
-          const futureUnpaidMonths = academicMonths.filter(m => 
+          const futureUnpaidMonths = studentAcademicMonths.filter(m => 
             !isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10) && 
             !paidMonths.some(pm => pm === m.trim().toLowerCase() || (pm && m.trim().toLowerCase().startsWith(pm)))
           );
           const tarif = Number(student.tarif) || 0;
-          const totalDebt = unpaidMonths.length * tarif;
-          const isLunas = unpaidMonths.length === 0;
+          const currentClassDebt = unpaidMonths.length * tarif;
+          const previousArrears = Number(student.arrearsAmount) || 0;
+          const totalDebt = currentClassDebt + previousArrears;
+          const isLunas = unpaidMonths.length === 0 && previousArrears === 0;
 
           return {
             student,
@@ -8583,7 +12037,7 @@ function ParentDashboardView({
             isLunas
           };
         });
-      }, [activeStudents, transactions, academicMonths, dueAcademicMonths, periodStartYear]);
+      }, [activeStudents, transactions, academicMonths, dueAcademicMonths, periodStartYear, settings]);
 
       const totalStudents = activeStudents.length;
       const studentsWithDebt = studentDebtList.filter(item => !item.isLunas);
@@ -8618,13 +12072,15 @@ function ParentDashboardView({
 
       const generateWhatsAppMessage = (student, unpaidMonths, totalDebt) => {
         const monthsStr = unpaidMonths.length > 0 ? unpaidMonths.join(', ') : '-';
+        const hasPrevArrears = Number(student.arrearsAmount) > 0;
         
         return `Yth. Bapak/Ibu ${student.wali || 'Wali Murid'} dari ananda *${student.name}* (Kelas: ${student.kelas}, NIS: ${student.nis}),\n\n` +
           `Semoga senantiasa dalam keadaan sehat dan penuh berkah.\n\n` +
           `Kami dari Bagian Tata Usaha (TU) *${settings.schoolName}* bermaksud menginformasikan status pembayaran SPP yang belum terselesaikan s/d bulan berjalan ini:\n\n` +
           `📌 *Rincian Tagihan SPP:*\n` +
           `• Tarif SPP: *${formatRupiah(student.tarif)}/bulan*${student.keringanan_note ? ` (Keringanan: ${student.keringanan_note})` : ''}\n` +
-          `• Bulan Tertunggak (s/d Bulan Berjalan): *${monthsStr}* (${unpaidMonths.length} bulan)\n` +
+          (unpaidMonths.length > 0 ? `• Bulan Tertunggak (s/d Bulan Berjalan): *${monthsStr}* (${unpaidMonths.length} bulan)\n` : '') +
+          (hasPrevArrears ? `• Sisa Tunggakan Kelas Sebelumnya: *${formatRupiah(student.arrearsAmount)}* (${student.arrearsNote || 'Tunggakan Kelas Sebelumnya'})\n` : '') +
           `• Total Tagihan: *${formatRupiah(totalDebt)}*\n\n` +
           `Pembayaran dapat ditransfer ke rekening resmi sekolah atau diserahkan langsung di kantor TU.\n` +
           `Apabila Bapak/Ibu telah melakukan pembayaran sebelumnya, mohon konfirmasikan bukti transfer kepada kami.\n\n` +
@@ -8702,11 +12158,14 @@ function ParentDashboardView({
 
             <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4 relative overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Icon name="dollar-sign" size={24} />
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 font-black text-sm border border-amber-200 shadow-2xs">
+                Rp
               </div>
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase">Total Tunggakan</p>
+                <p className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <span>Total Tunggakan</span>
+                  <span className="text-[9px] text-amber-600 font-extrabold lowercase bg-amber-50 px-1 rounded border border-amber-200">(s/d sekarang)</span>
+                </p>
                 <p className="text-xl font-black text-amber-700 mt-0.5">{formatRupiah(totalNominalTunggakan)}</p>
               </div>
             </div>
@@ -8735,23 +12194,34 @@ function ParentDashboardView({
           </div>
 
           {/* Filter Bar */}
-          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
-            <div className="relative w-full lg:w-72">
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3.5 items-stretch lg:items-center justify-between">
+            <div className="relative w-full sm:w-80 lg:w-80 flex items-center">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Icon name="search" size={16} />
+              </div>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Cari nama siswa, NIS, wali..."
-                className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white shadow-xs transition-all"
               />
-              <Icon name="search" size={14} className="absolute left-3 top-3.5 text-slate-400" />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto text-xs font-bold">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-center gap-2.5 w-full lg:w-auto text-xs font-bold">
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
               >
                 <option value="tunggakan">Hanya Belum Lunas ({studentsWithDebt.length})</option>
                 <option value="semua">Semua Siswa ({totalStudents})</option>
@@ -8760,8 +12230,13 @@ function ParentDashboardView({
 
               <select
                 value={filterPeriod || (activePeriod ? String(activePeriod.id) : 'all')}
-                onChange={e => setFilterPeriod(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onChange={e => {
+                  const newId = e.target.value;
+                  setFilterPeriod(newId);
+                  const matchP = periodsList.find(p => String(p.id) === String(newId));
+                  setFilterSemester(detectSemesterFromPeriod(matchP, defaultSemester));
+                }}
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
               >
                 <option value="all">Semua Periode</option>
                 {periodsList.map(p => (
@@ -8774,7 +12249,7 @@ function ParentDashboardView({
               <select
                 value={filterSemester}
                 onChange={e => setFilterSemester(e.target.value)}
-                className="px-3 py-2 bg-blue-50/70 border border-blue-200 rounded-xl text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-blue-50/80 border border-blue-200 rounded-xl text-blue-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
               >
                 <option value="all">Semua Semester</option>
                 <option value="1">Semester 1 (Ganjil)</option>
@@ -8784,7 +12259,7 @@ function ParentDashboardView({
               <select
                 value={filterKelas}
                 onChange={e => setFilterKelas(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
               >
                 <option value="Semua Kelas">Semua Kelas</option>
                 {availableClasses.map(cls => (
@@ -8795,7 +12270,7 @@ function ParentDashboardView({
               <select
                 value={filterMonth}
                 onChange={e => setFilterMonth(e.target.value)}
-                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs sm:col-span-2 lg:col-span-1"
               >
                 <option value="Semua Bulan">Semua Bulan Periode</option>
                 {academicMonths.map(m => {
@@ -8874,16 +12349,26 @@ function ParentDashboardView({
                         </div>
                       ) : (
                         <div className="space-y-1.5">
-                          <p className="text-[11px] font-black text-rose-600 uppercase tracking-wider flex items-center gap-1">
-                            <Icon name="clock" size={12} /> {unpaidMonths.length} Bulan Menunggak (s/d Bulan Berjalan):
-                          </p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {unpaidMonths.map((m, idx) => (
-                              <span key={idx} className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-extrabold">
-                                {m}
-                              </span>
-                            ))}
-                          </div>
+                          {unpaidMonths.length > 0 && (
+                            <>
+                              <p className="text-[11px] font-black text-rose-600 uppercase tracking-wider flex items-center gap-1">
+                                <Icon name="clock" size={12} /> {unpaidMonths.length} Bulan Menunggak (s/d Bulan Berjalan):
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {unpaidMonths.map((m, idx) => (
+                                  <span key={idx} className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-extrabold">
+                                    {m}
+                                  </span>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                          {Number(student.arrearsAmount) > 0 && (
+                            <div className="mt-1 px-2.5 py-1 bg-amber-50 border border-amber-300 rounded-lg text-[11px] font-extrabold text-amber-900 inline-flex items-center gap-1.5">
+                              <Icon name="alert-triangle" size={12} className="text-amber-600" />
+                              <span>Tunggakan Bawaan Kelas Sebelumnya: {formatRupiah(student.arrearsAmount)}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -9070,6 +12555,12 @@ function ParentDashboardView({
 
       const [currentView, setCurrentView] = useState('dashboard');
       const [isAdminMobileMenuOpen, setIsAdminMobileMenuOpen] = useState(false);
+      const [showAdminMobileBell, setShowAdminMobileBell] = useState(false);
+
+      useEffect(() => {
+        setShowAdminMobileBell(false);
+      }, [currentView]);
+
       const [adminExpandedGroup, setAdminExpandedGroup] = useState(() => {
         if (['transaksi', 'tunggakan', 'laporan'].includes('dashboard')) return 'keuangan';
         if (['siswa', 'catatan'].includes('dashboard')) return 'kesiswaan';
@@ -9094,39 +12585,107 @@ function ParentDashboardView({
       const [transactions, setTransactions] = useState(() => {
         try {
           const c = localStorage.getItem('spp_cached_transactions');
-          return c ? JSON.parse(c) : [];
+          if (!c) return [];
+          return JSON.parse(c).map(t => ({ ...t, date: formatDateIndo(t.date) }));
         } catch(e) { return []; }
       });
       const [announcements, setAnnouncements] = useState(() => {
         try {
           const c = localStorage.getItem('spp_cached_announcements');
-          return c ? JSON.parse(c) : [];
+          if (!c) return [];
+          return JSON.parse(c).map(a => ({ ...a, date: formatDateIndo(a.date) }));
         } catch(e) { return []; }
       });
       const [complaints, setComplaints] = useState(() => {
         try {
           const c = localStorage.getItem('spp_cached_complaints');
-          return c ? JSON.parse(c) : [];
+          if (!c) return [];
+          return JSON.parse(c).map(cp => ({
+            ...cp,
+            date: formatDateIndo(cp.date),
+            messages: Array.isArray(cp.messages)
+              ? cp.messages.map(m => ({ ...m, time: formatDateTimeIndo(m.time, cp.date) }))
+              : []
+          }));
         } catch(e) { return []; }
       });
       const [notes, setNotes] = useState(() => {
         try {
           const c = localStorage.getItem('spp_cached_notes');
-          return c ? JSON.parse(c) : [];
+          if (!c) return [];
+          return JSON.parse(c).map(n => ({
+            ...n,
+            date: formatDateTimeIndo(n.date),
+            comments: Array.isArray(n.comments)
+              ? n.comments.map(cm => ({ ...cm, time: formatDateTimeIndo(cm.time, n.date) }))
+              : []
+          }));
         } catch(e) { return []; }
       });
 
       const [selectedKuitansi, setSelectedKuitansi] = useState(null);
       const [activeMidtransBill, setActiveMidtransBill] = useState(null);
       const [toast, setToast] = useState(null);
+      const [crudPopup, setCrudPopup] = useState(null);
       const [pendingUser, setPendingUser] = useState(null);
       const [isLoadingPortal, setIsLoadingPortal] = useState(false);
 
-      const showToast = (title, message, type = 'success') => {
+      // Notifikasi Admin & Hitungan Unread (Dideklarasikan di level teratas komponen App sesuai Rules of Hooks)
+      const [notesReadSync, setNotesReadSync] = useState(0);
+      useEffect(() => {
+        const handleNoteReadSync = () => setNotesReadSync(s => s + 1);
+        window.addEventListener('spp_note_read_updated', handleNoteReadSync);
+        return () => window.removeEventListener('spp_note_read_updated', handleNoteReadSync);
+      }, []);
+
+      const unreadNotesRepliesList = useMemo(() => {
+        try {
+          const readMap = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+          return (notes || []).map(n => {
+            const readCount = readMap[n.id] || 0;
+            const comments = Array.isArray(n.comments) ? n.comments : [];
+            const unreadCount = Math.max(0, comments.length - readCount);
+            if (unreadCount <= 0) return null;
+            const lastComment = comments[comments.length - 1];
+            return {
+              ...n,
+              unreadCount,
+              lastCommentText: lastComment ? `${lastComment.sender}: "${lastComment.text}"` : 'Balasan baru masuk'
+            };
+          }).filter(Boolean);
+        } catch (e) {
+          return [];
+        }
+      }, [notes, isRefreshing, notesReadSync]);
+
+      const pendingComplaints = useMemo(() => complaints.filter(isComplaintPending), [complaints]);
+      const unreadTransactions = useMemo(() => transactions.filter(t => !t.isRead), [transactions]);
+      const totalAdminUnread = pendingComplaints.length + unreadTransactions.length + unreadNotesRepliesList.length;
+
+      const showToast = (title, message, type = 'success', extra = {}) => {
         setToast({ title, message, type });
+        setCrudPopup({
+          title,
+          message,
+          type,
+          ...extra
+        });
         setTimeout(() => {
           setToast(null);
         }, 4000);
+      };
+
+      const showConfirmPopup = ({ title, message, onConfirm, onCancel, confirmText, cancelText, details }) => {
+        setCrudPopup({
+          title,
+          message,
+          type: 'confirm',
+          onConfirm,
+          onCancel,
+          confirmText,
+          cancelText,
+          details
+        });
       };
 
       const handleForceLogout = useCallback((userName, device = 'Perangkat lain', time = 'Baru saja') => {
@@ -9203,7 +12762,11 @@ function ParentDashboardView({
         if (supabase) {
           try {
             if (userObj.role === 'parent' && userObj.student) {
-              await supabase.from('students').update({ arrears_note: newSessionToken }).eq('id', userObj.student.id);
+              const sessionPayload = { session_token: newSessionToken };
+              if (userObj.student.arrearsNote && String(userObj.student.arrearsNote).startsWith('sess_')) {
+                sessionPayload.arrears_note = '';
+              }
+              await supabase.from('students').update(sessionPayload).eq('id', userObj.student.id);
             }
 
             const userKey = userObj.role === 'parent' ? ('student_' + userObj.student.id) : 'admin_account';
@@ -9251,7 +12814,7 @@ function ParentDashboardView({
               const activeToken = mySessionTokenRef.current;
               if (activeUser && activeUser.role === 'parent' && activeUser.student && activeToken) {
                 const freshSt = mappedStudents.find(s => s.id === activeUser.student.id);
-                if (freshSt && freshSt.arrearsNote && freshSt.arrearsNote !== activeToken) {
+                if (freshSt && freshSt.sessionToken && freshSt.sessionToken !== activeToken) {
                   handleForceLogout(freshSt.name, 'Perangkat lain');
                   return;
                 }
@@ -9421,7 +12984,8 @@ function ParentDashboardView({
       };
 
       const handleAddAnnouncement = async (annData) => {
-        const newAnn = { id: Date.now(), ...annData };
+        const formattedDate = formatDateIndo(annData.date || new Date());
+        const newAnn = { id: Date.now(), ...annData, date: formattedDate };
         setAnnouncements(prev => [newAnn, ...prev]);
         showToast("Berita Ditambahkan", `Berita "${annData.title}" berhasil ditambahkan & disinkronkan.`, "success");
 
@@ -9432,7 +12996,7 @@ function ParentDashboardView({
               title: annData.title,
               content: annData.content,
               image_url: annData.imageUrl || '',
-              date: annData.date || new Date().toLocaleDateString('id-ID')
+              date: formattedDate
             }]);
           } catch (err) {
             console.error("Gagal simpan pengumuman ke Supabase:", err);
@@ -9441,17 +13005,18 @@ function ParentDashboardView({
       };
 
       const handleUpdateAnnouncement = async (id, updatedObj) => {
-        setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...updatedObj } : a));
+        const formattedObj = { ...updatedObj, date: formatDateIndo(updatedObj.date || new Date()) };
+        setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...formattedObj } : a));
         showToast("Berita Diperbarui", `Perubahan berita "${updatedObj.title}" berhasil disimpan.`, "success");
 
         const supabase = getSupabaseClient();
         if (supabase && typeof id !== 'number') {
           try {
             await supabase.from('announcements').update({
-              title: updatedObj.title,
-              content: updatedObj.content,
-              image_url: updatedObj.imageUrl || '',
-              date: updatedObj.date
+              title: formattedObj.title,
+              content: formattedObj.content,
+              image_url: formattedObj.imageUrl || '',
+              date: formattedObj.date
             }).eq('id', id);
           } catch (err) {
             console.error("Gagal update pengumuman ke Supabase:", err);
@@ -9460,33 +13025,43 @@ function ParentDashboardView({
       };
 
       const handleDeleteAnnouncement = async (id) => {
-        if (confirm("Apakah Anda yakin ingin menghapus berita pengumuman ini?")) {
-          const target = announcements.find(a => a.id === id);
-          setAnnouncements(prev => prev.filter(a => a.id !== id));
-          showToast("Berita Dihapus", `Berita "${target ? target.title : ''}" telah berhasil dihapus dari sistem.`, "delete");
+        const target = announcements.find(a => a.id === id);
+        showConfirmPopup({
+          title: "Hapus Berita Pengumuman?",
+          message: `Apakah Anda yakin ingin menghapus pengumuman "${target ? target.title : ''}" dari portal? Data yang dihapus tidak dapat dipulihkan.`,
+          confirmText: "Ya, Hapus",
+          cancelText: "Batal",
+          onConfirm: async () => {
+            setAnnouncements(prev => prev.filter(a => a.id !== id));
+            showToast("Berita Dihapus", `Berita "${target ? target.title : ''}" telah berhasil dihapus dari sistem.`, "delete");
 
-          const supabase = getSupabaseClient();
-          if (supabase && typeof id !== 'number') {
-            try {
-              await supabase.from('announcements').delete().eq('id', id);
-            } catch (err) {
-              console.error("Gagal hapus pengumuman dari Supabase:", err);
+            const supabase = getSupabaseClient();
+            if (supabase && typeof id !== 'number') {
+              try {
+                await supabase.from('announcements').delete().eq('id', id);
+              } catch (err) {
+                console.error("Gagal hapus pengumuman dari Supabase:", err);
+              }
             }
           }
-        }
+        });
       };
 
       const handleAddComplaint = async (compData) => {
         const now = Date.now();
+        const nowObj = new Date(now);
+        const formattedDate = formatDateIndo(compData.date || nowObj);
+        const clockStr = nowObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
         const initialMessages = [{ 
           sender: 'Wali Murid', 
           senderRole: 'parent',
           text: compData.content, 
-          time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) 
+          time: `${formattedDate} • ${clockStr} WIB`
         }];
         const newComp = { 
           id: now, 
           ...compData,
+          date: formattedDate,
           createdAtMs: now,
           expiresAtMs: now + 3600000,
           isRead: false,
@@ -9510,7 +13085,7 @@ function ParentDashboardView({
               messages: JSON.stringify(initialMessages),
               status: 'Belum Ditangani',
               is_read: false,
-              date: compData.date
+              date: formattedDate
             }]).select();
             if (data && data[0]) {
               const mapped = mapComplaintFromDb(data[0]);
@@ -9530,12 +13105,14 @@ function ParentDashboardView({
             const isExpired = Date.now() > (c.expiresAtMs || (c.createdAtMs + 3600000));
             if (isExpired) return c; // Sesi 1 jam telah berakhir
 
+            const nowObj = new Date();
+            const clockStr = nowObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
             const newMsg = {
               sender: senderRole,
               senderRole: isFromAdmin ? 'admin' : 'parent',
               text: replyText,
               imageUrl: imageUrl,
-              time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+              time: `${formatDateIndo(nowObj)} • ${clockStr} WIB`
             };
             const existingMsgs = (c.messages && c.messages.length > 0) 
               ? [...c.messages] 
@@ -9699,8 +13276,11 @@ function ParentDashboardView({
               photo_url: stObj.fotoUrl || '',
               status: stObj.statusAktif ? 'Aktif' : 'Non-Aktif',
               keringanan_note: stObj.keringanan_note || '',
-              arrears_amount: 0,
-              arrears_note: ''
+              arrears_amount: Number(stObj.arrearsAmount) || 0,
+              arrears_note: stObj.arrearsNote || '',
+              start_active_month: stObj.startActiveMonth || '',
+              start_active_year: stObj.startActiveYear ? Number(stObj.startActiveYear) : null,
+              class_history: JSON.stringify(stObj.classHistory || [])
             }]);
           } catch (err) {}
         }
@@ -9715,6 +13295,14 @@ function ParentDashboardView({
 
         setCurrentUser(prev => {
           if (prev && prev.role === 'parent' && prev.student && (prev.student.id === id || prev.student.nis === updatedObj.nis)) {
+            if (updatedObj.statusAktif === false || (updatedObj.status && updatedObj.status.toLowerCase() !== 'aktif')) {
+              try {
+                sessionStorage.removeItem('spp_tab_session');
+                localStorage.removeItem('spp_parent_session');
+              } catch (e) {}
+              alert('Akun siswa telah dinonaktifkan / keluar / lulus oleh Admin (Status: OFF). Sesi akses login telah ditutup.');
+              return null;
+            }
             const updatedUser = {
               ...prev,
               student: { ...prev.student, ...updatedObj }
@@ -9752,10 +13340,30 @@ function ParentDashboardView({
             if ('telepon' in updatedObj) dbUpdateObj.telepon = updatedObj.telepon;
             if ('password' in updatedObj) dbUpdateObj.password = updatedObj.password;
             if ('fotoUrl' in updatedObj) dbUpdateObj.photo_url = updatedObj.fotoUrl;
-            if ('statusAktif' in updatedObj) dbUpdateObj.status = updatedObj.statusAktif ? 'Aktif' : 'Non-Aktif';
+            if ('statusAktif' in updatedObj) {
+              if (updatedObj.statusAktif === false) {
+                dbUpdateObj.status = updatedObj.status || 'Non-Aktif';
+              } else {
+                dbUpdateObj.status = 'Aktif';
+              }
+            } else if ('status' in updatedObj) {
+              dbUpdateObj.status = updatedObj.status;
+            }
             if ('keringanan_note' in updatedObj) dbUpdateObj.keringanan_note = updatedObj.keringanan_note;
-            dbUpdateObj.arrears_amount = 0;
+            if ('arrearsAmount' in updatedObj) dbUpdateObj.arrears_amount = Number(updatedObj.arrearsAmount) || 0;
             if ('arrearsNote' in updatedObj) dbUpdateObj.arrears_note = updatedObj.arrearsNote;
+            if ('startActiveMonth' in updatedObj) dbUpdateObj.start_active_month = updatedObj.startActiveMonth || '';
+            if ('startActiveYear' in updatedObj) dbUpdateObj.start_active_year = updatedObj.startActiveYear ? Number(updatedObj.startActiveYear) : null;
+            if ('classHistory' in updatedObj) dbUpdateObj.class_history = JSON.stringify(updatedObj.classHistory);
+            if (updatedObj.completedLevels) {
+              try {
+                localStorage.setItem('spp_completed_levels_' + id, JSON.stringify(updatedObj.completedLevels));
+                if (updatedObj.nis) localStorage.setItem('spp_completed_levels_' + updatedObj.nis, JSON.stringify(updatedObj.completedLevels));
+              } catch (e) {}
+            }
+            if (updatedObj.statusAktif === false || (updatedObj.status && updatedObj.status.toLowerCase() !== 'aktif')) {
+              dbUpdateObj.session_token = null;
+            }
             
             if (typeof id === 'string' && id.includes('-')) {
               await supabase.from('students').update(dbUpdateObj).eq('id', id);
@@ -9771,29 +13379,51 @@ function ParentDashboardView({
       };
 
       const handleDeleteStudent = async (id) => {
-        if (confirm("Apakah Anda yakin ingin menghapus data siswa ini?")) {
-          const target = students.find(s => s.id === id);
-          setStudents(prev => {
-            const next = prev.filter(s => s.id !== id);
-            try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
-            return next;
-          });
-          showToast("Data Murid Dihapus", `Data murid ${target ? target.name : ''} telah berhasil dihapus.`, "delete");
+        const target = students.find(s => s.id === id);
+        showConfirmPopup({
+          title: "Hapus Data Murid?",
+          message: `Apakah Anda yakin ingin menghapus data murid "${target ? target.name : ''}" (NIS: ${target?.nis || '-'})? Semua histori transaksi dan data kesiswaan akan ikut terhapus.`,
+          confirmText: "Ya, Hapus Data",
+          cancelText: "Batal",
+          details: target ? {
+            'Nama Siswa': target.name,
+            'NIS / NISN': `${target.nis || '-'} / ${target.nisn || '-'}`,
+            'Kelas / Jenjang': target.kelas || '-'
+          } : null,
+          onConfirm: async () => {
+            setStudents(prev => {
+              const next = prev.filter(s => s.id !== id);
+              try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
+              return next;
+            });
+            showToast("Data Murid Dihapus", `Data murid ${target ? target.name : ''} telah berhasil dihapus.`, "delete");
 
-          const supabase = getSupabaseClient();
-          if (supabase && typeof id !== 'number') {
-            try {
-              await supabase.from('students').delete().eq('id', id);
-            } catch (err) {}
+            const supabase = getSupabaseClient();
+            if (supabase && typeof id !== 'number') {
+              try {
+                await supabase.from('students').delete().eq('id', id);
+              } catch (err) {}
+            }
           }
-        }
+        });
       };
 
       const handleAddTransaction = async (trxObj) => {
         const newTrx = { id: Date.now(), ...trxObj };
         setTransactions(prev => [newTrx, ...prev]);
         setSelectedKuitansi(newTrx);
-        showToast("Pembayaran Berhasil", `Pembayaran SPP ${trxObj.month} a.n ${trxObj.studentName} tercatat!`, "success");
+        showToast("Pembayaran Berhasil", `Pembayaran SPP ${trxObj.month} a.n ${trxObj.studentName} tercatat!`, "success", {
+          details: {
+            'Nama Siswa': trxObj.studentName,
+            'Bulan SPP': trxObj.month,
+            'Nominal': formatRupiah(trxObj.amount),
+            'Metode': trxObj.method || 'Tunai / Manual',
+            'No. Kuitansi': trxObj.kuitansiNo
+          },
+          extraActionText: 'Cetak Kuitansi',
+          extraActionIcon: 'printer',
+          onExtraAction: () => setSelectedKuitansi(newTrx)
+        });
 
         const supabase = getSupabaseClient();
         if (supabase) {
@@ -9848,8 +13478,8 @@ function ParentDashboardView({
       }
 
       const RefreshLoadingOverlay = () => (
-        <div className="fixed inset-0 z-[99999] bg-slate-950/60 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200 select-none">
-          <div className="loading-glass-card rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-white/20 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in-95 duration-200 text-white">
+        <div className="fixed inset-0 z-[99999] bg-slate-950/70 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200 select-none overflow-hidden">
+          <div className="loading-glass-card rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-white/20 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in-95 duration-200 text-white z-10">
             {/* Ambient Decorative Blurs */}
             <div className="absolute -top-10 -left-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-2xl pointer-events-none"></div>
             <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-blue-600/25 rounded-full blur-2xl pointer-events-none"></div>
@@ -9875,6 +13505,20 @@ function ParentDashboardView({
         const liveStudent = students.find(s => 
           currentUser.student && (s.id === currentUser.student.id || s.nis === currentUser.student.nis)
         ) || currentUser.student;
+
+        // CEK STATUS AKTIF SISWA (ON / OFF): Jika dinonaktifkan (OFF), keluar, atau lulus -> otomatis keluarkan sesi login
+        const isStudentStillActive = liveStudent && liveStudent.statusAktif !== false && (!liveStudent.status || liveStudent.status.toLowerCase() === 'aktif');
+        if (!isStudentStillActive) {
+          try {
+            sessionStorage.removeItem('spp_tab_session');
+            localStorage.removeItem('spp_parent_session');
+          } catch (e) {}
+          setTimeout(() => {
+            setCurrentUser(null);
+            alert('Akun siswa ini berstatus Non-Aktif / Keluar / Lulus (Status: OFF). Akses portal wali murid telah ditutup oleh pihak sekolah.');
+          }, 50);
+          return null;
+        }
 
         return (
           <>
@@ -9923,10 +13567,17 @@ function ParentDashboardView({
                     method: method,
                     status: 'Lunas',
                     isRead: false,
-                    date: new Date().toLocaleDateString('id-ID'),
+                    date: formatDateIndo(new Date()),
                     kuitansiNo: `K-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}-${Math.floor(100+Math.random()*900)}`
                   };
                   handleAddTransaction(newTrx);
+                  if (bill.isArrearsPayment) {
+                    handleUpdateStudent(currentUser.student.id, {
+                      ...currentUser.student,
+                      arrearsAmount: 0,
+                      arrearsNote: `Lunas via Midtrans Online (${newTrx.date})`
+                    });
+                  }
                   setSelectedKuitansi(newTrx);
                   setActiveMidtransBill(null);
                 }}
@@ -9934,15 +13585,142 @@ function ParentDashboardView({
             )}
 
             <ToastNotification toast={toast} onClose={() => setToast(null)} />
+            <CrudPopupModal popup={crudPopup} onClose={() => setCrudPopup(null)} />
           </>
         );
       }
 
       return (
         <>
-          <div className="min-h-screen bg-slate-100 flex flex-col w-full text-slate-800">
-            {/* TOP MOBILE APP BAR with 3-Line Hamburger Menu for Admin (Midnight Obsidian Sapphire Luxury Theme) */}
-            <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#0a1838]/95 via-[#0d2250]/95 to-[#07132e]/95 backdrop-blur-xl px-4.5 py-3.5 border-b border-white/10 shadow-xl flex items-center justify-between min-h-[66px] text-white">
+          <div className="min-h-screen bg-aesthetic-pattern flex flex-col w-full text-slate-800 relative">
+            {/* Ambient Smurf Glowing Orbs */}
+            <div className="smurf-ambient-orb smurf-orb-1"></div>
+            <div className="smurf-ambient-orb smurf-orb-2"></div>
+            <div className="smurf-ambient-orb smurf-orb-3"></div>
+
+            {/* ROOT-LEVEL ADMIN NOTIFICATION MODAL (FLOATING DROPDOWN DARI ATAS) */}
+            {showAdminMobileBell && (
+              <div className="fixed inset-0 z-[9999] pointer-events-auto">
+                <div 
+                  className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[9999]" 
+                  onClick={() => setShowAdminMobileBell(false)} 
+                />
+                <div className="fixed inset-x-3 sm:inset-x-auto sm:right-8 top-[72px] sm:top-20 z-[10000] w-auto max-w-sm sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 max-h-[82vh] overflow-y-auto">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Icon name="bell" size={14} />
+                      </div>
+                      <h4 className="font-extrabold text-xs uppercase text-slate-800 tracking-wide">Notifikasi Admin TU</h4>
+                      {totalAdminUnread > 0 && (
+                        <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
+                          {totalAdminUnread} Baru
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {totalAdminUnread > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            complaints.forEach(c => handleMarkReadNotification('complaint', c.id));
+                            transactions.forEach(t => handleMarkReadNotification('transaction', t.id));
+                          }}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          Tandai Dibaca
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminMobileBell(false)}
+                        className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-xs font-bold transition-colors"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 text-xs max-h-80 overflow-y-auto pr-0.5">
+                    {totalAdminUnread === 0 ? (
+                      <div className="text-center py-6 text-slate-400 font-medium">
+                        <Icon name="bell-off" size={26} className="mx-auto mb-1.5 text-slate-300" />
+                        Semua pengaduan dan transaksi telah ditinjau.
+                      </div>
+                    ) : (
+                      <>
+                        {pendingComplaints.map(c => (
+                          <div 
+                            key={'pending_' + c.id}
+                            onClick={() => {
+                              handleMarkReadNotification('complaint', c.id);
+                              setShowAdminMobileBell(false);
+                              setCurrentView('pengaduan');
+                            }}
+                            className="p-3 rounded-2xl border border-amber-300 bg-amber-50/90 cursor-pointer hover:scale-[0.99] transition-all text-amber-950 font-bold shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-black truncate flex items-center gap-1.5 text-amber-900">
+                                <Icon name="message-circle" size={13} className="text-amber-600 shrink-0" />
+                                Aduan: {c.studentName || 'Wali Murid'}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500 text-white shrink-0">Menunggu</span>
+                            </div>
+                            <p className="text-[11px] text-amber-800 line-clamp-1 font-medium">{c.title || c.description || 'Pengaduan baru dari wali murid'}</p>
+                            {c.date && <span className="text-[9.5px] text-amber-700/80 font-semibold mt-1 block">{formatDateIndo(c.date)}</span>}
+                          </div>
+                        ))}
+                        {unreadTransactions.map(t => (
+                          <div 
+                            key={'trx_' + t.id}
+                            onClick={() => {
+                              handleMarkReadNotification('transaction', t.id);
+                              setShowAdminMobileBell(false);
+                              setCurrentView('transaksi');
+                            }}
+                            className="p-3 rounded-2xl border border-blue-200 bg-blue-50/90 cursor-pointer hover:scale-[0.99] transition-all text-blue-950 font-bold shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-black truncate flex items-center gap-1.5 text-blue-900">
+                                <Icon name="credit-card" size={13} className="text-blue-600 shrink-0" />
+                                {t.studentName} ({t.month || 'SPP'})
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-600 text-white shrink-0">{t.status || 'Lunas'}</span>
+                            </div>
+                            <p className="text-[11px] text-blue-800 font-semibold">{formatRupiah(t.amount)} • {formatDateIndo(t.date)}</p>
+                          </div>
+                        ))}
+                        {unreadNotesRepliesList.map(n => (
+                          <div 
+                            key={'note_reply_' + n.id}
+                            onClick={() => {
+                              setShowAdminMobileBell(false);
+                              setCurrentView('catatan');
+                            }}
+                            className="p-3 rounded-2xl border border-teal-200 bg-teal-50/90 cursor-pointer hover:scale-[0.99] transition-all text-teal-950 font-bold shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-black truncate flex items-center gap-1.5 text-teal-900">
+                                <Icon name="message-circle" size={13} className="text-teal-600 shrink-0" />
+                                Catatan: {n.studentName}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-500 text-white shrink-0 animate-pulse">
+                                {n.unreadCount} Balasan Baru
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-teal-800 line-clamp-1 font-medium">{n.lastCommentText}</p>
+                            {n.date && <span className="text-[9.5px] text-teal-700/80 font-semibold mt-1 block">{formatDateTimeIndo(n.date)}</span>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TOP MOBILE APP BAR with Refresh, Bell, and 3-Line Hamburger Menu for Admin */}
+            <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#072a6b]/95 via-[#0d3b8f]/95 to-[#1554c2]/95 backdrop-blur-xl px-4 sm:px-6 py-3.5 border-b border-cyan-400/30 shadow-xl shadow-blue-950/20 flex items-center justify-between min-h-[66px] text-white">
               <div className="flex items-center gap-3.5 min-w-0">
                 <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400 via-indigo-600 to-blue-700 p-0.5 shadow-lg shadow-blue-950/50 overflow-hidden shrink-0 flex items-center justify-center ring-2 ring-cyan-400/30">
                   <img src="logo.png" alt="PAUD Setia Bhakti" className="w-8 h-8 object-contain filter drop-shadow" />
@@ -9956,23 +13734,55 @@ function ParentDashboardView({
                 </div>
               </div>
 
-              {/* Rounded Dark Frosted 3-Line Hamburger Button */}
-              <button
-                type="button"
-                onClick={() => setIsAdminMobileMenuOpen(!isAdminMobileMenuOpen)}
-                className="relative w-12 h-12 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex flex-col items-center justify-center gap-[5px] p-3 transition-all shadow-lg border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
-                aria-label="Buka Menu Admin"
-              >
-                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 rotate-45 translate-y-[7.5px]' : 'w-5'}`}></span>
-                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'opacity-0 w-0' : 'w-4 self-start ml-0.5'}`}></span>
-                <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 -rotate-45 -translate-y-[7.5px]' : 'w-5'}`}></span>
+              {/* Action Buttons: [Refresh] [Lonceng] [Garis 3] */}
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* Refresh / Sinkronisasi Button on Mobile */}
+                <button
+                  type="button"
+                  onClick={() => fetchData(true)}
+                  disabled={isRefreshing}
+                  className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                  aria-label="Sinkronisasi Data"
+                  title="Sinkronisasi Data"
+                >
+                  <Icon name="refresh-cw" size={18} className={isRefreshing ? 'animate-spin text-cyan-300' : 'text-white'} />
+                </button>
 
-                {transactions.filter(t => !t.isRead).length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 rounded-full ring-2 ring-white animate-pulse flex items-center justify-center text-[10px] font-black text-white shadow-md">
-                    !
-                  </span>
-                )}
-              </button>
+                {/* Notification Bell Button on Mobile */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdminMobileBell(!showAdminMobileBell);
+                    setIsAdminMobileMenuOpen(false);
+                  }}
+                  className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                  aria-label="Lihat Notifikasi Admin"
+                  title="Notifikasi"
+                >
+                  <Icon name="bell" size={19} />
+                  {totalAdminUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center animate-pulse ring-2 ring-white shadow-md">
+                      {totalAdminUnread > 9 ? '9+' : totalAdminUnread}
+                    </span>
+                  )}
+                </button>
+
+                {/* Rounded Dark Frosted 3-Line Hamburger Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdminMobileMenuOpen(!isAdminMobileMenuOpen);
+                    setShowAdminMobileBell(false);
+                  }}
+                  className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex flex-col items-center justify-center gap-[4.5px] p-2.5 transition-all shadow-lg border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                  aria-label="Buka Menu Admin"
+                  title="Menu Navigasi"
+                >
+                  <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 rotate-45 translate-y-[7px]' : 'w-5'}`}></span>
+                  <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'opacity-0 w-0' : 'w-4 self-start ml-0.5'}`}></span>
+                  <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 -rotate-45 -translate-y-[7px]' : 'w-5'}`}></span>
+                </button>
+              </div>
             </div>
 
             {/* MOBILE SLIDE-OUT NAVIGATION DRAWER - Admin */}
@@ -9983,7 +13793,7 @@ function ParentDashboardView({
                   onClick={() => setIsAdminMobileMenuOpen(false)}
                 ></div>
 
-                <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] bg-gradient-to-b from-[#0a1838] via-[#091735] to-[#040b1a] text-white flex flex-col justify-between shadow-2xl z-10 border-l border-white/15 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
+                <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] smurf-mobile-drawer text-white flex flex-col justify-between shadow-2xl z-10 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
                   {/* Luminous Glow Orbs in Drawer */}
                   <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/15 blur-3xl pointer-events-none"></div>
                   <div className="absolute bottom-20 -left-10 w-40 h-40 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none"></div>
@@ -10054,7 +13864,8 @@ function ParentDashboardView({
                           icon: 'message-square', 
                           defaultView: 'pengumuman', 
                           views: ['pengumuman', 'pengaduan'], 
-                          badge: null,
+                          badge: (complaints.filter(isComplaintPending).length) || null,
+                          badgeType: 'danger',
                           subItems: [
                             { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper' },
                             { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: (complaints.filter(isComplaintPending).length) || null, badgeType: 'danger' }
@@ -10087,8 +13898,8 @@ function ParentDashboardView({
                               }}
                               className={`w-full min-h-[44px] py-2.5 px-3.5 rounded-xl flex items-center justify-between text-xs sm:text-sm font-extrabold transition-all duration-200 active:scale-[0.99] ${
                                 isGroupActive
-                                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/25 border border-white/10'
-                                  : 'text-slate-300 hover:text-white hover:bg-white/5'
+                                  ? 'smurf-nav-active'
+                                  : 'smurf-nav-item'
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0 flex-1 truncate">
@@ -10096,6 +13907,17 @@ function ParentDashboardView({
                                 <span className="truncate capitalize">{group.label}</span>
                               </div>
                               <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {group.badge !== undefined && group.badge !== null && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                    group.badge === 0 
+                                      ? 'badge-zero-muted'
+                                      : group.badgeType === 'danger'
+                                        ? 'badge-danger-active animate-pulse ring-1 ring-rose-300'
+                                        : 'badge-cyan-active'
+                                  }`}>
+                                    {group.badge}
+                                  </span>
+                                )}
                                 {group.subItems && (
                                   <Icon name="chevron-down" size={16} className={`transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
                                 )}
@@ -10138,8 +13960,13 @@ function ParentDashboardView({
                     </div>
                   </div>
 
+                  {/* Ornamental Corak Pattern at Bottom of Admin Mobile Drawer */}
+                  <div className="mt-auto relative z-10">
+                    <SidebarBottomOrnament roleLabel="Panel Admin TU" />
+                  </div>
+
                   {/* Sticky Drawer Footer Actions */}
-                  <div className="sticky bottom-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 p-4 space-y-2 mt-auto">
+                  <div className="sticky bottom-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 p-4 space-y-2 relative z-10">
                     <button
                       type="button"
                       onClick={() => {
@@ -10213,10 +14040,11 @@ function ParentDashboardView({
                         icon: 'users', 
                         defaultView: 'siswa', 
                         views: ['siswa', 'catatan'], 
-                        badge: null,
+                        badge: (unreadNotesRepliesList.length > 0 ? unreadNotesRepliesList.length : null),
+                        badgeType: 'danger',
                         subItems: [
                           { id: 'siswa', label: 'Data Murid', icon: 'user-check' },
-                          { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text' }
+                          { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text', badge: (unreadNotesRepliesList.length > 0 ? unreadNotesRepliesList.length : null), badgeType: 'danger' }
                         ]
                       },
                       { 
@@ -10225,7 +14053,8 @@ function ParentDashboardView({
                         icon: 'message-square', 
                         defaultView: 'pengumuman', 
                         views: ['pengumuman', 'pengaduan'], 
-                        badge: null,
+                        badge: (complaints.filter(c => isComplaintPending(c)).length) || null,
+                        badgeType: 'danger',
                         subItems: [
                           { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper' },
                           { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: (complaints.filter(c => isComplaintPending(c)).length) || null, badgeType: 'danger' }
@@ -10254,10 +14083,10 @@ function ParentDashboardView({
                                 setCurrentView(group.defaultView);
                               }
                             }}
-                            className={`w-full py-3 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap rounded-2xl ${
+                            className={`w-full py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap rounded-2xl ${
                               isGroupActive
-                                ? 'bg-white text-blue-700 font-black shadow-lg shadow-blue-950/20 scale-[1.01]'
-                                : 'text-white/85 hover:text-white hover:bg-white/10 font-bold'
+                                ? 'smurf-nav-active'
+                                : 'smurf-nav-item'
                             }`}
                           >
                             <div className="flex items-center gap-3 truncate">
@@ -10302,8 +14131,8 @@ function ParentDashboardView({
                                   }}
                                   className={`w-full px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
                                     currentView === sub.id
-                                      ? 'bg-white/20 text-white font-black border border-white/25 shadow-sm'
-                                      : 'text-white/75 hover:text-white hover:bg-white/10'
+                                      ? 'bg-white text-sky-800 font-black shadow-md border border-cyan-300'
+                                      : 'text-white/80 hover:text-white hover:bg-white/15'
                                   }`}
                                 >
                                   <div className="flex items-center gap-2 truncate">
@@ -10335,40 +14164,44 @@ function ParentDashboardView({
                   </nav>
                 </div>
 
-                {/* Sidebar Footer: Admin Profile Chip with Logout Button */}
-                <div className="p-3 sm:p-3.5 m-3 sm:m-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white hidden md:block relative z-10 shadow-lg shadow-blue-950/20">
-                  <div className="flex items-center justify-between gap-2.5">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative shrink-0">
-                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white border border-white/25">
-                          {settings.adminName ? settings.adminName.charAt(0) : 'A'}
+                {/* Bottom Admin Sidebar Section: Decorative Corak Ornament + Admin Profile Chip */}
+                <div className="mt-auto relative z-10 hidden md:block">
+                  <SidebarBottomOrnament roleLabel="Panel Admin TU" />
+                  <div className="p-3 sm:p-3.5 m-3 sm:m-4 mt-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white relative z-10 shadow-lg shadow-blue-950/20">
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white border border-white/25">
+                            {settings.adminName ? settings.adminName.charAt(0) : 'A'}
+                          </div>
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse"></span>
                         </div>
-                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse"></span>
+                        <div className="truncate flex-1">
+                          <p className="text-sm font-black text-white truncate">{settings.adminName || 'Admin TU'}</p>
+                          <p className="text-xs text-blue-100/80 font-semibold truncate">Tahun Ajaran {settings.academicYear || 'Aktif'}</p>
+                        </div>
                       </div>
-                      <div className="truncate flex-1">
-                        <p className="text-sm font-black text-white truncate">{settings.adminName || 'Admin TU'}</p>
-                        <p className="text-xs text-blue-100/80 font-semibold truncate">Tahun Ajaran {settings.academicYear || 'Aktif'}</p>
-                      </div>
+                      <button
+                        onClick={handleUserLogout}
+                        title="Keluar Akun Admin"
+                        className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/90 hover:text-white transition-all shadow-sm shrink-0"
+                      >
+                        <Icon name="log-out" size={16} />
+                      </button>
                     </div>
-                    <button
-                      onClick={handleUserLogout}
-                      title="Keluar Akun Admin"
-                      className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/90 hover:text-white transition-all shadow-sm shrink-0"
-                    >
-                      <Icon name="log-out" size={16} />
-                    </button>
                   </div>
                 </div>
               </aside>
 
             {/* MAIN AESTHETIC CONTENT CARD */}
             <main className="flex-1 bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
+              <PanelAestheticBg />
               {/* Header Top Bar */}
-              <header className="px-6 md:px-10 pt-7 pb-5 border-b border-slate-200/80 flex flex-col gap-4 bg-white/90 backdrop-blur-md sticky top-0 z-10">
+              <header className="px-4 sm:px-6 md:px-10 pt-7 sm:pt-8 pb-4 sm:pb-5 border-b border-slate-200/80 flex flex-col gap-3.5 sm:gap-4 bg-white/95 backdrop-blur-md relative z-20 md:sticky md:top-0 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-3">
-                      <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                      <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-snug">
                         {currentView === 'dashboard' && 'Dashboard Utama'}
                         {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && 'Keuangan & Tagihan SPP'}
                         {['siswa', 'catatan'].includes(currentView) && 'Data Kesiswaan'}
@@ -10387,7 +14220,7 @@ function ParentDashboardView({
                         {currentView === 'pengaturan' && 'Konfigurasi'}
                       </span>
                     </div>
-                    <p className="text-sm sm:text-base text-slate-500 font-medium mt-1">
+                    <p className="text-xs sm:text-sm md:text-base text-slate-500 font-medium mt-1">
                       {currentView === 'dashboard' && 'Ringkasan operasional dan grafik penerimaan SPP'}
                       {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && 'Kelola pencatatan bayar manual, pantau tunggakan & cetak laporan'}
                       {['siswa', 'catatan'].includes(currentView) && 'Kelola database murid aktif, kelas dan catatan konseling'}
@@ -10396,8 +14229,28 @@ function ParentDashboardView({
                     </p>
                   </div>
 
-                  {/* Header Actions */}
-                  <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+                  {/* Header Actions - Tampil hanya di desktop, di mobile sudah ada di top bar & drawer */}
+                  <div className="hidden md:flex items-center gap-2.5 sm:gap-3 shrink-0">
+                    {/* Desktop Notification Bell (Samakan fitur dengan mobile header) */}
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminMobileBell(prev => !prev)}
+                      title="Notifikasi Masuk (Pengaduan, Transaksi & Balasan Catatan Siswa)"
+                      className={`relative px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm cursor-pointer ${
+                        totalAdminUnread > 0
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <Icon name="bell" size={17} className={totalAdminUnread > 0 ? 'text-rose-600' : 'text-slate-600'} />
+                      <span className="hidden sm:inline">Notifikasi</span>
+                      {totalAdminUnread > 0 && (
+                        <span className="px-1.5 py-0.2 min-w-[18px] text-center bg-rose-500 text-white rounded-full text-[10px] font-black animate-pulse shadow-xs">
+                          {totalAdminUnread > 99 ? '99+' : totalAdminUnread}
+                        </span>
+                      )}
+                    </button>
+
                     <button
                       onClick={() => fetchData(true)}
                       title="Sinkronisasi Data"
@@ -10421,7 +14274,7 @@ function ParentDashboardView({
 
               {/* Mobile Sub-Navigation Pills for Admin Multi-View Sections */}
               {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && (
-                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0">
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
                   <button
                     onClick={() => setCurrentView('transaksi')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
@@ -10453,7 +14306,7 @@ function ParentDashboardView({
               )}
 
               {['siswa', 'catatan'].includes(currentView) && (
-                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0">
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
                   <button
                     onClick={() => setCurrentView('siswa')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
@@ -10476,7 +14329,7 @@ function ParentDashboardView({
               )}
 
               {['pengumuman', 'pengaduan'].includes(currentView) && (
-                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0">
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
                   <button
                     onClick={() => setCurrentView('pengumuman')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
@@ -10503,7 +14356,7 @@ function ParentDashboardView({
                 </div>
               )}
 
-              <div key={currentView} className="p-6 md:p-10 space-y-8 flex-1 animate-tab-switch">
+              <div key={currentView} className="px-3.5 py-4 sm:px-6 md:p-10 space-y-6 sm:space-y-8 flex-1 animate-tab-switch relative z-10">
             {currentView === 'dashboard' && (
               <DashboardView
                 students={students}
@@ -10524,9 +14377,11 @@ function ParentDashboardView({
               <SiswaListView
                 students={students}
                 settings={settings}
+                transactions={transactions}
                 onAddStudent={handleAddStudent}
                 onUpdateStudent={handleUpdateStudent}
                 onDeleteStudent={handleDeleteStudent}
+                showToast={showToast}
               />
             )}
 
@@ -10537,6 +14392,7 @@ function ParentDashboardView({
                 settings={settings}
                 onAddTransaction={handleAddTransaction}
                 onShowKuitansi={(trx) => setSelectedKuitansi(trx)}
+                onUpdateStudent={handleUpdateStudent}
               />
             )}
 
@@ -10580,13 +14436,21 @@ function ParentDashboardView({
                 students={students}
                 notes={notes}
                 onAddNote={handleAddNote}
-                onDeleteNote={async (id) => {
-                  const supabase = getSupabaseClient();
-                  if (supabase && typeof id !== 'number') {
-                    await supabase.from('student_notes').delete().eq('id', id);
-                  }
-                  setNotes(prev => prev.filter(n => n.id !== id));
-                  showToast('Catatan berhasil dihapus', 'success');
+                onDeleteNote={(id) => {
+                  showConfirmPopup({
+                    title: "Hapus Catatan Kesiswaan?",
+                    message: "Apakah Anda yakin ingin menghapus catatan bimbingan/evaluasi murid ini? Data yang dihapus tidak dapat dipulihkan.",
+                    confirmText: "Ya, Hapus",
+                    cancelText: "Batal",
+                    onConfirm: async () => {
+                      const supabase = getSupabaseClient();
+                      if (supabase && typeof id !== 'number') {
+                        await supabase.from('student_notes').delete().eq('id', id);
+                      }
+                      setNotes(prev => prev.filter(n => n.id !== id));
+                      showToast('Catatan berhasil dihapus', 'delete');
+                    }
+                  });
                 }}
               />
             )}
@@ -10614,6 +14478,7 @@ function ParentDashboardView({
         )}
 
         <ToastNotification toast={toast} onClose={() => setToast(null)} />
+        <CrudPopupModal popup={crudPopup} onClose={() => setCrudPopup(null)} />
       </>
     );
     }

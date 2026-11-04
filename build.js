@@ -1,18 +1,22 @@
 const babel = require('@babel/core');
 const fs = require('fs');
 
+console.log('Compiling full_app_source.jsx to app.js (Preserving structure and formatting)...');
 const source = fs.readFileSync('full_app_source.jsx', 'utf8');
 
 const result = babel.transformSync(source, {
   presets: [
     ['@babel/preset-react', { runtime: 'classic' }]
-  ]
+  ],
+  compact: false,
+  retainLines: true,
+  comments: true
 });
 
 fs.writeFileSync('app.js', result.code, 'utf8');
-console.log('SUCCESS: app.js generated with classic React.createElement runtime. Size:', result.code.length);
+console.log('SUCCESS: app.js generated with clean structured layout. Lines:', result.code.split('\n').length);
 
-// Generate secure class-based env.js (Strictly sanitized, no comments, no secrets, no server keys)
+// Generate secure class-based env.js (Strictly sanitized, no hardcoded admin credentials or school data)
 let envData = {};
 let secretVault = {};
 try {
@@ -28,20 +32,17 @@ try {
     const key = line.slice(0, eqIdx).trim();
     const val = line.slice(eqIdx + 1).trim();
 
-    // 2. Abaikan server secrets, server port, dan variabel server yang tidak boleh ada di client
+    // 2. Abaikan server secrets, server port, dan variabel server internal
     if (/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|^PORT$)/i.test(key)) return;
 
-    // 3. Supabase Key & Default Admin Pass dienkapsulasi ke vault Base64 (tidak tampil di _rawValues)
+    // 3. Supabase Key dienkapsulasi ke vault Base64 (tidak tampil polos di _rawValues)
     if (/SUPABASE_KEY|SUPABASE_ANON_KEY/i.test(key)) {
       secretVault.k = Buffer.from(val).toString('base64');
       return;
     }
-    if (/DEFAULT_ADMIN_PASS|ADMIN_PASSWORD/i.test(key)) {
-      secretVault.p = Buffer.from(val).toString('base64');
-      return;
-    }
 
-    if (key) {
+    // 4. Hanya simpan konfigurasi koneksi publik yang valid (SUPABASE_URL, MIDTRANS_CLIENT_KEY)
+    if (/^(SUPABASE_URL|MIDTRANS_CLIENT_KEY)$/i.test(key)) {
       envData[key] = val;
     }
   });
@@ -52,6 +53,7 @@ const envClassCode = `/**
  * Dedicated Environment Configuration Class (Security Encapsulated)
  * Melindungi kredensial klien, menyembunyikan kunci rahasia server,
  * dan mencegah manipulasi objek runtime (Object.freeze & Tamper-Proof).
+ * Seluruh data identitas sekolah, periode, dan admin dimuat dari Supabase.
  * ====================================================================
  */
 class EnvironmentConfig {
@@ -68,8 +70,8 @@ class EnvironmentConfig {
     for (const [key, val] of Object.entries(rawConfig)) {
       if (!key || typeof key !== 'string') continue;
       const cleanKey = key.trim();
-      // KEAMANAN: Filter otomatis kunci rahasia server dan baris komentar
-      if (!/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|^#|^PORT$)/i.test(cleanKey)) {
+      // KEAMANAN: Hanya konfigurasi publik yang diizinkan
+      if (/^(SUPABASE_URL|MIDTRANS_CLIENT_KEY|SCHOOL_NAME)$/i.test(cleanKey)) {
         sanitized[cleanKey] = String(val || '').trim();
       }
     }
@@ -118,33 +120,8 @@ class EnvironmentConfig {
     return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI');
   }
 
-  get schoolAddress() {
-    return this.get('SCHOOL_ADDRESS', 'Bekasi, Jawa Barat');
-  }
-
-  get schoolPhone() {
-    return this.get('SCHOOL_PHONE', '081234567890');
-  }
-
-  get academicYear() {
-    return this.get('ACADEMIC_YEAR', '2025/2026');
-  }
-
-  get adminName() {
-    return this.get('DEFAULT_ADMIN_NAME', 'Siti Rahma (Admin TU)');
-  }
-
-  get adminUsername() {
-    return this.get('DEFAULT_ADMIN_USER', 'admin');
-  }
-
-  get adminPassword() {
-    const fromVault = this.#decode(this.#vault.p);
-    return fromVault || this.get('DEFAULT_ADMIN_PASS', 'admin123');
-  }
-
   toObject() {
-    // Hanya konfigurasi publik yang aman, Supabase Key dan Password tidak dibocorkan ke window.ENV
+    // Hanya konfigurasi koneksi publik yang aman
     return { ...this.#config };
   }
 }
@@ -187,5 +164,5 @@ class EnvironmentConfig {
 `;
 
 fs.writeFileSync('env.js', envClassCode, 'utf8');
-console.log('SUCCESS: env.js generated with dedicated EnvironmentConfig security class.');
+console.log('SUCCESS: env.js generated with zero hardcoded credentials.');
 

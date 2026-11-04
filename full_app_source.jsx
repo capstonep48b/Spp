@@ -467,33 +467,25 @@
         }
       }
 
-      const defaultSchool = window.AppEnv?.schoolName || window.ENV?.SCHOOL_NAME || 'PAUD SETIA BHAKTI';
-      const defaultAddr = window.AppEnv?.schoolAddress || window.ENV?.SCHOOL_ADDRESS || 'Bekasi, Jawa Barat';
-      const defaultPhone = window.AppEnv?.schoolPhone || window.ENV?.SCHOOL_PHONE || '081234567890';
-      const defaultYear = window.AppEnv?.academicYear || window.ENV?.ACADEMIC_YEAR || '2025/2026';
-      const defaultAdmin = window.AppEnv?.adminName || window.ENV?.DEFAULT_ADMIN_NAME || 'Siti Rahma (Admin TU)';
-      const defaultAdminUser = window.AppEnv?.adminUsername || window.ENV?.DEFAULT_ADMIN_USER || 'admin';
-      const defaultMidtransClient = window.AppEnv?.midtransClientKey || window.ENV?.MIDTRANS_CLIENT_KEY || '';
-
-      const currentSchoolName = row.school_name || localExt.schoolName || defaultSchool;
+      const currentSchoolName = row.school_name || localExt.schoolName || 'PAUD SETIA BHAKTI';
 
       return {
         id: row.id,
         schoolName: currentSchoolName,
-        address: row.address || localExt.address || defaultAddr,
-        phone: row.phone || localExt.phone || defaultPhone,
-        academicYear: row.academic_year || localExt.academicYear || defaultYear,
-        activePeriodName: row.active_period_name || localExt.activePeriodName || `Periode ${row.academic_year || defaultYear}`,
-        adminName: row.admin_name || localExt.adminName || defaultAdmin,
-        adminUsername: row.admin_username || localExt.adminUsername || defaultAdminUser,
-        adminPassword: row.admin_password || localExt.adminPassword || window.AppEnv?.adminPassword || window.ENV?.DEFAULT_ADMIN_PASS || 'admin123',
+        address: row.address || localExt.address || '',
+        phone: row.phone || localExt.phone || '',
+        academicYear: row.academic_year || localExt.academicYear || '',
+        activePeriodName: row.active_period_name || localExt.activePeriodName || (row.academic_year ? `Periode ${row.academic_year}` : ''),
+        adminName: row.admin_name || localExt.adminName || 'Sarah Aura Alamanda',
+        adminUsername: row.admin_username || localExt.adminUsername || 'Sarah',
+        adminPassword: row.admin_password || localExt.adminPassword || '',
         dueDateDay: Number(row.due_date_day || localExt.dueDateDay || 10),
-        midtransClientKey: row.midtrans_client_key || localExt.midtransClientKey || defaultMidtransClient,
+        midtransClientKey: row.midtrans_client_key || localExt.midtransClientKey || (window.AppEnv?.midtransClientKey || ''),
         midtransServerKey: row.midtrans_server_key || localExt.midtransServerKey || '',
         startMonth: row.start_month || localExt.startMonth || 'Juli',
-        startYear: Number(row.start_year || localExt.startYear || 2025),
-        endMonth: row.end_month || localExt.endMonth || 'Juni',
-        endYear: Number(row.end_year || localExt.endYear || 2026),
+        startYear: Number(row.start_year || localExt.startYear || 2026),
+        endMonth: row.end_month || localExt.endMonth || 'Desember',
+        endYear: Number(row.end_year || localExt.endYear || 2027),
         semester: row.semester || localExt.semester || 'Semua',
         customClasses,
         academicPeriods: academicPeriods.map(p => ({
@@ -536,20 +528,20 @@
 
     const DEFAULT_SETTINGS = {
       startMonth: 'Juli',
-      startYear: 2025,
-      endMonth: 'Juni',
-      endYear: 2026,
+      startYear: 2026,
+      endMonth: 'Desember',
+      endYear: 2027,
       semester: 'Semua',
-      academicYear: window.AppEnv?.academicYear || window.ENV?.ACADEMIC_YEAR || '2025/2026',
-      activePeriodName: `Periode ${window.AppEnv?.academicYear || window.ENV?.ACADEMIC_YEAR || '2025/2026'}`,
+      academicYear: '20262027',
+      activePeriodName: 'Periode Juli 2026 - Desember 2027',
       academicPeriods: [],
       customClasses: [],
-      schoolName: window.AppEnv?.schoolName || window.ENV?.SCHOOL_NAME || 'PAUD SETIA BHAKTI',
-      address: window.AppEnv?.schoolAddress || window.ENV?.SCHOOL_ADDRESS || 'Bekasi, Jawa Barat',
-      phone: window.AppEnv?.schoolPhone || window.ENV?.SCHOOL_PHONE || '081234567890',
-      adminName: window.AppEnv?.adminName || window.ENV?.DEFAULT_ADMIN_NAME || 'Siti Rahma (Admin TU)',
-      adminUsername: window.AppEnv?.adminUsername || window.ENV?.DEFAULT_ADMIN_USER || 'admin',
-      adminPassword: window.AppEnv?.adminPassword || window.ENV?.DEFAULT_ADMIN_PASS || 'admin123',
+      schoolName: 'PAUD SETIA BHAKTI',
+      address: 'Paud setia bhakti, GMQR+P5P, Purwadadi Tim., Kec. Purwadadi, Kabupaten Subang, Jawa Barat 46385',
+      phone: '089503222835',
+      adminName: 'Sarah Aura Alamanda',
+      adminUsername: 'Sarah',
+      adminPassword: '',
       dueDateDay: 10,
       midtransClientKey: window.AppEnv?.midtransClientKey || window.ENV?.MIDTRANS_CLIENT_KEY || '',
       midtransServerKey: ''
@@ -1431,14 +1423,15 @@
         const cleanInput = username.trim().toLowerCase();
 
         if (role === 'admin') {
-          const expectedAdminUser = (settings.adminUsername || 'admin').trim().toLowerCase();
-          const expectedAdminPass = (settings.adminPassword || 'admin123').trim();
+          const expectedAdminUser = (settings.adminUsername || '').trim().toLowerCase();
+          const expectedAdminPass = (settings.adminPassword || '').trim();
           
           if (
-            (cleanInput === expectedAdminUser || cleanInput === 'admin') &&
+            expectedAdminUser &&
+            cleanInput === expectedAdminUser &&
             password.trim() === expectedAdminPass
           ) {
-            onLogin({ role: 'admin', name: settings.adminName || 'Admin TU' });
+            onLogin({ role: 'admin', name: settings.adminName || 'Sarah Aura Alamanda' });
           } else {
             setErrorMsg('Username atau Password Admin TU tidak cocok. Silakan pastikan akun Admin Anda benar.');
           }
@@ -8724,7 +8717,7 @@ function ParentDashboardView({
         </div>
       );
     }
-          
+
     // 6. CATAT PEMBAYARAN MANUAL
     // ==========================================
     function LaporanView({ students, transactions, settings }) {
@@ -9247,8 +9240,8 @@ function ParentDashboardView({
               </div>
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-wider">{settings?.schoolName || 'PAUD SETIA BHAKTI'}</h1>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-1">{settings?.address || 'Bekasi, Jawa Barat'}</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-600">Telp / WA: {settings?.phone || '081234567890'}</p>
+                <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-1">{settings?.address || 'Paud setia bhakti, Subang, Jawa Barat'}</p>
+                <p className="text-xs sm:text-sm font-semibold text-slate-600">Telp / WA: {settings?.phone || '089503222835'}</p>
               </div>
               
               <div className="mt-5 pt-3 border-t border-slate-200">
@@ -9549,8 +9542,8 @@ function ParentDashboardView({
 
               <div className="text-center w-64 ml-auto">
                 <p className="text-xs font-bold text-slate-600 mb-16">Mengetahui, Administrator TU</p>
-                <p className="font-extrabold text-slate-900 underline uppercase text-sm">{settings?.adminName || 'Siti Rahma (Admin TU)'}</p>
-                <p className="text-[10px] text-slate-500 font-bold">NIP / ID: {settings?.adminUsername || 'Admin'}</p>
+                <p className="font-extrabold text-slate-900 underline uppercase text-sm">{settings?.adminName || 'Sarah Aura Alamanda'}</p>
+                <p className="text-[10px] text-slate-500 font-bold">NIP / ID: {settings?.adminUsername || 'Sarah'}</p>
               </div>
             </div>
           </div>
@@ -10851,18 +10844,6 @@ function ParentDashboardView({
                       <Icon name="lock" size={13} className="text-amber-600" />
                       <span>Ganti Password Admin <span className="normal-case text-slate-400 font-normal">(Opsional)</span></span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        isDirtyRef.current = true;
-                        setNewAdminPassword('admin123');
-                        alert("Password admin diatur ke default ('admin123'). Klik 'Simpan Pengaturan' untuk menyimpan perubahan.");
-                      }}
-                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 underline"
-                      title="Set password admin kembali ke default (admin123)"
-                    >
-                      Reset Default (admin123)
-                    </button>
                   </div>
                   <input
                     type="password"

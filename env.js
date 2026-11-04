@@ -3,6 +3,7 @@
  * Dedicated Environment Configuration Class (Security Encapsulated)
  * Melindungi kredensial klien, menyembunyikan kunci rahasia server,
  * dan mencegah manipulasi objek runtime (Object.freeze & Tamper-Proof).
+ * Seluruh data identitas sekolah, periode, dan admin dimuat dari Supabase.
  * ====================================================================
  */
 class EnvironmentConfig {
@@ -19,8 +20,8 @@ class EnvironmentConfig {
     for (const [key, val] of Object.entries(rawConfig)) {
       if (!key || typeof key !== 'string') continue;
       const cleanKey = key.trim();
-      // KEAMANAN: Filter otomatis kunci rahasia server dan baris komentar
-      if (!/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|^#|^PORT$)/i.test(cleanKey)) {
+      // KEAMANAN: Hanya konfigurasi publik yang diizinkan
+      if (/^(SUPABASE_URL|MIDTRANS_CLIENT_KEY|SCHOOL_NAME)$/i.test(cleanKey)) {
         sanitized[cleanKey] = String(val || '').trim();
       }
     }
@@ -69,33 +70,8 @@ class EnvironmentConfig {
     return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI');
   }
 
-  get schoolAddress() {
-    return this.get('SCHOOL_ADDRESS', 'Bekasi, Jawa Barat');
-  }
-
-  get schoolPhone() {
-    return this.get('SCHOOL_PHONE', '081234567890');
-  }
-
-  get academicYear() {
-    return this.get('ACADEMIC_YEAR', '2025/2026');
-  }
-
-  get adminName() {
-    return this.get('DEFAULT_ADMIN_NAME', 'Siti Rahma (Admin TU)');
-  }
-
-  get adminUsername() {
-    return this.get('DEFAULT_ADMIN_USER', 'admin');
-  }
-
-  get adminPassword() {
-    const fromVault = this.#decode(this.#vault.p);
-    return fromVault || this.get('DEFAULT_ADMIN_PASS', 'admin123');
-  }
-
   toObject() {
-    // Hanya konfigurasi publik yang aman, Supabase Key dan Password tidak dibocorkan ke window.ENV
+    // Hanya konfigurasi koneksi publik yang aman
     return { ...this.#config };
   }
 }
@@ -104,17 +80,10 @@ class EnvironmentConfig {
 (function() {
   const _rawValues = {
   "SUPABASE_URL": "https://mgywbrmneeorynisujkf.supabase.co",
-  "MIDTRANS_CLIENT_KEY": "SB-Mid-client-demo",
-  "SCHOOL_NAME": "PAUD SETIA BHAKTI",
-  "SCHOOL_ADDRESS": "Bekasi, Jawa Barat",
-  "SCHOOL_PHONE": "081234567890",
-  "ACADEMIC_YEAR": "2025/2026",
-  "DEFAULT_ADMIN_NAME": "Siti Rahma (Admin TU)",
-  "DEFAULT_ADMIN_USER": "admin"
+  "MIDTRANS_CLIENT_KEY": "SB-Mid-client-demo"
 };
   const _vault = {
-  "k": "c2JfcHVibGlzaGFibGVfQlRfMWxIaHZKZXJ3WTBrNGZXekliZ181MS1WUTdWNQ==",
-  "p": "YWRtaW4xMjM="
+  "k": "c2JfcHVibGlzaGFibGVfQlRfMWxIaHZKZXJ3WTBrNGZXekliZ181MS1WUTdWNQ=="
 };
   const _envInstance = new EnvironmentConfig(_rawValues, _vault);
 

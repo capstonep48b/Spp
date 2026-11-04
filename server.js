@@ -47,11 +47,9 @@ const server = http.createServer((req, res) => {
           secretVault.k = Buffer.from(val).toString('base64');
           return;
         }
-        if (/DEFAULT_ADMIN_PASS|ADMIN_PASSWORD/i.test(key)) {
-          secretVault.p = Buffer.from(val).toString('base64');
-          return;
+        if (/^(SUPABASE_URL|MIDTRANS_CLIENT_KEY)$/i.test(key)) {
+          envData[key] = val;
         }
-        if (key) envData[key] = val;
       });
     } catch (e) {}
 
@@ -77,12 +75,6 @@ const server = http.createServer((req, res) => {
   get supabaseKey() { return this.#decode(this.#vault.k) || (typeof localStorage !== 'undefined' ? (localStorage.getItem('spp_supabase_key') || localStorage.getItem('supabase_key')) : '') || ''; }
   get midtransClientKey() { return this.get('MIDTRANS_CLIENT_KEY'); }
   get schoolName() { return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI'); }
-  get schoolAddress() { return this.get('SCHOOL_ADDRESS', 'Bekasi, Jawa Barat'); }
-  get schoolPhone() { return this.get('SCHOOL_PHONE', '081234567890'); }
-  get academicYear() { return this.get('ACADEMIC_YEAR', '2025/2026'); }
-  get adminName() { return this.get('DEFAULT_ADMIN_NAME', 'Siti Rahma (Admin TU)'); }
-  get adminUsername() { return this.get('DEFAULT_ADMIN_USER', 'admin'); }
-  get adminPassword() { return this.#decode(this.#vault.p) || this.get('DEFAULT_ADMIN_PASS', 'admin123'); }
   toObject() { return { ...this.#config }; }
 }
 (function() {

@@ -9,21 +9,21 @@
 CREATE TABLE IF NOT EXISTS public.settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_name VARCHAR(255) NOT NULL DEFAULT 'PAUD SETIA BHAKTI',
-    address TEXT DEFAULT 'Bekasi, Jawa Barat',
-    phone VARCHAR(50) DEFAULT '081234567890',
-    academic_year VARCHAR(50) DEFAULT '2025/2026',
-    active_period_name VARCHAR(100) DEFAULT 'Periode 2025/2026',
+    address TEXT DEFAULT 'Paud setia bhakti, GMQR+P5P, Purwadadi Tim., Kec. Purwadadi, Kabupaten Subang, Jawa Barat 46385',
+    phone VARCHAR(50) DEFAULT '089503222835',
+    academic_year VARCHAR(50) DEFAULT '20262027',
+    active_period_name VARCHAR(100) DEFAULT 'Periode Juli 2026 - Desember 2027',
     semester VARCHAR(50) DEFAULT 'Semua',
-    admin_name VARCHAR(255) DEFAULT 'Siti Rahma (Admin TU)',
-    admin_username VARCHAR(100) DEFAULT 'admin',
+    admin_name VARCHAR(255) DEFAULT 'Sarah Aura Alamanda',
+    admin_username VARCHAR(100) DEFAULT 'Sarah',
     admin_password VARCHAR(255) DEFAULT 'admin123',
     due_date_day INT DEFAULT 10,
     midtrans_client_key VARCHAR(255) DEFAULT '',
     midtrans_server_key VARCHAR(255) DEFAULT '',
     start_month VARCHAR(50) DEFAULT 'Juli',
-    start_year INT DEFAULT 2025,
-    end_month VARCHAR(50) DEFAULT 'Juni',
-    end_year INT DEFAULT 2026,
+    start_year INT DEFAULT 2026,
+    end_month VARCHAR(50) DEFAULT 'Desember',
+    end_year INT DEFAULT 2027,
     academic_periods JSONB DEFAULT '[]',
     custom_classes JSONB DEFAULT '[]',
     session_token VARCHAR(255) DEFAULT '',
@@ -36,21 +36,21 @@ CREATE TABLE IF NOT EXISTS public.settings (
 
 -- Migrasi idempotent kolom tabel settings
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS school_name VARCHAR(255) DEFAULT 'PAUD SETIA BHAKTI';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS address TEXT DEFAULT 'Bekasi, Jawa Barat';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT '081234567890';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS academic_year VARCHAR(50) DEFAULT '2025/2026';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS active_period_name VARCHAR(100) DEFAULT 'Periode 2025/2026';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS address TEXT DEFAULT 'Paud setia bhakti, GMQR+P5P, Purwadadi Tim., Kec. Purwadadi, Kabupaten Subang, Jawa Barat 46385';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT '089503222835';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS academic_year VARCHAR(50) DEFAULT '20262027';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS active_period_name VARCHAR(100) DEFAULT 'Periode Juli 2026 - Desember 2027';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS semester VARCHAR(50) DEFAULT 'Semua';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS admin_name VARCHAR(255) DEFAULT 'Siti Rahma (Admin TU)';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS admin_username VARCHAR(100) DEFAULT 'admin';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS admin_name VARCHAR(255) DEFAULT 'Sarah Aura Alamanda';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS admin_username VARCHAR(100) DEFAULT 'Sarah';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS admin_password VARCHAR(255) DEFAULT 'admin123';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS due_date_day INT DEFAULT 10;
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS midtrans_client_key VARCHAR(255) DEFAULT '';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS midtrans_server_key VARCHAR(255) DEFAULT '';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS start_month VARCHAR(50) DEFAULT 'Juli';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS start_year INT DEFAULT 2025;
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS end_month VARCHAR(50) DEFAULT 'Juni';
-ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS end_year INT DEFAULT 2026;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS start_year INT DEFAULT 2026;
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS end_month VARCHAR(50) DEFAULT 'Desember';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS end_year INT DEFAULT 2027;
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS academic_periods JSONB DEFAULT '[]';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS custom_classes JSONB DEFAULT '[]';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS session_token VARCHAR(255) DEFAULT '';
@@ -66,11 +66,11 @@ INSERT INTO public.settings (
     academic_periods, custom_classes
 )
 SELECT 
-    'PAUD SETIA BHAKTI', 'Bekasi, Jawa Barat', '081234567890', '2025/2026', 'Periode 2025/2026', 'Semua',
-    'Siti Rahma (Admin TU)', 'admin', 'admin123', 10,
-    'Juli', 2025, 'Juni', 2026,
-    '[{"id":"1","name":"Periode 2025/2026","startMonth":"Juli","startYear":2025,"endMonth":"Juni","endYear":2026,"semester":"Semua","isActive":true}]'::jsonb,
-    '[]'::jsonb
+    'PAUD SETIA BHAKTI', 'Paud setia bhakti, GMQR+P5P, Purwadadi Tim., Kec. Purwadadi, Kabupaten Subang, Jawa Barat 46385', '089503222835', '20262027', 'Periode Juli 2026 - Desember 2027', 'Semua',
+    'Sarah Aura Alamanda', 'Sarah', 'admin123', 10,
+    'Juli', 2026, 'Desember', 2027,
+    '[{"id":"1792760033459","name":"Periode Juli 2026 - Desember 2027","startMonth":"Juli","startYear":2026,"endMonth":"Desember","endYear":2027,"semester":"Semua","isActive":true}]'::jsonb,
+    '[{"name":"KELAS A","tarif":100000},{"name":"KELAS B","tarif":1200000}]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM public.settings);
 
 -- 2. TABEL STUDENTS

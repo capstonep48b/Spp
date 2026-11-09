@@ -1620,13 +1620,13 @@
               {/* Brand & Content Container */}
               <div className="relative z-10 flex flex-col justify-between h-full pb-4 lg:pb-0">
                 
-                {/* 1. Header Bar: Status Capsule on Mobile & Desktop */}
+                {/* 1. Header Bar: Status Capsule on Mobile & Desktop (Locked bounds to prevent font layout shift) */}
                 <div className="flex items-center justify-between gap-2.5 mb-4 sm:mb-5">
-                  <div className="inline-flex items-center gap-2 h-8 sm:h-9 px-3.5 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm">
+                  <div className="inline-flex items-center gap-2 h-8 sm:h-9 px-3.5 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm min-w-0">
                     <Icon name="clock" size={13} className="text-cyan-300 shrink-0" />
                     <span className="truncate">{formattedDate} • {formattedClock}</span>
                   </div>
-                  <div className="inline-flex items-center gap-1.5 h-8 sm:h-9 px-3 rounded-full bg-white/15 backdrop-blur-md text-xs font-black text-cyan-200 border border-white/20 shadow-xs">
+                  <div className="inline-flex items-center justify-center shrink-0 min-w-[125px] gap-1.5 h-8 sm:h-9 px-3 rounded-full bg-white/15 backdrop-blur-md text-xs font-black text-cyan-200 border border-white/20 shadow-xs">
                     <span>{greeting.emoji}</span>
                     <span>{greeting.text}!</span>
                   </div>
@@ -1664,7 +1664,7 @@
                   </div>
                 </div>
 
-                {/* 3. 4 Interactive Feature Cards (2x2 Grid) with Rotating/Orbital Icons */}
+                {/* 3. 4 Interactive Feature Cards (2x2 Grid) */}
                 <div className="mb-3 lg:mb-5">
                   <div className="grid grid-cols-2 gap-2.5 text-xs text-blue-100 font-semibold">
                     {loginFeatures.map((feat, idx) => {
@@ -1688,21 +1688,19 @@
                           {/* Subtle hover gradient glow */}
                           <div className={`absolute inset-0 bg-gradient-to-br ${feat.glowColor} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`}></div>
 
-                          {/* Rotating / Orbiting Icon Container */}
+                          {/* Rotating / Orbiting Icon Container (Flattened DOM level) */}
                           <div className={`relative w-8 h-8 lg:w-9 lg:h-9 rounded-xl border ${feat.iconBg} flex items-center justify-center shrink-0 transition-transform duration-500 group-hover:scale-110`}>
                             {/* Continuous rotating dashed orbit ring around the icon */}
                             <span
                               className="login-icon-orbit-ring absolute -inset-1 rounded-xl border border-dashed border-current opacity-40 group-hover:opacity-85 pointer-events-none"
                               style={{ animationDelay: `${idx * -1.5}s` }}
                             ></span>
-                            <div
-                              className={`login-feature-icon-inner flex items-center justify-center ${
-                                isSpinning ? 'login-icon-spin-burst' : 'login-icon-idle-orbit'
-                              }`}
+                            <Icon 
+                              name={feat.icon} 
+                              size={15} 
+                              className={`login-feature-icon-inner ${isSpinning ? 'login-icon-spin-burst' : 'login-icon-idle-orbit'}`}
                               style={{ animationDelay: `${idx * 0.4}s` }}
-                            >
-                              <Icon name={feat.icon} size={15} />
-                            </div>
+                            />
                           </div>
 
                           <div className="min-w-0 flex-1 relative z-10">

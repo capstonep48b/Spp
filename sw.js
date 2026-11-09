@@ -3,10 +3,11 @@
  * Provides high-efficiency caching, instant load times, and offline capabilities.
  */
 
-const CACHE_NAME = 'spp-cache-v2';
+const CACHE_NAME = 'spp-cache-v3';
 const STATIC_ASSETS = [
   './',
   'index.html',
+  'style.min.css',
   'style.css',
   'logo.webp',
   'logo.png',
@@ -95,3 +96,4 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+

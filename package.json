@@ -19,6 +19,8 @@
     "@babel/preset-react": "^8.0.1"
   },
   "devDependencies": {
-    "jimp": "^1.6.1"
+    "clean-css": "^5.3.3",
+    "jimp": "^1.6.1",
+    "terser": "^5.51.2"
   }
 }

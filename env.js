@@ -20,7 +20,6 @@ class EnvironmentConfig {
     for (const [key, val] of Object.entries(rawConfig)) {
       if (!key || typeof key !== 'string') continue;
       const cleanKey = key.trim();
-      // KEAMANAN: Hanya konfigurasi publik yang diizinkan
       if (/^(SUPABASE_URL|MIDTRANS_CLIENT_KEY|SCHOOL_NAME)$/i.test(cleanKey)) {
         sanitized[cleanKey] = String(val || '').trim();
       }
@@ -71,12 +70,10 @@ class EnvironmentConfig {
   }
 
   toObject() {
-    // Hanya konfigurasi koneksi publik yang aman
     return { ...this.#config };
   }
 }
 
-// Inisialisasi Singleton Aman
 (function() {
   const _rawValues = {
   "SUPABASE_URL": "https://mgywbrmneeorynisujkf.supabase.co",
@@ -88,7 +85,6 @@ class EnvironmentConfig {
   const _envInstance = new EnvironmentConfig(_rawValues, _vault);
 
   if (typeof window !== 'undefined') {
-    // 1. Ekspor kelas dan instance resmi
     Object.defineProperty(window, 'EnvironmentConfig', {
       value: EnvironmentConfig,
       writable: false,
@@ -103,7 +99,6 @@ class EnvironmentConfig {
       enumerable: true
     });
 
-    // 2. Backward compatibility untuk window.ENV (Read-only Getter publik)
     Object.defineProperty(window, 'ENV', {
       get: () => _envInstance.toObject(),
       set: () => { console.warn("Peringatan Keamanan: window.ENV bersifat read-only dan terlindungi!"); },

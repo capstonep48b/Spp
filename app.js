@@ -363,7 +363,7 @@ const GreetingMascotBanner = ({ name, role = 'Pengguna', schoolName, academicYea
     React.createElement("div", { className: "relative shrink-0" }, /*#__PURE__*/
     React.createElement("div", { className: "w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-2xl bg-gradient-to-tr from-cyan-400 via-blue-500 to-indigo-600 p-0.5 shadow-xl shadow-blue-900/50 flex items-center justify-center animate-mascot-sway ring-2 ring-white/20" }, /*#__PURE__*/
     React.createElement("img", {
-      src: "logo.png",
+      src: "logo.webp",
       alt: "Mascot Logo",
       className: "w-full h-full object-contain p-1.5 rounded-[14px] bg-slate-950/80 backdrop-blur-md" }
     )
@@ -993,7 +993,7 @@ const PanelAestheticBg = React.memo(function PanelAestheticBg() {
     React.createElement("circle", { cx: "1060", cy: "140", r: "125", stroke: "rgba(37, 99, 235, 0.04)", strokeWidth: "1" })
     ), /*#__PURE__*/
     React.createElement("div", { className: "panel-subtle-watermark" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "", className: "panel-subtle-watermark-img" })
+    React.createElement("img", { src: "logo.webp", alt: "", className: "panel-subtle-watermark-img" })
     )
     ));
 
@@ -1036,7 +1036,7 @@ function SchoolWatermarkBg() {
 
     React.createElement("div", { className: "luxury-school-watermark flex items-center justify-center" }, /*#__PURE__*/
     React.createElement("img", {
-      src: "logo.png",
+      src: "logo.webp",
       alt: "Watermark PAUD Setia Bhakti",
       className: "w-full h-full object-contain filter contrast-125 select-none pointer-events-none drop-shadow-sm" }
     )
@@ -1093,7 +1093,7 @@ function LoadingBarScreen({ userRole, userName, onComplete }) {
 
     React.createElement("div", { className: "absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden", "aria-hidden": "true" }, /*#__PURE__*/
     React.createElement("div", { className: "w-[min(85vw,640px)] h-[min(85vw,640px)] opacity-[0.045] flex items-center justify-center pointer-events-none select-none" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "watermark", className: "w-full h-full object-contain filter brightness-125 select-none pointer-events-none" })
+    React.createElement("img", { src: "logo.webp", alt: "watermark", className: "w-full h-full object-contain filter brightness-125 select-none pointer-events-none" })
     )
     ), /*#__PURE__*/
 
@@ -1117,7 +1117,7 @@ function LoadingBarScreen({ userRole, userName, onComplete }) {
 
     React.createElement("div", { className: "relative w-28 h-28 rounded-full p-2 bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 shadow-[0_15px_40px_rgba(6,182,212,0.45)] overflow-hidden flex items-center justify-center border-4 border-white/95 bg-white group hover:scale-105 transition-transform animate-pulse-glow" }, /*#__PURE__*/
     React.createElement("img", {
-      src: "logo.png",
+      src: "logo.webp",
       alt: "Logo PAUD Setia Bhakti",
       className: "w-full h-full object-contain rounded-full" }
     )
@@ -1570,14 +1570,20 @@ function LoginView({ onLogin, settings, students }) {
 
     React.createElement("div", { className: "luxury-watermark-bg", "aria-hidden": "true" }, /*#__PURE__*/
     React.createElement("div", { className: "luxury-school-watermark flex items-center justify-center" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "Watermark", className: "w-full h-full object-contain filter contrast-125 select-none pointer-events-none opacity-15" })
+    React.createElement("img", {
+      src: "logo.webp",
+      alt: "Watermark",
+      fetchPriority: "high",
+      decoding: "async",
+      className: "w-full h-full object-contain filter contrast-125 select-none pointer-events-none opacity-15" }
+    )
     )
     ), /*#__PURE__*/
 
 
     React.createElement("div", { className: "relative z-10 mb-4 hidden lg:flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl shadow-blue-950/40" }, /*#__PURE__*/
     React.createElement("div", { className: "w-7 h-7 rounded-full bg-white/20 border border-white/30 flex items-center justify-center p-0.5 overflow-hidden shrink-0" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
     ), /*#__PURE__*/
     React.createElement("span", { className: "text-xs font-black tracking-wide text-white" }, settings.schoolName || 'PAUD SETIA BHAKTI'), /*#__PURE__*/
     React.createElement("span", { className: "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" }), /*#__PURE__*/
@@ -1634,7 +1640,7 @@ function LoginView({ onLogin, settings, students }) {
       style: { width: '56px', height: '56px', minWidth: '56px', minHeight: '56px', maxWidth: '56px', maxHeight: '56px' } }, /*#__PURE__*/
 
     React.createElement("img", {
-      src: "logo.png",
+      src: "logo.webp",
       alt: "PAUD Setia Bhakti",
       className: "w-full h-full max-h-full max-w-full object-contain filter drop-shadow select-none pointer-events-none" }
     )
@@ -2799,7 +2805,7 @@ function ParentDashboardView({
     student.fotoUrl ? /*#__PURE__*/
     React.createElement("img", { src: student.fotoUrl, alt: student.name, className: "w-full h-full object-cover rounded-[14px]" }) : /*#__PURE__*/
 
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-8 h-8 object-contain filter drop-shadow" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-8 h-8 object-contain filter drop-shadow" })
 
     ), /*#__PURE__*/
     React.createElement("div", { className: "min-w-0" }, /*#__PURE__*/
@@ -2881,7 +2887,7 @@ function ParentDashboardView({
     React.createElement("div", { className: "flex items-center justify-between pb-3.5 border-b border-white/10 mb-4" }, /*#__PURE__*/
     React.createElement("div", { className: "flex items-center gap-3 min-w-0" }, /*#__PURE__*/
     React.createElement("div", { className: "w-10 h-10 rounded-xl bg-slate-900 border border-white/15 flex items-center justify-center p-1.5 shadow-md shrink-0" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
     ), /*#__PURE__*/
     React.createElement("div", { className: "min-w-0 flex-1" }, /*#__PURE__*/
     React.createElement("h2", { className: "text-sm font-black text-white leading-tight truncate" }, settings.schoolName || 'PAUD SETIA BHAKTI'), /*#__PURE__*/
@@ -3060,7 +3066,7 @@ function ParentDashboardView({
     student.fotoUrl ? /*#__PURE__*/
     React.createElement("img", { src: student.fotoUrl, alt: student.name, className: "w-full h-full object-cover" }) : /*#__PURE__*/
 
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-9 h-9 object-contain filter drop-shadow" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-9 h-9 object-contain filter drop-shadow" })
 
     ), /*#__PURE__*/
     React.createElement("div", { className: "min-w-0 flex-1" }, /*#__PURE__*/
@@ -9236,7 +9242,7 @@ function LaporanView({ students, transactions, settings }) {
 
     React.createElement("div", { className: "flex flex-col sm:flex-row items-center justify-center gap-5 border-b-2 border-slate-900 pb-5 text-center sm:text-left" }, /*#__PURE__*/
     React.createElement("div", { className: "w-20 h-20 shrink-0 flex items-center justify-center p-1.5 bg-white border-2 border-slate-200 rounded-2xl shadow-sm" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
     ), /*#__PURE__*/
     React.createElement("div", null, /*#__PURE__*/
     React.createElement("h1", { className: "text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-wider" }, settings?.schoolName || 'PAUD SETIA BHAKTI'), /*#__PURE__*/
@@ -11413,7 +11419,7 @@ function KuitansiModal({ transaction, settings, onClose }) {
     React.createElement("div", { className: "pt-8 pb-4 px-6 text-center space-y-2" }, /*#__PURE__*/
     React.createElement("div", { className: "w-16 h-16 mx-auto relative flex items-center justify-center mb-1" }, /*#__PURE__*/
     React.createElement("div", { className: "w-16 h-16 rounded-2xl bg-white border-2 border-blue-200 shadow-md p-2 flex items-center justify-center relative" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" }), /*#__PURE__*/
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" }), /*#__PURE__*/
     React.createElement("div", { className: "absolute -bottom-2 -right-2 w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-md text-white" }, /*#__PURE__*/
     React.createElement(Icon, { name: "check", size: 16, className: "text-white stroke-[3]" })
     )
@@ -12784,57 +12790,83 @@ function App() {
 
     try {
       if (supabase) {
-        const { data: stData } = await supabase.from('students').select('*');
-        if (stData) {
-          const mappedStudents = stData.map(mapStudentFromDb);
-          setStudents(mappedStudents);
-          try {localStorage.setItem('spp_cached_students', JSON.stringify(mappedStudents));} catch (e) {}
+        const activeUser = currentUserRef.current;
+        const shouldFetchAll = isManual || !!activeUser;
 
-          // Cek validitas sesi siswa aktif di perangkat ini
-          const activeUser = currentUserRef.current;
-          const activeToken = mySessionTokenRef.current;
-          if (activeUser && activeUser.role === 'parent' && activeUser.student && activeToken) {
-            const freshSt = mappedStudents.find((s) => s.id === activeUser.student.id);
-            if (freshSt && freshSt.sessionToken && freshSt.sessionToken !== activeToken) {
-              handleForceLogout(freshSt.name, 'Perangkat lain');
-              return;
+        if (!shouldFetchAll) {
+          // Mode Tamu / Awal Login: Hanya muat 'students' & 'settings' secara paralel (mengeliminasi 6 rantai sekuensial)
+          const [stRes, stgRes] = await Promise.allSettled([
+          supabase.from('students').select('*'),
+          supabase.from('settings').select('*').limit(1)]
+          );
+
+          if (stRes.status === 'fulfilled' && stRes.value && stRes.value.data) {
+            const mappedStudents = stRes.value.data.map(mapStudentFromDb);
+            setStudents(mappedStudents);
+            try {localStorage.setItem('spp_cached_students', JSON.stringify(mappedStudents));} catch (e) {}
+          }
+
+          if (stgRes.status === 'fulfilled' && stgRes.value && stgRes.value.data && stgRes.value.data.length > 0) {
+            const mappedSettings = mapSettingsFromDb(stgRes.value.data[0]);
+            setSettings(mappedSettings);
+            try {localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings));} catch (e) {}
+          }
+        } else {
+          // Mode Sesi Pengguna: Ambil seluruh data secara konkruen / paralel sekaligus
+          const [stRes, trRes, anRes, cpRes, ntRes, stgRes] = await Promise.allSettled([
+          supabase.from('students').select('*'),
+          supabase.from('transactions').select('*'),
+          supabase.from('announcements').select('*'),
+          supabase.from('complaints').select('*'),
+          supabase.from('student_notes').select('*'),
+          supabase.from('settings').select('*').limit(1)]
+          );
+
+          if (stRes.status === 'fulfilled' && stRes.value && stRes.value.data) {
+            const mappedStudents = stRes.value.data.map(mapStudentFromDb);
+            setStudents(mappedStudents);
+            try {localStorage.setItem('spp_cached_students', JSON.stringify(mappedStudents));} catch (e) {}
+
+            // Cek validitas sesi siswa aktif di perangkat ini
+            const activeToken = mySessionTokenRef.current;
+            if (activeUser && activeUser.role === 'parent' && activeUser.student && activeToken) {
+              const freshSt = mappedStudents.find((s) => s.id === activeUser.student.id);
+              if (freshSt && freshSt.sessionToken && freshSt.sessionToken !== activeToken) {
+                handleForceLogout(freshSt.name, 'Perangkat lain');
+                return;
+              }
             }
           }
-        }
 
-        const { data: trData } = await supabase.from('transactions').select('*');
-        if (trData) {
-          const mappedTr = trData.map(mapTransactionFromDb);
-          setTransactions(mappedTr);
-          try {localStorage.setItem('spp_cached_transactions', JSON.stringify(mappedTr));} catch (e) {}
-        }
+          if (trRes.status === 'fulfilled' && trRes.value && trRes.value.data) {
+            const mappedTr = trRes.value.data.map(mapTransactionFromDb);
+            setTransactions(mappedTr);
+            try {localStorage.setItem('spp_cached_transactions', JSON.stringify(mappedTr));} catch (e) {}
+          }
 
-        const { data: anData } = await supabase.from('announcements').select('*');
-        if (anData) {
-          const mappedAn = anData.map(mapAnnouncementFromDb);
-          setAnnouncements(mappedAn);
-          try {localStorage.setItem('spp_cached_announcements', JSON.stringify(mappedAn));} catch (e) {}
-        }
+          if (anRes.status === 'fulfilled' && anRes.value && anRes.value.data) {
+            const mappedAn = anRes.value.data.map(mapAnnouncementFromDb);
+            setAnnouncements(mappedAn);
+            try {localStorage.setItem('spp_cached_announcements', JSON.stringify(mappedAn));} catch (e) {}
+          }
 
-        const { data: cpData } = await supabase.from('complaints').select('*');
-        if (cpData) {
-          const mappedCp = cpData.map(mapComplaintFromDb);
-          setComplaints(mappedCp);
-          try {localStorage.setItem('spp_cached_complaints', JSON.stringify(mappedCp));} catch (e) {}
-        }
+          if (cpRes.status === 'fulfilled' && cpRes.value && cpRes.value.data) {
+            const mappedCp = cpRes.value.data.map(mapComplaintFromDb);
+            setComplaints(mappedCp);
+            try {localStorage.setItem('spp_cached_complaints', JSON.stringify(mappedCp));} catch (e) {}
+          }
 
-        const { data: ntData } = await supabase.from('student_notes').select('*');
-        if (ntData) {
-          const mappedNt = ntData.map(mapNoteFromDb);
-          setNotes(mappedNt);
-          try {localStorage.setItem('spp_cached_notes', JSON.stringify(mappedNt));} catch (e) {}
-        }
+          if (ntRes.status === 'fulfilled' && ntRes.value && ntRes.value.data) {
+            const mappedNt = ntRes.value.data.map(mapNoteFromDb);
+            setNotes(mappedNt);
+            try {localStorage.setItem('spp_cached_notes', JSON.stringify(mappedNt));} catch (e) {}
+          }
 
-        const { data: stgData } = await supabase.from('settings').select('*').limit(1);
-        if (stgData && stgData.length > 0) {
-          const mappedSettings = mapSettingsFromDb(stgData[0]);
-          setSettings(mappedSettings);
-          try {localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings));} catch (e) {}
+          if (stgRes.status === 'fulfilled' && stgRes.value && stgRes.value.data && stgRes.value.data.length > 0) {
+            const mappedSettings = mapSettingsFromDb(stgRes.value.data[0]);
+            setSettings(mappedSettings);
+            try {localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings));} catch (e) {}
+          }
         }
       }
     } catch (e) {
@@ -12881,6 +12913,13 @@ function App() {
     }, 30000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  // Saat pengguna berhasil login, sinkronkan seluruh transaksi dan pengumuman secara instan
+  useEffect(() => {
+    if (currentUser) {
+      fetchData(false);
+    }
+  }, [currentUser, fetchData]);
 
   const handleUpdateSettings = async (newSettings) => {
     setSettings(newSettings);
@@ -13467,7 +13506,7 @@ function App() {
 
   React.createElement("div", { className: "w-20 h-20 bg-white/10 rounded-full p-2 mb-4 border border-cyan-400/30 flex items-center justify-center relative shadow-inner" }, /*#__PURE__*/
   React.createElement("div", { className: "w-16 h-16 rounded-full border-4 border-cyan-400 border-t-transparent animate-spin absolute inset-0 m-auto" }), /*#__PURE__*/
-  React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-10 h-10 object-contain relative z-10 animate-pulse" })
+  React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-10 h-10 object-contain relative z-10 animate-pulse" })
   ), /*#__PURE__*/
 
   React.createElement("h3", { className: "text-lg font-black text-white tracking-tight" }, "Menyinkronkan Data..."), /*#__PURE__*/
@@ -13704,7 +13743,7 @@ function App() {
     React.createElement("div", { className: "md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#072a6b]/95 via-[#0d3b8f]/95 to-[#1554c2]/95 backdrop-blur-xl px-4 sm:px-6 py-3.5 border-b border-cyan-400/30 shadow-xl shadow-blue-950/20 flex items-center justify-between min-h-[66px] text-white" }, /*#__PURE__*/
     React.createElement("div", { className: "flex items-center gap-3.5 min-w-0" }, /*#__PURE__*/
     React.createElement("div", { className: "w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400 via-indigo-600 to-blue-700 p-0.5 shadow-lg shadow-blue-950/50 overflow-hidden shrink-0 flex items-center justify-center ring-2 ring-cyan-400/30" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-8 h-8 object-contain filter drop-shadow" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-8 h-8 object-contain filter drop-shadow" })
     ), /*#__PURE__*/
     React.createElement("div", { className: "min-w-0" }, /*#__PURE__*/
     React.createElement("h1", { className: "text-base font-black text-white truncate tracking-tight" }, settings.schoolName || 'PAUD SETIA BHAKTI'), /*#__PURE__*/
@@ -13784,7 +13823,7 @@ function App() {
     React.createElement("div", { className: "flex items-center justify-between pb-3.5 border-b border-white/10 mb-4" }, /*#__PURE__*/
     React.createElement("div", { className: "flex items-center gap-3 min-w-0" }, /*#__PURE__*/
     React.createElement("div", { className: "w-10 h-10 rounded-xl bg-slate-900 border border-white/15 flex items-center justify-center p-1.5 shadow-md shrink-0" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-full h-full object-contain" })
     ), /*#__PURE__*/
     React.createElement("div", { className: "min-w-0 flex-1" }, /*#__PURE__*/
     React.createElement("h2", { className: "text-sm font-black text-white leading-tight truncate" }, settings.schoolName || 'PAUD SETIA BHAKTI'), /*#__PURE__*/
@@ -13988,7 +14027,7 @@ function App() {
 
     React.createElement("div", { className: "p-4 sm:p-5 m-3 sm:m-4 mb-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex items-center gap-3.5 shadow-lg shadow-blue-950/20" }, /*#__PURE__*/
     React.createElement("div", { className: "w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/30 overflow-hidden shrink-0 shadow-md" }, /*#__PURE__*/
-    React.createElement("img", { src: "logo.png", alt: "PAUD Setia Bhakti", className: "w-9 h-9 object-contain filter drop-shadow" })
+    React.createElement("img", { src: "logo.webp", alt: "PAUD Setia Bhakti", className: "w-9 h-9 object-contain filter drop-shadow" })
     ), /*#__PURE__*/
     React.createElement("div", { className: "min-w-0 flex-1" }, /*#__PURE__*/
     React.createElement("h1", { className: "font-black text-sm sm:text-base leading-tight text-white tracking-tight truncate" }, settings.schoolName || 'PAUD SETIA BHAKTI'), /*#__PURE__*/

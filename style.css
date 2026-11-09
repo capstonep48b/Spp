@@ -1,5 +1,5 @@
 /* Custom Design System - Royal Blue & Cloud Aesthetics for SPP App */
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+/* Note: Google Fonts Plus Jakarta Sans preconnected and loaded directly in index.html for high performance */
 
 :root {
   --blue-primary: #2563eb;

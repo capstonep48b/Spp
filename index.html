@@ -1,41 +1,48 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <script src="init.js"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sistem Informasi Pembayaran SPP - PAUD Setia Bhakti</title>
   
+  <!-- LCP & Modern Image Preload for Instant Discovery -->
+  <link rel="preload" as="image" href="logo.webp" type="image/webp" fetchpriority="high" />
+
+  <!-- Preconnect & Asynchronous Google Fonts Loading (Eliminating Render-Blocking Chain) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" />
+
+  <!-- App Favicons -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-  <link rel="icon" type="image/png" href="logo.png" />
-  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="icon" type="image/webp" href="logo.webp" />
+  <link rel="apple-touch-icon" href="logo.webp" />
   
   <!-- External Custom Styles -->
   <link rel="stylesheet" href="style.css" />
 
-  <!-- Tailwind CSS (Local Vendor) -->
-  <script src="libs/tailwind.js"></script>
-  
-  <!-- Lucide Icons (Local Vendor) -->
-  <script src="libs/lucide.min.js"></script>
-  
-  <!-- React & ReactDOM UMD (Local Vendor) -->
-  <script src="libs/react.production.min.js"></script>
-  <script src="libs/react-dom.production.min.js"></script>
-
-  <!-- Supabase JS Client (Local Vendor) -->
-  <script src="libs/supabase.min.js"></script>
-
-  <!-- Recharts & Prop-Types (Local Vendor) -->
-  <script src="libs/prop-types.min.js"></script>
-  <script src="libs/recharts.min.js"></script>
-
+  <!-- Deferred Vendor Scripts (Eliminating Render-Blocking) -->
+  <script defer src="init.js"></script>
+  <script defer src="libs/tailwind.js"></script>
+  <script defer src="libs/lucide.min.js"></script>
+  <script defer src="libs/react.production.min.js"></script>
+  <script defer src="libs/react-dom.production.min.js"></script>
+  <script defer src="libs/supabase.min.js"></script>
+  <script defer src="env.js"></script>
+  <script defer src="app.js"></script>
 </head>
 <body class="bg-slate-50 text-slate-800 antialiased selection:bg-blue-600 selection:text-white min-h-screen">
   <div id="root"></div>
 
-  <!-- CSP Compliant Pre-Compiled React Application Script -->
-  <script src="env.js"></script>
-  <script src="app.js"></script>
+  <!-- Register Service Worker for Client-Side Caching & Offline Resilience -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js').catch(function(err) {
+          console.debug('ServiceWorker notice:', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>

@@ -8714,5 +8714,5923 @@ function ParentDashboardView({
               {selectedStudent ? (
                 <>
                   <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-[11px] shrink-0 overflow-hidden">
+                    {selectedStudent.fotoUrl ? (
+                      <img src={selectedStudent.fotoUrl} alt={selectedStudent.name} className="w-full h-full object-cover" />
+                    ) : (
+                      (selectedStudent.name || 'M').charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <span className="truncate text-slate-900 font-extrabold">{selectedStudent.name}</span>
+                  <span className="shrink-0 px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-black uppercase">
+                    {selectedStudent.nis ? `${selectedStudent.nis} • ` : ''}{selectedStudent.kelas}
+                  </span>
+                </>
+              ) : (
+                <span className="text-slate-400 font-medium truncate">{placeholder}</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0 text-slate-400">
+              {selectedStudent && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="p-1 hover:text-rose-600 rounded-full hover:bg-rose-50 transition-colors cursor-pointer"
+                  title="Hapus Pilihan Siswa"
+                >
+                  <Icon name="x" size={13} />
+                </button>
+              )}
+              <Icon name="chevron-down" size={15} className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-blue-600' : ''}`} />
+            </div>
+          </div>
+
+          {isOpen && (
+            <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-2xl border border-slate-200 shadow-2xl z-[999] overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <div className="p-2.5 border-b border-slate-100 bg-slate-50/80">
+                <div className="relative flex items-center">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Icon name="search" size={14} />
+                  </div>
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Ketik untuk mencari nama, NIS, atau kelas..."
+                    className="w-full pl-9 pr-8 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      onClick={() => setSearch('')}
+                      className="absolute right-2.5 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <Icon name="x" size={12} />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 mt-1.5 px-1">
+                  <span>{filteredStudents.length} dari {students.length} murid</span>
+                  {search && <span className="text-blue-600 font-extrabold">Hasil Pencarian</span>}
+                </div>
+              </div>
+
+              <div className="max-h-60 overflow-y-auto divide-y divide-slate-50 text-xs">
+                {filteredStudents.length === 0 ? (
+                  <div className="p-5 text-center text-slate-400 font-medium">
+                    <Icon name="search-x" size={20} className="mx-auto mb-1 text-slate-300" />
+                    Tidak ada murid yang cocok dengan "{search}"
+                  </div>
+                ) : (
+                  filteredStudents.map(s => {
+                    const isSelected = String(s.id) === String(value);
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => handleSelect(s)}
+                        className={`w-full px-3.5 py-2.5 flex items-center justify-between gap-2.5 text-left transition-colors cursor-pointer ${
+                          isSelected 
+                            ? 'bg-blue-50/80 text-blue-900 font-black' 
+                            : 'hover:bg-slate-50 text-slate-700 font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
+                            {s.fotoUrl ? (
+                              <img src={s.fotoUrl} alt={s.name} className="w-full h-full object-cover" />
+                            ) : (
+                              (s.name || 'M').charAt(0).toUpperCase()
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-slate-800 truncate">{s.name}</p>
+                            <p className="text-[10px] text-slate-400 font-semibold truncate">
+                              {s.nis ? `NIS: ${s.nis} • ` : ''}Kelas {s.kelas}
+                            </p>
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <Icon name="check" size={15} className="text-blue-600 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // 6. CATAT PEMBAYARAN MANUAL
+    // ==========================================
+    function LaporanView({ students, transactions, settings }) {
+      const [filterType, setFilterType] = useState('all');
+      const [filterClass, setFilterClass] = useState(() => (settings?.customClasses && settings.customClasses.length > 0) ? settings.customClasses[0].name : '');
+      const [filterStudent, setFilterStudent] = useState('');
+      const [filterSemester, setFilterSemester] = useState('all'); // 'all', '1', '2'
+      const [viewMode, setViewMode] = useState('all'); // 'all', 'rekap', 'transaksi'
+      const [filterTrxScope, setFilterTrxScope] = useState('all'); // 'all' (Termasuk Riwayat Kelas Sebelumnya) | 'current_only' (Hanya Transaksi di Kelas Terpilih)
+
+      // Daftar periode pembayaran SPP yang tersedia dari pengaturan
+      const periodsList = useMemo(() => {
+        let list = [];
+        if (Array.isArray(settings?.academicPeriods) && settings.academicPeriods.length > 0) {
+          list = settings.academicPeriods.map((p, idx) => ({
+            ...p,
+            id: String(p.id || `period-${idx}`)
+          }));
+        }
+
+        const sStartM = settings?.startMonth || 'Juli';
+        const sStartY = parseInt(settings?.startYear) || 2026;
+        const sEndM = settings?.endMonth || 'Juni';
+        const sEndY = parseInt(settings?.endYear) || 2027;
+
+        // Jika belum ada di list, masukkan periode aktif default dari settings
+        if (list.length === 0) {
+          list.push({
+            id: 'active-default',
+            name: `Periode ${sStartM} ${sStartY} - ${sEndM} ${sEndY}`,
+            startMonth: sStartM,
+            startYear: sStartY,
+            endMonth: sEndM,
+            endYear: sEndY,
+            semester: settings?.semester || 'Semua',
+            isActive: true
+          });
+        } else {
+          // Pastikan ada setidaknya satu yang bertanda isActive
+          const hasActive = list.some(p => p.isActive);
+          if (!hasActive) {
+            const matchIdx = list.findIndex(p => 
+              p.startMonth === sStartM && 
+              parseInt(p.startYear) === sStartY && 
+              p.endMonth === sEndM && 
+              parseInt(p.endYear) === sEndY
+            );
+            if (matchIdx !== -1) {
+              list[matchIdx].isActive = true;
+            } else {
+              list[0].isActive = true;
+            }
+          }
+        }
+        return list;
+      }, [settings]);
+
+      // Temukan periode aktif
+      const activePeriod = useMemo(() => {
+        return periodsList.find(p => p.isActive) || periodsList[0] || null;
+      }, [periodsList]);
+
+      // State pilihan periode (default ke periode aktif)
+      const [filterPeriod, setFilterPeriod] = useState(() => {
+        return activePeriod ? String(activePeriod.id) : 'all';
+      });
+
+      // Filter student dibiarkan kosong jika user menekan tombol [x] (clear)
+
+      // Sinkronisasi default periode jika awalnya kosong
+      useEffect(() => {
+        if (!filterPeriod && activePeriod) {
+          setFilterPeriod(String(activePeriod.id));
+        }
+      }, [activePeriod, filterPeriod]);
+
+      // Objek periode yang sedang dipilih
+      const selectedPeriodObj = useMemo(() => {
+        const curId = filterPeriod || (activePeriod ? String(activePeriod.id) : 'all');
+        if (curId === 'all') return null;
+        return periodsList.find(p => String(p.id) === String(curId)) || null;
+      }, [filterPeriod, activePeriod, periodsList]);
+
+      // Sinkronisasi otomatis semester saat periode terpilih berubah
+      useEffect(() => {
+        if (selectedPeriodObj) {
+          setFilterSemester(detectSemesterFromPeriod(selectedPeriodObj, 'all'));
+        }
+      }, [selectedPeriodObj]);
+
+      // Objek murid yang dipilih saat filter student aktif
+      const selectedStudentObj = useMemo(() => {
+        if (!filterStudent) return null;
+        return students.find(s => s.id === filterStudent || s.name === filterStudent) || null;
+      }, [students, filterStudent]);
+
+      // Rangkaian bulan untuk cakupan periode & semester yang dipilih
+      const scopeMonths = useMemo(() => {
+        if (selectedPeriodObj) {
+          const pStartM = selectedPeriodObj.startMonth || 'Juli';
+          const pStartY = parseInt(selectedPeriodObj.startYear) || 2026;
+          const pEndM = selectedPeriodObj.endMonth || 'Juni';
+          const pEndY = parseInt(selectedPeriodObj.endYear) || pStartY;
+
+          const pMonths = getMonthsList(pStartM, '', pEndM, pStartY, pEndY);
+          if (pMonths.length > 6 && filterSemester !== 'all') {
+            return getSemesterMonths(pMonths, filterSemester);
+          }
+          return pMonths;
+        }
+
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const endM = settings?.endMonth || 'Juni';
+        const endY = parseInt(settings?.endYear) || (sysEarliest.year + 1);
+
+        const baseMonths = getMonthsList(sysEarliest.month, '', endM, sysEarliest.year, endY);
+        return getSemesterMonths(baseMonths, filterSemester);
+      }, [selectedPeriodObj, filterSemester, settings]);
+
+      // Tahun mulai periode untuk acuan perhitungan bulan jatuh tempo
+      const periodStartYear = useMemo(() => {
+        if (selectedPeriodObj) return parseInt(selectedPeriodObj.startYear) || 2026;
+        return parseInt(settings?.startYear) || 2026;
+      }, [selectedPeriodObj, settings]);
+
+      // Bulan yang SUDAH JATUH TEMPO / BERJALAN s/d bulan sekarang dalam cakupan ini
+      // Bulan mendatang TIDAK dihitung sebagai tunggakan ("kalo blm kelewat bulan jangan terhitung")
+      const dueMonths = useMemo(() => {
+        return scopeMonths.filter(m => isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10));
+      }, [scopeMonths, settings?.dueDateDay]);
+
+      // Bulan mendatang yang belum tiba (belum jatuh tempo)
+      const futureMonths = useMemo(() => {
+        return scopeMonths.filter(m => !dueMonths.includes(m));
+      }, [scopeMonths, dueMonths]);
+
+      // Helper pencocokan transaksi dalam cakupan bulan
+      const isTrxInScope = useCallback((trx) => {
+        if (!trx) return false;
+        const trxMonth = (trx.month || '').trim().toLowerCase();
+        if (!trxMonth) return false;
+
+        // Sertakan transaksi pelunasan tunggakan bawaan / kelas sebelumnya
+        if (trxMonth.includes('tunggakan') || trxMonth.includes('kelas sebelumnya')) {
+          return true;
+        }
+
+        if (scopeMonths.some(m => m.trim().toLowerCase() === trxMonth)) {
+          return true;
+        }
+
+        const parts = trxMonth.split(/\s+/);
+        if (parts.length >= 2) return false;
+
+        let trxYear = null;
+        if (trx.date) {
+          const matchYear = trx.date.match(/\b(20\d{2})\b/);
+          if (matchYear) trxYear = parseInt(matchYear[1]);
+        }
+
+        if (trxYear) {
+          const targetWithYear = `${parts[0]} ${trxYear}`.toLowerCase();
+          return scopeMonths.some(m => m.trim().toLowerCase() === targetWithYear);
+        }
+
+        return scopeMonths.some(m => m.trim().toLowerCase().startsWith(parts[0]));
+      }, [scopeMonths]);
+
+      // Siswa yang masuk dalam filter (hanya siswa aktif)
+      const filteredStudents = useMemo(() => {
+        let list = students.filter(s => s.statusAktif !== false);
+        if (filterType === 'class') {
+          list = list.filter(s => (s.kelas || '').toLowerCase().trim() === (filterClass || '').toLowerCase().trim());
+        } else if (filterType === 'student') {
+          if (filterStudent) {
+            list = list.filter(s => String(s.id) === String(filterStudent) || s.name === filterStudent);
+          } else {
+            return []; // Jika pilihan siswa dihapus (kosong), tampilkan tabel kosong tanpa memilih acak
+          }
+        }
+        return list;
+      }, [students, filterType, filterClass, filterStudent]);
+
+      // Data Rekap Status Pembayaran & Tunggakan per Siswa
+      const studentReportData = useMemo(() => {
+        return filteredStudents.map(student => {
+          const studentTrx = transactions.filter(t => {
+            const isMatch = (t.studentId === student.id) ||
+              (student.name && t.studentName && t.studentName.toLowerCase().trim() === student.name.toLowerCase().trim());
+            const st = (t.status || '').toLowerCase().trim();
+            const isPaid = (st === 'lunas' || st === 'berhasil' || st === 'sukses');
+            return isMatch && isPaid;
+          });
+
+          // Filter scope, due, dan future months agar HANYA menghitung bulan saat siswa aktif
+          const studentScopeMonths = scopeMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+          const studentDueMonths = dueMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+          const studentFutureMonths = futureMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+
+          // Bulan apa saja yang sudah dibayar oleh siswa ini di scope ini
+          const paidMonths = studentScopeMonths.filter(m => {
+            const mLower = m.trim().toLowerCase();
+            return studentTrx.some(t => {
+              const tMonth = (t.month || '').trim().toLowerCase();
+              if (tMonth === mLower) return true;
+              const parts = tMonth.split(/\s+/);
+              if (parts.length === 1 && mLower.startsWith(parts[0])) return true;
+              return false;
+            });
+          });
+
+          // Bulan apa saja yang BELUM DIBAYAR dan SUDAH JATUH TEMPO s/d bulan sekarang (Tunggakan Aktif)
+          // Kalo belum kelewat bulan jangan terhitung!
+          const unpaidDueMonths = studentDueMonths.filter(m => !paidMonths.includes(m));
+
+          // Bulan mendatang yang belum dibayar (belum jatuh tempo)
+          const futureUnpaidMonths = studentFutureMonths.filter(m => !paidMonths.includes(m));
+
+          const tarif = Number(student.tarif) || 350000;
+          const totalPaidAmount = paidMonths.length * tarif;
+          const previousArrears = Number(student.arrearsAmount) || 0;
+          const totalDebtAmount = (unpaidDueMonths.length * tarif) + previousArrears;
+          const isLunas = unpaidDueMonths.length === 0 && previousArrears === 0;
+
+          return {
+            student,
+            tarif,
+            paidMonths,
+            unpaidDueMonths,
+            futureUnpaidMonths,
+            totalPaidAmount,
+            totalDebtAmount,
+            isLunas
+          };
+        });
+      }, [filteredStudents, transactions, scopeMonths, dueMonths, futureMonths, settings]);
+
+      // Total agregat statistik
+      const grandTotalPaid = useMemo(() => {
+        return studentReportData.reduce((sum, item) => sum + item.totalPaidAmount, 0);
+      }, [studentReportData]);
+
+      const grandTotalDebt = useMemo(() => {
+        return studentReportData.reduce((sum, item) => sum + item.totalDebtAmount, 0);
+      }, [studentReportData]);
+
+      const totalLunasCount = useMemo(() => {
+        return studentReportData.filter(i => i.isLunas).length;
+      }, [studentReportData]);
+
+      const totalDebtCount = useMemo(() => {
+        return studentReportData.filter(i => !i.isLunas).length;
+      }, [studentReportData]);
+
+      // Riwayat Transaksi Kuitansi Pembayaran Lunas dalam scope
+      const filteredTransactions = useMemo(() => {
+        let res = transactions.filter(t => {
+          const st = (t.status || '').toLowerCase().trim();
+          return st === 'lunas' || st === 'berhasil' || st === 'sukses';
+        });
+
+        if (filterType === 'class') {
+          if (filterTrxScope === 'current_only') {
+            res = res.filter(t => (t.kelas || '').toLowerCase().trim() === (filterClass || '').toLowerCase().trim());
+          } else {
+            // 'all': Termasuk transaksi murid rombel ini saat di kelas sebelumnya
+            const studentIdsInClass = new Set(filteredStudents.map(s => String(s.id)));
+            const studentNamesInClass = new Set(filteredStudents.map(s => (s.name || '').toLowerCase().trim()));
+            res = res.filter(t => 
+              (t.kelas || '').toLowerCase().trim() === (filterClass || '').toLowerCase().trim() ||
+              (t.studentId && studentIdsInClass.has(String(t.studentId))) ||
+              (t.studentName && studentNamesInClass.has((t.studentName || '').toLowerCase().trim()))
+            );
+          }
+        } else if (filterType === 'student') {
+          if (filterStudent) {
+            res = res.filter(t => 
+              String(t.studentId) === String(filterStudent) || 
+              (selectedStudentObj && t.studentName && t.studentName.toLowerCase().trim() === selectedStudentObj.name.toLowerCase().trim()) ||
+              (t.studentName && t.studentName.toLowerCase().trim() === String(filterStudent).toLowerCase().trim())
+            );
+          } else {
+            return []; // Jika belum ada siswa yang dipilih, transaksi kosong
+          }
+        }
+
+        res = res.filter(t => isTrxInScope(t));
+        return res;
+      }, [transactions, filterType, filterClass, filterStudent, selectedStudentObj, isTrxInScope, filterTrxScope, filteredStudents]);
+
+      const totalReceiptAmount = filteredTransactions.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
+
+      const handlePrint = () => {
+        setTimeout(() => {
+          window.print();
+        }, 100);
+      };
+
+      const handleOpenPrintTab = () => {
+        const printContent = document.querySelector('.printable-area');
+        if (!printContent) {
+          window.print();
+          return;
+        }
+        const win = window.open('', '_blank');
+        if (!win) {
+          window.print();
+          return;
+        }
+        win.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="UTF-8">
+              <title>Laporan SPP - ${settings?.schoolName || 'PAUD'}</title>
+              <link rel="stylesheet" href="dashboard.min.css">
+              <style>
+                body { padding: 24px; background: #ffffff; color: #0f172a; font-family: sans-serif; }
+                @media print { body { padding: 0; } }
+              </style>
+            </head>
+            <body>
+              <div class="printable-area">
+                ${printContent.innerHTML}
+              </div>
+              <script>
+                setTimeout(() => {
+                  window.print();
+                }, 400);
+              <\/script>
+            </body>
+          </html>
+        `);
+        win.document.close();
+      };
+
+      const now = new Date();
+      const currentMonthLabel = ALL_MONTHS[now.getMonth()];
+      const currentDateFormatted = now.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      const semesterLabel = filterSemester === '1' ? 'Semester 1 (Ganjil)' : (filterSemester === '2' ? 'Semester 2 (Genap)' : 'Semua Semester');
+
+      return (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* FILTER PANEL ADMIN (SEMBUNYI SAAT CETAK) */}
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-sm print:hidden space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+                  <Icon name="printer" className="text-blue-600" /> Cetak Laporan Pembayaran & Rekap Tunggakan
+                </h2>
+                <p className="text-xs text-slate-500 mt-1 font-medium">
+                  Filter laporan berdasarkan siswa/kelas, periode ajaran, dan pilihan semester dengan rekap bulan lunas vs tunggakan s/d bulan sekarang.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button 
+                  onClick={handlePrint} 
+                  className="py-2.5 px-5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2"
+                >
+                  <Icon name="printer" size={16} /> Cetak Sekarang (PDF)
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleOpenPrintTab} 
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 border border-slate-200"
+                  title="Buka dokumen di tab baru untuk dicetak / simpan PDF"
+                >
+                  <Icon name="external-link" size={15} /> Buka Tab Cetak
+                </button>
+              </div>
+            </div>
+
+            {/* Grid Kontrol Filter */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Filter Berdasarkan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Berdasarkan</label>
+                <select 
+                  value={filterType} 
+                  onChange={e => setFilterType(e.target.value)} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">Semua Siswa</option>
+                  <option value="class">Per Kelas</option>
+                  <option value="student">Per Nama Siswa</option>
+                </select>
+              </div>
+              
+              {/* 2. Pilihan Kelas (Jika Per Kelas) */}
+              {filterType === 'class' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pilih Kelas</label>
+                  <select 
+                    value={filterClass} 
+                    onChange={e => setFilterClass(e.target.value)} 
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    {(settings?.customClasses || []).map(c => (
+                      <option key={c.name} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              {/* 2. Pilihan Siswa (Jika Per Siswa) */}
+              {filterType === 'student' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Pilih Siswa</label>
+                  <SearchableStudentSelect 
+                    students={students}
+                    value={filterStudent} 
+                    onChange={e => setFilterStudent(e.target.value)} 
+                    placeholder="-- Cari & Pilih Siswa --"
+                    theme="blue"
+                  />
+                </div>
+              )}
+
+              {/* 3. Filter Periode SPP */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Periode Pembayaran SPP</label>
+                <select 
+                  value={filterPeriod || (activePeriod ? String(activePeriod.id) : 'all')} 
+                  onChange={e => {
+                    const newId = e.target.value;
+                    setFilterPeriod(newId);
+                    const matchP = periodsList.find(p => String(p.id) === String(newId));
+                    setFilterSemester(detectSemesterFromPeriod(matchP, 'all'));
+                  }} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">Semua Periode</option>
+                  {periodsList.map(p => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name} {p.isActive ? '(Aktif)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 4. Filter Semester (Fitur Baru Permintaan User) */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
+                  <span>Pilih Semester</span>
+                  <span className="px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded text-[9px] font-black">Filter</span>
+                </label>
+                <select 
+                  value={filterSemester} 
+                  onChange={e => setFilterSemester(e.target.value)} 
+                  className="w-full px-3.5 py-2.5 bg-blue-50/60 border border-blue-300 rounded-xl font-bold text-xs text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">Semua Semester (1 Tahun Penuh)</option>
+                  <option value="1">Semester 1 (Ganjil)</option>
+                  <option value="2">Semester 2 (Genap)</option>
+                </select>
+              </div>
+
+              {/* 5. Tampilan Bagian Laporan */}
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Bagian Ditampilkan</label>
+                <select 
+                  value={viewMode} 
+                  onChange={e => setViewMode(e.target.value)} 
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">Lengkap (Rekap Siswa + Kuitansi)</option>
+                  <option value="rekap">Hanya Rekap Pembayaran & Tunggakan</option>
+                  <option value="transaksi">Hanya Riwayat Kuitansi Masuk</option>
+                </select>
+              </div>
+
+              {/* 6. Cakupan Riwayat Kelas (Untuk memastikan pembayaran kelas sebelumnya terlacak) */}
+              {filterType === 'class' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1">
+                    <span>Riwayat Kelas</span>
+                    <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[9px] font-black">Pelacakan</span>
+                  </label>
+                  <select 
+                    value={filterTrxScope} 
+                    onChange={e => setFilterTrxScope(e.target.value)} 
+                    className="w-full px-3.5 py-2.5 bg-emerald-50/60 border border-emerald-300 rounded-xl font-bold text-xs text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="all">Semua Rombel (Termasuk Kelas Sebelumnya)</option>
+                    <option value="current_only">Hanya Kelas {filterClass} Saja</option>
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Info Badge Ringkas Status Filter */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+              <span className="text-[11px] font-bold text-slate-500">Info Filter Aktif:</span>
+              <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                <Icon name="calendar" size={13} className="text-blue-600" />
+                Periode: <strong className="text-slate-900">{selectedPeriodObj ? selectedPeriodObj.name : 'Semua Periode'}</strong>
+              </span>
+              <span className="px-2.5 py-1 bg-blue-100/70 text-blue-800 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                <Icon name="bookmark" size={13} className="text-blue-600" />
+                Semester: <strong className="text-blue-950">{semesterLabel}</strong>
+              </span>
+              <span className="px-2.5 py-1 bg-emerald-100/70 text-emerald-800 rounded-lg font-bold text-[11px] flex items-center gap-1">
+                <Icon name="clock" size={13} className="text-emerald-700" />
+                Bulan Acuan Jatuh Tempo: <strong className="text-emerald-950">{currentMonthLabel} (Bulan Sekarang)</strong>
+              </span>
+              <span className="px-2.5 py-1 bg-purple-100/70 text-purple-800 rounded-lg font-bold text-[11px]">
+                {scopeMonths.length} Bulan Teranalisis
+              </span>
+            </div>
+          </div>
+
+          {/* DOKUMEN LAPORAN CETAK / PREVIEW */}
+          <div className="printable-area bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-sm print:shadow-none print:border-none print:p-0 space-y-8">
+            {/* KOP SURAT SEKOLAH */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-5 border-b-2 border-slate-900 pb-5 text-center sm:text-left">
+              <div className="w-20 h-20 shrink-0 flex items-center justify-center p-1.5 bg-white border-2 border-slate-200 rounded-2xl shadow-sm">
+                <img src="logo.webp" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 uppercase tracking-wider">{settings?.schoolName || 'PAUD SETIA BHAKTI'}</h1>
+                <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-1">{settings?.address || 'Paud setia bhakti, Subang, Jawa Barat'}</p>
+                <p className="text-xs sm:text-sm font-semibold text-slate-600">Telp / WA: {settings?.phone || '089503222835'}</p>
+              </div>
+              
+              <div className="mt-5 pt-3 border-t border-slate-200">
+                <h2 className="text-lg sm:text-xl font-black text-slate-800 uppercase tracking-wide">
+                  LAPORAN PEMBAYARAN & REKAP TUNGGAKAN SPP
+                </h2>
+                <div className="flex flex-wrap items-center justify-center gap-3 mt-1.5 text-xs font-bold text-slate-600 uppercase">
+                  <span>CAKUPAN: <strong className="text-slate-900">{
+                    filterType === 'all' ? 'SEMUA SISWA' : 
+                    filterType === 'class' ? `KELAS ${filterClass}` : 
+                    (selectedStudentObj ? `${selectedStudentObj.name} (${selectedStudentObj.kelas})` : 'BELUM ADA SISWA DIPILIH')
+                  }</strong></span>
+                  <span>•</span>
+                  <span>PERIODE: <strong className="text-slate-900">{selectedPeriodObj ? selectedPeriodObj.name : 'SEMUA PERIODE'}</strong></span>
+                  <span>•</span>
+                  <span>SEMESTER: <strong className="text-slate-900">{semesterLabel.toUpperCase()}</strong></span>
+                </div>
+                <p className="text-[11px] font-medium text-slate-500 mt-1">
+                  Dicetak pada: {currentDateFormatted} | Acuan Jatuh Tempo s/d Bulan Berjalan: <strong className="text-slate-700 font-bold">{currentMonthLabel}</strong>
+                </p>
+              </div>
+            </div>
+
+            {/* RINGKASAN METRIK FINANSIAL */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-200 print:border-slate-300">
+                <p className="text-[11px] font-black uppercase text-emerald-800">Total SPP Terbayarkan</p>
+                <p className="text-xl sm:text-2xl font-black text-emerald-700 mt-1">{formatRupiah(grandTotalPaid)}</p>
+                <p className="text-[10px] font-bold text-emerald-600 mt-0.5">Penerimaan dari siswa terdata</p>
+              </div>
+
+              <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 print:border-slate-300">
+                <p className="text-[11px] font-black uppercase text-rose-800">Total Tunggakan SPP</p>
+                <p className="text-xl sm:text-2xl font-black text-rose-700 mt-1">{formatRupiah(grandTotalDebt)}</p>
+                <p className="text-[10px] font-bold text-rose-600 mt-0.5">
+                  Hanya s/d {currentMonthLabel} (Bulan mendatang tidak terhitung)
+                </p>
+              </div>
+
+              <div className="p-4 bg-blue-50 rounded-2xl border border-blue-200 print:border-slate-300">
+                <p className="text-[11px] font-black uppercase text-blue-800">Status Pembayaran Siswa</p>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="text-xs font-black text-emerald-700 bg-white px-2.5 py-1 rounded-lg border border-emerald-200">
+                    {totalLunasCount} Lunas
+                  </span>
+                  <span className="text-xs font-black text-rose-700 bg-white px-2.5 py-1 rounded-lg border border-rose-200">
+                    {totalDebtCount} Menunggak
+                  </span>
+                </div>
+                <p className="text-[10px] font-bold text-blue-600 mt-1.5">Total: {studentReportData.length} Siswa Terdaftar</p>
+              </div>
+            </div>
+
+            {/* TABEL 1: REKAP PEMBAYARAN & TUNGGAKAN SISWA */}
+            {(viewMode === 'all' || viewMode === 'rekap') && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <h3 className="font-black text-sm text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                    <Icon name="users" size={16} className="text-blue-600 print:hidden" />
+                    I. Rekap Status Pembayaran & Tunggakan Siswa
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    Rentang: {scopeMonths.length} Bulan ({semesterLabel})
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse border border-slate-300 text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold text-slate-700 border-b-2 border-slate-300 print:bg-slate-200">
+                        <th className="py-2.5 px-3 border-r border-slate-300 text-center w-10">No</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Nama Siswa & NIS</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Kelas</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Bulan Sudah Dibayar (Lunas)</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Bulan Belum Dibayar (Tunggakan s/d {currentMonthLabel})</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300 text-right">Total Terbayar</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300 text-right">Total Tunggakan</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
+                      {studentReportData.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="py-8 text-center text-slate-500 font-bold">
+                            {filterType === 'student' && !filterStudent
+                              ? 'Belum Ada Siswa yang Dipilih. Silakan cari dan pilih nama siswa pada kolom filter di atas.'
+                              : 'Tidak ada data siswa yang sesuai kriteria filter.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        studentReportData.map((item, idx) => {
+                          const { student, paidMonths, unpaidDueMonths, futureUnpaidMonths, totalPaidAmount, totalDebtAmount, isLunas } = item;
+                          return (
+                            <tr key={student.id || idx} className="hover:bg-slate-50">
+                              <td className="py-2.5 px-3 border-r border-slate-200 text-center font-bold text-slate-600">
+                                {idx + 1}
+                              </td>
+                              <td className="py-2.5 px-3 border-r border-slate-200 font-black text-slate-900">
+                                {student.name}
+                                <span className="block text-[10px] font-bold text-slate-400">NIS: {student.nis || '-'}</span>
+                              </td>
+                              <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-slate-700">
+                                {student.kelas}
+                              </td>
+                              {/* Bulan Sudah Dibayar */}
+                              <td className="py-2.5 px-3 border-r border-slate-200">
+                                {paidMonths.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {paidMonths.map((m, i) => (
+                                      <span key={i} className="inline-block px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black text-[10px]">
+                                        {m}
+                                      </span>
+                                    ))}
+                                    <span className="text-[10px] text-emerald-700 font-bold ml-1 self-center">
+                                      ({paidMonths.length} Bln)
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400 italic text-[11px]">Belum ada pembayaran (-)</span>
+                                )}
+                              </td>
+                              {/* Bulan Belum Dibayar (Tunggakan s/d Bulan Sekarang) */}
+                              <td className="py-2.5 px-3 border-r border-slate-200">
+                                {unpaidDueMonths.length > 0 ? (
+                                  <div className="space-y-1">
+                                    <div className="flex flex-wrap gap-1">
+                                      {unpaidDueMonths.map((m, i) => (
+                                        <span key={i} className="inline-block px-1.5 py-0.5 bg-rose-100 text-rose-800 rounded font-black text-[10px]">
+                                          {m}
+                                        </span>
+                                      ))}
+                                      <span className="text-[10px] text-rose-700 font-black ml-1 self-center">
+                                        ({unpaidDueMonths.length} Bulan Menunggak)
+                                      </span>
+                                    </div>
+                                    {futureUnpaidMonths.length > 0 && (
+                                      <p className="text-[9px] text-slate-400 italic">
+                                        *Bulan mendatang: {futureUnpaidMonths[0]} s/d {futureUnpaidMonths[futureUnpaidMonths.length - 1]} ({futureUnpaidMonths.length} Bln belum jatuh tempo)
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <span className="inline-flex items-center gap-1 text-emerald-700 font-black text-[11px]">
+                                      <Icon name="check-circle" size={12} /> Lunas (0 Tunggakan)
+                                    </span>
+                                    {futureUnpaidMonths.length > 0 && (
+                                      <p className="text-[9px] text-slate-400 italic">
+                                        {futureUnpaidMonths.length} bulan mendatang belum jatuh tempo
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </td>
+                              {/* Total Terbayar */}
+                              <td className="py-2.5 px-3 border-r border-slate-200 text-right font-black text-emerald-700">
+                                {formatRupiah(totalPaidAmount)}
+                              </td>
+                              {/* Total Tunggakan */}
+                              <td className="py-2.5 px-3 border-r border-slate-200 text-right font-black text-rose-700">
+                                {formatRupiah(totalDebtAmount)}
+                              </td>
+                              {/* Status */}
+                              <td className="py-2.5 px-3 text-center">
+                                {isLunas ? (
+                                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-black text-[10px] inline-block uppercase">
+                                    Lunas
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded font-black text-[10px] inline-block uppercase">
+                                    Nunggak ({unpaidDueMonths.length} Bln)
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                        <td colSpan="5" className="py-3 px-3 text-right border-r border-slate-300 uppercase">
+                          Total Keseluruhan Rekap:
+                        </td>
+                        <td className="py-3 px-3 text-right text-emerald-700 border-r border-slate-300">
+                          {formatRupiah(grandTotalPaid)}
+                        </td>
+                        <td className="py-3 px-3 text-right text-rose-700 border-r border-slate-300">
+                          {formatRupiah(grandTotalDebt)}
+                        </td>
+                        <td className="py-3 px-3 text-center text-slate-600 text-[10px]">
+                          {totalLunasCount} Lunas / {totalDebtCount} Nunggak
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TABEL 2: RINCIAN RIWAYAT TRANSAKSI KUITANSI */}
+            {(viewMode === 'all' || viewMode === 'transaksi') && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                  <h3 className="font-black text-sm text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                    <Icon name="receipt" size={16} className="text-emerald-600 print:hidden" />
+                    II. Rincian Riwayat Pembayaran Masuk (Kuitansi)
+                  </h3>
+                  <span className="text-[11px] font-bold text-slate-500">
+                    {filteredTransactions.length} Transaksi Terverifikasi
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse border border-slate-300 text-xs">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold text-slate-700 border-b-2 border-slate-300 print:bg-slate-200">
+                        <th className="py-2.5 px-3 border-r border-slate-300 text-center w-10">No</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Tanggal</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">No Kuitansi</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Nama Siswa</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Kelas</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Bulan SPP</th>
+                        <th className="py-2.5 px-3 border-r border-slate-300">Metode Bayar</th>
+                        <th className="py-2.5 px-3 text-right">Nominal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 font-medium text-slate-800">
+                      {filteredTransactions.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="py-8 text-center text-slate-500 font-bold">
+                            {filterType === 'student' && !filterStudent
+                              ? 'Belum ada siswa yang dipilih. Silakan pilih siswa pada filter di atas.'
+                              : 'Tidak ada riwayat kuitansi pembayaran pada periode & semester ini.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredTransactions.map((trx, idx) => (
+                          <tr key={trx.id || idx} className="hover:bg-slate-50">
+                            <td className="py-2.5 px-3 border-r border-slate-200 text-center font-bold text-slate-600">{idx + 1}</td>
+                            <td className="py-2.5 px-3 border-r border-slate-200 font-semibold">{formatDateIndo(trx.date)}</td>
+                            <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-slate-800">{trx.kuitansiNo || '-'}</td>
+                            <td className="py-2.5 px-3 border-r border-slate-200 font-black text-slate-900">{trx.studentName}</td>
+                            <td className="py-2.5 px-3 border-r border-slate-200">
+                              <span className="font-semibold">{trx.kelas}</span>
+                              {filterType === 'class' && trx.kelas && (trx.kelas || '').toLowerCase().trim() !== (filterClass || '').toLowerCase().trim() && (
+                                <span className="block text-[10px] text-amber-700 font-bold">(Kelas Sebelumnya)</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-200 font-bold text-emerald-800">
+                              <span>{trx.month}</span>
+                              {Boolean(trx.keringananNote) && (
+                                <span className="block text-[10px] font-black text-emerald-700 italic">
+                                  * Diringankan ({trx.keringananNote})
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 border-r border-slate-200 text-slate-600">{trx.method || 'Tunai (di TU)'}</td>
+                            <td className="py-2.5 px-3 text-right font-black text-emerald-700">
+                              <div>{formatRupiah(trx.amount)}</div>
+                              {Boolean(trx.keringananNote) && (
+                                <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100/80 px-1 py-0.5 rounded border border-emerald-300">
+                                  * Keringanan
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-300">
+                        <td colSpan="7" className="py-3 px-3 text-right border-r border-slate-300 uppercase">
+                          Total Pemasukan Kuitansi:
+                        </td>
+                        <td className="py-3 px-3 text-right text-emerald-700">
+                          {formatRupiah(totalReceiptAmount)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* CATATAN KAKI & PENGESAHAN LAPORAN */}
+            <div className="pt-4 border-t border-slate-200 text-xs text-slate-500 space-y-2">
+              <p className="italic">
+                * Catatan Sistem: Perhitungan total tunggakan hanya memperhitungkan tagihan yang telah jatuh tempo atau berjalan sampai dengan bulan saat ini (<strong>{currentMonthLabel}</strong>). Bulan-bulan mendatang dalam tahun ajaran yang belum jatuh tempo tidak dihitung sebagai tunggakan.
+              </p>
+            </div>
+
+            <div className="mt-8 pt-4 flex justify-between items-end print:block print:text-right">
+              <div className="text-[11px] text-slate-500 hidden sm:block print:hidden">
+                <p>Dokumen ini dibuat otomatis oleh Sistem Informasi SPP PAUD.</p>
+                <p>Berlaku sebagai rekapitulasi sah administrasi sekolah.</p>
+              </div>
+
+              <div className="text-center w-64 ml-auto">
+                <p className="text-xs font-bold text-slate-600 mb-16">Mengetahui, Administrator TU</p>
+                <p className="font-extrabold text-slate-900 underline uppercase text-sm">{settings?.adminName || 'Sarah Aura Alamanda'}</p>
+                <p className="text-[10px] text-slate-500 font-bold">NIP / ID: {settings?.adminUsername || 'Sarah'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function TransaksiView({ students, transactions, settings, onAddTransaction, onShowKuitansi, onUpdateStudent }) {
+      const [selectedStudentId, setSelectedStudentId] = useState('');
+      const [selectedMonth, setSelectedMonth] = useState('');
+      const [payMethod, setPayMethod] = useState('Tunai (di TU)');
+      const [customAmount, setCustomAmount] = useState('');
+
+      // Daftar periode pembayaran SPP dari pengaturan
+      const periodsList = useMemo(() => {
+        let list = [];
+        if (Array.isArray(settings?.academicPeriods) && settings.academicPeriods.length > 0) {
+          list = settings.academicPeriods.map((p, idx) => ({
+            ...p,
+            id: String(p.id || `period-${idx}`)
+          }));
+        }
+        const sStartM = settings?.startMonth || 'Juli';
+        const sStartY = parseInt(settings?.startYear) || 2026;
+        const sEndM = settings?.endMonth || 'Juni';
+        const sEndY = parseInt(settings?.endYear) || 2027;
+
+        if (list.length === 0) {
+          list.push({
+            id: 'active-default',
+            name: `Periode ${sStartM} ${sStartY} - ${sEndM} ${sEndY}`,
+            startMonth: sStartM,
+            startYear: sStartY,
+            endMonth: sEndM,
+            endYear: sEndY,
+            semester: settings?.semester || 'Semua',
+            isActive: true
+          });
+        }
+        return list;
+      }, [settings]);
+
+      const activePeriod = useMemo(() => {
+        return periodsList.find(p => p.isActive) || periodsList[0] || null;
+      }, [periodsList]);
+
+      const [filterPeriod, setFilterPeriod] = useState(() => {
+        return activePeriod ? String(activePeriod.id) : 'all';
+      });
+
+      // Semester otomatis terisi dari periode pembayaran yang dipilih atau pengaturan
+      const defaultSemester = useMemo(() => {
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      }, [activePeriod, settings?.semester]);
+
+      const [filterSemester, setFilterSemester] = useState(() => {
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      });
+
+      useEffect(() => {
+        if (activePeriod && (!filterPeriod || filterPeriod === 'all')) {
+          setFilterPeriod(String(activePeriod.id));
+        }
+      }, [activePeriod]);
+
+      const selectedPeriodObj = useMemo(() => {
+        const curId = filterPeriod || (activePeriod ? String(activePeriod.id) : 'all');
+        if (curId === 'all') return null;
+        return periodsList.find(p => String(p.id) === String(curId)) || null;
+      }, [filterPeriod, activePeriod, periodsList]);
+
+      // Sinkronisasi otomatis saat periode pembayaran berubah
+      useEffect(() => {
+        if (selectedPeriodObj) {
+          setFilterSemester(detectSemesterFromPeriod(selectedPeriodObj, defaultSemester));
+        } else {
+          setFilterSemester(defaultSemester);
+        }
+      }, [selectedPeriodObj, defaultSemester]);
+
+      const activeStudents = useMemo(() => students.filter(s => s.statusAktif !== false), [students]);
+
+      const selectedStudent = useMemo(() => {
+        return students.find(s => s.id.toString() === selectedStudentId.toString());
+      }, [students, selectedStudentId]);
+
+      // Rangkaian bulan untuk cakupan periode & semester yang dipilih (diambil langsung dari periode pilihan)
+      const scopeMonths = useMemo(() => {
+        if (selectedPeriodObj) {
+          const pStartM = selectedPeriodObj.startMonth || 'Juli';
+          const pStartY = parseInt(selectedPeriodObj.startYear) || 2026;
+          const pEndM = selectedPeriodObj.endMonth || 'Juni';
+          const pEndY = parseInt(selectedPeriodObj.endYear) || pStartY;
+
+          const pMonths = getMonthsList(pStartM, '', pEndM, pStartY, pEndY);
+          // Jika periode mencakup lebih dari 1 semester (> 6 bulan) dan filterSemester disetel bukan 'all'
+          if (pMonths.length > 6 && filterSemester !== 'all') {
+            return getSemesterMonths(pMonths, filterSemester);
+          }
+          return pMonths;
+        }
+
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const endM = settings?.endMonth || 'Juni';
+        const endY = parseInt(settings?.endYear) || (sysEarliest.year + 1);
+
+        const baseMonths = getMonthsList(sysEarliest.month, '', endM, sysEarliest.year, endY);
+        return getSemesterMonths(baseMonths, filterSemester);
+      }, [selectedPeriodObj, filterSemester, settings]);
+
+      const periodStartYear = useMemo(() => {
+        if (selectedPeriodObj) return parseInt(selectedPeriodObj.startYear) || 2026;
+        return parseInt(settings?.startYear) || 2026;
+      }, [selectedPeriodObj, settings?.startYear]);
+
+      // Status pembayaran siswa pada bulan-bulan dalam semester & periode ini
+      const paymentSummary = useMemo(() => {
+        if (!selectedStudent) return { paidMonths: [], unpaidMonths: [], dueUnpaidMonths: [], futureUnpaidMonths: [], pastUnpaidDueMonths: [] };
+        const studentTrx = transactions.filter(t => 
+          (t.studentId === selectedStudent.id || (t.studentName && t.studentName.toLowerCase().trim() === selectedStudent.name.toLowerCase().trim())) &&
+          (t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
+        );
+
+        // Cakupan bulan yang dihitung hanya yang jatuh pada masa aktif siswa
+        const studentScopeMonths = scopeMonths.filter(m => isMonthOnOrAfterStudentStart(m, selectedStudent, settings));
+
+        // Cari juga bulan lampau sejak murid masuk s/d awal periode ini yang belum lunas (sisa tunggakan sebelum semester sekarang)
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const studentStart = getStudentEffectiveStart(selectedStudent, settings);
+        let pastUnpaidDueMonths = [];
+        if (scopeMonths.length > 0) {
+          const firstMonthInScope = scopeMonths[0];
+          const parts = firstMonthInScope.split(' ');
+          const fMonth = parts[0];
+          const fYear = parseInt(parts[1]) || sysEarliest.year;
+          const fIdx = ALL_MONTHS.indexOf(fMonth);
+
+          const priorMonths = getMonthsList(studentStart.month, '', ALL_MONTHS[(fIdx - 1 + 12) % 12], studentStart.year, (fIdx === 0 ? fYear - 1 : fYear));
+          if (priorMonths.length > 0 && priorMonths[0] !== firstMonthInScope) {
+            pastUnpaidDueMonths = priorMonths.filter(m => {
+              if (!isMonthOnOrAfterStudentStart(m, selectedStudent, settings)) return false;
+              if (!isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10)) return false;
+              const mLower = m.trim().toLowerCase();
+              return !studentTrx.some(t => {
+                const tMonth = (t.month || '').trim().toLowerCase();
+                return tMonth === mLower || (tMonth && mLower.startsWith(tMonth));
+              });
+            });
+          }
+        }
+
+        const paidMonths = studentScopeMonths.filter(m => {
+          const mLower = m.trim().toLowerCase();
+          return studentTrx.some(t => {
+            const tMonth = (t.month || '').trim().toLowerCase();
+            return tMonth === mLower || (tMonth && mLower.startsWith(tMonth));
+          });
+        });
+        const allUnpaidMonths = studentScopeMonths.filter(m => !paidMonths.includes(m));
         
-... [truncated for diff preview]
+        // Pemisahan akurat: HANYA bulan yang telah berjalan s/d saat ini yang dihitung menunggak
+        const dueUnpaidMonths = allUnpaidMonths.filter(m => isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10));
+        const futureUnpaidMonths = allUnpaidMonths.filter(m => !isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10));
+
+        const combinedDueUnpaid = [...pastUnpaidDueMonths, ...dueUnpaidMonths.filter(m => !pastUnpaidDueMonths.includes(m))];
+        const combinedAllUnpaid = [...pastUnpaidDueMonths, ...allUnpaidMonths.filter(m => !pastUnpaidDueMonths.includes(m))];
+
+        return { 
+          paidMonths, 
+          unpaidMonths: combinedAllUnpaid, 
+          dueUnpaidMonths: combinedDueUnpaid, 
+          futureUnpaidMonths,
+          pastUnpaidDueMonths
+        };
+      }, [selectedStudent, transactions, scopeMonths, settings?.dueDateDay, settings]);
+
+      useEffect(() => {
+        if (selectedStudent) {
+          if (selectedMonth && selectedMonth.startsWith('Tunggakan')) {
+            setCustomAmount(selectedStudent.arrearsAmount || 0);
+          } else {
+            setCustomAmount(selectedStudent.tarif || 350000);
+          }
+          if (paymentSummary.dueUnpaidMonths.length > 0) {
+            setSelectedMonth(paymentSummary.dueUnpaidMonths[0]);
+          } else if (Number(selectedStudent.arrearsAmount || 0) > 0) {
+            setSelectedMonth(selectedStudent.arrearsNote ? `Tunggakan (${selectedStudent.arrearsNote})` : 'Tunggakan Kelas Sebelumnya');
+            setCustomAmount(Number(selectedStudent.arrearsAmount));
+          } else if (paymentSummary.futureUnpaidMonths.length > 0) {
+            setSelectedMonth(paymentSummary.futureUnpaidMonths[0]);
+          } else {
+            setSelectedMonth('');
+          }
+        } else {
+          setSelectedMonth('');
+        }
+      }, [selectedStudent, paymentSummary.dueUnpaidMonths, paymentSummary.futureUnpaidMonths]);
+
+      const handleManualPaymentSubmit = (e) => {
+        e.preventDefault();
+        if (!selectedStudent) {
+          alert('Pilih siswa terlebih dahulu.');
+          return;
+        }
+        if (!selectedMonth) {
+          alert('Pilih bulan SPP terlebih dahulu.');
+          return;
+        }
+
+        const currentDate = formatDateIndo(new Date());
+        const kuitansiNo = `K-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}-${Math.floor(100+Math.random()*900)}`;
+
+        const isArrears = selectedMonth.startsWith('Tunggakan') || selectedMonth.includes('Kelas Sebelumnya');
+
+        const newTrx = {
+          studentId: selectedStudent.id,
+          studentName: selectedStudent.name,
+          kelas: selectedStudent.kelas,
+          month: selectedMonth,
+          amount: Number(customAmount) || (isArrears ? selectedStudent.arrearsAmount : selectedStudent.tarif),
+          method: payMethod,
+          status: 'Lunas',
+          isRead: false,
+          date: currentDate,
+          kuitansiNo: kuitansiNo,
+          keringananNote: selectedStudent.keringanan_note || selectedStudent.keringananNote || ''
+        };
+
+        onAddTransaction(newTrx);
+
+        if (isArrears && typeof onUpdateStudent === 'function') {
+          onUpdateStudent(selectedStudent.id, {
+            ...selectedStudent,
+            arrearsAmount: 0,
+            arrearsNote: `Lunas via Manual TU (${currentDate})`
+          });
+        }
+
+        alert(`Pembayaran SPP Bulan ${selectedMonth} untuk ${selectedStudent.name} (${formatRupiah(newTrx.amount)}) berhasil dicatat!`);
+      };
+
+      return (
+        <div className="space-y-6">
+          {/* Card 1: Catat Pembayaran SPP (Manual TU) - Nuansa Buku Ledger Pastel */}
+          <div className="pastel-ledger-card p-6 sm:p-8 space-y-5 relative">
+            {/* Subtle Stationery Motifs (Clean, Academic & Non-childish) */}
+            <div className="absolute top-4 right-5 hidden sm:flex items-center gap-2 pointer-events-none opacity-40 select-none text-base">
+              <span title="Buku Akademik">📖</span>
+              <span title="Penggaris Pembukuan">📐</span>
+              <span title="Catatan">✈️</span>
+            </div>
+
+            <div className="relative z-10">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-amber-100/80 text-amber-900 rounded-full text-xs font-black uppercase mb-2 border border-amber-300/80 shadow-2xs">
+                <span>📖</span>
+                <span>Buku Catat Pembayaran SPP (Manual TU)</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+                Catat Pembayaran SPP (Manual TU)
+              </h2>
+              <p className="text-xs text-slate-600 font-medium mt-1">
+                Pencatatan langsung saat wali murid membayar tunai atau transfer TU dengan nomor periode & semester otomatis.
+              </p>
+            </div>
+
+            {/* Filter Scope Periode & Semester (Sinkron Otomatis dari Pengaturan) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-amber-50/40 rounded-2xl border border-amber-200/70 text-xs">
+              <div>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>PERIODE PEMBAYARAN</span>
+                </label>
+                <select
+                  value={filterPeriod || (activePeriod ? String(activePeriod.id) : 'all')}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setFilterPeriod(newId);
+                    const matchP = periodsList.find(p => String(p.id) === String(newId));
+                    setFilterSemester(detectSemesterFromPeriod(matchP, defaultSemester));
+                  }}
+                  className="w-full px-4 py-2.5 bg-white border-2 border-emerald-200/90 rounded-2xl font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/20 shadow-2xs"
+                >
+                  <option value="all">Semua Periode</option>
+                  {periodsList.map(p => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name} {p.isActive ? '(Aktif)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span>SEMESTER</span>
+                  </span>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full flex items-center gap-1 ${Boolean(filterPeriod && filterPeriod !== 'all') ? 'text-amber-800 bg-amber-100 border border-amber-200' : 'text-blue-700 bg-blue-100/60'}`}>
+                    {Boolean(filterPeriod && filterPeriod !== 'all') ? '🔒 Terkunci (Sesuai Periode)' : 'Otomatis Terisi'}
+                  </span>
+                </label>
+                <select
+                  value={filterSemester}
+                  disabled={Boolean(filterPeriod && filterPeriod !== 'all')}
+                  onChange={(e) => setFilterSemester(e.target.value)}
+                  className={`w-full px-4 py-2.5 rounded-2xl font-bold border-2 shadow-2xs transition-all ${
+                    Boolean(filterPeriod && filterPeriod !== 'all')
+                      ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed opacity-90'
+                      : 'bg-white border-rose-200/90 text-slate-800 focus:outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-400/20'
+                  }`}
+                >
+                  <option value="all">Semua Semester (1 Tahun Penuh)</option>
+                  <option value="1">Semester 1 (Ganjil)</option>
+                  <option value="2">Semester 2 (Genap)</option>
+                </select>
+              </div>
+            </div>
+
+            <form onSubmit={handleManualPaymentSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div className="relative z-30">
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1">
+                  <span>PILIH MURID</span>
+                </label>
+                <SearchableStudentSelect
+                  required
+                  students={activeStudents}
+                  value={selectedStudentId}
+                  onChange={(e) => setSelectedStudentId(e.target.value)}
+                  placeholder="-- Cari & Pilih Murid --"
+                  theme="sky"
+                />
+              </div>
+
+              <div>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center justify-between">
+                  <span>PILIH KAS / BULAN SPP</span>
+                  <span className="text-[10px] font-extrabold text-purple-700">{scopeMonths.length} Bln</span>
+                </label>
+                <select
+                  required
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedMonth(val);
+                    if (val.startsWith('Tunggakan') && selectedStudent) {
+                      setCustomAmount(selectedStudent.arrearsAmount || 0);
+                    } else if (selectedStudent) {
+                      setCustomAmount(selectedStudent.tarif || 350000);
+                    }
+                  }}
+                  className="w-full px-4 py-2.5 bg-white border-2 border-purple-200/90 rounded-2xl font-bold text-slate-800 focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-400/20 shadow-2xs"
+                >
+                  {!selectedStudent ? (
+                    <>
+                      <option value="">-- Pilih Murid Terlebih Dahulu --</option>
+                      {scopeMonths.map(m => (
+                        <option key={m} value={m} disabled>{m} ({selectedPeriodObj?.name || 'Scope Periode'})</option>
+                      ))}
+                    </>
+                  ) : paymentSummary.unpaidMonths.length === 0 && Number(selectedStudent.arrearsAmount || 0) === 0 ? (
+                    <option value="">Semua Bulan di Semester Ini Sudah Lunas</option>
+                  ) : (
+                    <>
+                      {Number(selectedStudent.arrearsAmount || 0) > 0 && (
+                        <optgroup label="[Tunggakan Bawaan] Kelas Sebelumnya">
+                          <option value={selectedStudent.arrearsNote ? `Tunggakan (${selectedStudent.arrearsNote})` : 'Tunggakan Kelas Sebelumnya'}>
+                            {selectedStudent.arrearsNote ? `Tunggakan (${selectedStudent.arrearsNote})` : 'Tunggakan Kelas Sebelumnya'} - {formatRupiah(selectedStudent.arrearsAmount)}
+                          </option>
+                        </optgroup>
+                      )}
+                      {paymentSummary.pastUnpaidDueMonths && paymentSummary.pastUnpaidDueMonths.length > 0 && (
+                        <optgroup label="[Sisa Tunggakan Sebelumnya] Periode Lampau">
+                          {paymentSummary.pastUnpaidDueMonths.map(m => (
+                            <option key={m} value={m}>{m} (Menunggak Lampau)</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {paymentSummary.dueUnpaidMonths.filter(m => !paymentSummary.pastUnpaidDueMonths?.includes(m)).length > 0 && (
+                        <optgroup label="[Jatuh Tempo] Tagihan Periode Ini">
+                          {paymentSummary.dueUnpaidMonths.filter(m => !paymentSummary.pastUnpaidDueMonths?.includes(m)).map(m => (
+                            <option key={m} value={m}>{m} (Menunggak)</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {paymentSummary.futureUnpaidMonths.length > 0 && (
+                        <optgroup label="[Mendatang] Belum Jatuh Tempo (Bayar Awal)">
+                          {paymentSummary.futureUnpaidMonths.map(m => (
+                            <option key={m} value={m}>{m} (Bulan Mendatang)</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1">
+                  <span>METODE BAYAR</span>
+                </label>
+                <select
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-white border-2 border-emerald-200/90 rounded-2xl font-bold text-slate-800 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/20 shadow-2xs"
+                >
+                  <option value="Tunai (di TU)">Tunai (di TU)</option>
+                  <option value="Transfer Bank Manual">Transfer Bank Manual</option>
+                  <option value="EDC TU">Mesin EDC TU</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-black text-slate-700 uppercase mb-1.5 flex items-center gap-1">
+                  <span>NOMINAL SPP</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-black text-slate-400 text-xs">Rp</span>
+                  <input
+                    type="text"
+                    required
+                    value={formatInputNumber(customAmount)}
+                    onChange={(e) => setCustomAmount(parseNumberOnly(e.target.value))}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-amber-200/90 rounded-2xl font-black text-slate-900 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-400/20 shadow-2xs"
+                  />
+                </div>
+              </div>
+
+              {selectedStudent && (
+                <div className="md:col-span-2 lg:col-span-4 p-4 bg-amber-50/60 border border-amber-200 rounded-2xl space-y-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-slate-900 text-sm">{selectedStudent.name}</span>
+                      <span className="text-slate-400">•</span>
+                      <span className="font-bold text-slate-600">Kelas: <strong className="text-slate-800">{selectedStudent.kelas}</strong></span>
+                      <span className="text-slate-400">•</span>
+                      <span className="font-bold text-slate-600">Tarif Resmi: <strong className="text-blue-700 font-extrabold">{formatRupiah(selectedStudent.tarif)}/bln</strong></span>
+                    </div>
+                    {selectedStudent.keringanan_note && (
+                      <span className="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-lg font-black text-[11px] border border-amber-300 flex items-center gap-1">
+                        <Icon name="tag" size={12} /> Keringanan: {selectedStudent.keringanan_note}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px]">
+                    <span className="font-bold text-slate-500">Status di Semester Ini:</span>
+                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-black flex items-center gap-1">
+                      <Icon name="check-circle" size={12} /> {paymentSummary.paidMonths.length} Bulan Lunas
+                    </span>
+                    {paymentSummary.dueUnpaidMonths.length > 0 ? (
+                      <span className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-lg font-black flex items-center gap-1 border border-rose-200">
+                        <Icon name="alert-circle" size={12} /> {paymentSummary.dueUnpaidMonths.length} Bulan Menunggak (s/d Bulan Ini)
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 bg-teal-100 text-teal-800 rounded-lg font-black flex items-center gap-1 border border-teal-200">
+                        <Icon name="shield-check" size={12} /> 0 Tunggakan (Lunas s/d Bulan Ini)
+                      </span>
+                    )}
+                    {paymentSummary.futureUnpaidMonths.length > 0 && (
+                      <span className="px-2.5 py-1 bg-sky-100 text-sky-800 rounded-lg font-black flex items-center gap-1 border border-sky-200">
+                        <Icon name="calendar" size={12} /> {paymentSummary.futureUnpaidMonths.length} Bulan Mendatang (Belum Jatuh Tempo)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="md:col-span-2 lg:col-span-4 pt-2">
+                <button
+                  type="submit"
+                  disabled={paymentSummary.unpaidMonths.length === 0}
+                  className="py-3 px-6 bg-gradient-to-r from-orange-400 via-amber-500 to-orange-500 hover:from-orange-500 hover:to-amber-600 disabled:opacity-50 disabled:pointer-events-none text-white font-black shadow-md shadow-orange-300/40 rounded-2xl text-xs sm:text-sm transition-all flex items-center gap-2"
+                >
+                  <Icon name="check-circle" size={16} />
+                  <span>Simpan Pembayaran & Terbitkan Kuitansi</span>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Card 2: Riwayat Transaksi - Table Header Chip Pastel Matching Screenshot 1 */}
+          <div className="pastel-table-card">
+            <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-amber-500 text-base">⭐</span>
+                <h3 className="font-black text-slate-800 text-base sm:text-lg">Riwayat Transaksi</h3>
+              </div>
+              <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                {transactions.length} Data Tersimpan
+              </span>
+            </div>
+
+            <div className="overflow-x-auto p-3 sm:p-4">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="text-[11px] sm:text-xs font-black uppercase tracking-wider">
+                    <th className="py-3.5 px-4 pastel-th-sky rounded-l-2xl text-left whitespace-nowrap">No Kuitansi</th>
+                    <th className="py-3.5 px-4 pastel-th-orange text-left whitespace-nowrap">Nama Siswa</th>
+                    <th className="py-3.5 px-4 pastel-th-yellow text-left whitespace-nowrap">Kelas</th>
+                    <th className="py-3.5 px-4 pastel-th-mint text-left whitespace-nowrap">Bulan SPP</th>
+                    <th className="py-3.5 px-4 pastel-th-teal text-left whitespace-nowrap">Nominal</th>
+                    <th className="py-3.5 px-4 pastel-th-coral text-left whitespace-nowrap">Metode</th>
+                    <th className="py-3.5 px-4 pastel-th-mint text-center whitespace-nowrap">Status</th>
+                    <th className="py-3.5 px-4 pastel-th-purple text-left whitespace-nowrap">Tanggal</th>
+                    <th className="py-3.5 px-4 pastel-th-blue text-center rounded-r-2xl whitespace-nowrap">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs font-medium">
+                  {transactions.length > 0 ? (
+                    transactions.map((trx) => {
+                      const isLunas = (trx.status || 'Lunas').toLowerCase().includes('lunas') || (trx.status || '').toLowerCase().includes('berhasil') || (trx.status || '').toLowerCase().includes('sukses');
+                      return (
+                        <tr key={trx.id} className="hover:bg-amber-50/40 transition-colors">
+                          <td className="py-3.5 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">{trx.kuitansiNo}</td>
+                          <td className="py-3.5 px-4 font-extrabold text-slate-800 whitespace-nowrap">{trx.studentName}</td>
+                          <td className="py-3.5 px-4 font-bold text-slate-700 whitespace-nowrap">{trx.kelas}</td>
+                          <td className="py-3.5 px-4 font-extrabold text-emerald-800 whitespace-nowrap">{trx.month}</td>
+                          <td className="py-3.5 px-4 font-black text-slate-900 whitespace-nowrap">{formatRupiah(trx.amount)}</td>
+                          <td className="py-3.5 px-4 text-slate-700 font-semibold whitespace-nowrap">{trx.method}</td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            {isLunas ? (
+                              <span className="status-pill-lunas">
+                                <Icon name="check" size={11} /> Lunas
+                              </span>
+                            ) : (
+                              <span className="status-pill-menunggu">
+                                <Icon name="clock" size={11} /> Menunggu
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-slate-600 font-bold whitespace-nowrap">{formatDateIndo(trx.date)}</td>
+                          <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                            <button
+                              onClick={() => onShowKuitansi(trx)}
+                              className="btn-print-kuitansi"
+                              title="Cetak Kuitansi Sah"
+                            >
+                              <Icon name="printer" size={13} />
+                              <span>Cetak Kuitansi</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="9" className="text-center py-8 text-slate-400 font-bold">
+                        Belum ada riwayat transaksi pembayaran tercatat.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 7. MANAJEMEN PENGADUAN (DENGAN GROUPING SUB-PERCAKAPAN PER SISWA)
+    // ==========================================
+    function AdminPengaduanView({ complaints, onReplyComplaint, onToggleComplaintStatus, onMarkAsRead }) {
+      const [activeChatId, setActiveChatId] = useState(null);
+      const [replyText, setReplyText] = useState('');
+      const [nowMs, setNowMs] = useState(Date.now());
+      const [expandedStudents, setExpandedStudents] = useState({});
+      const chatEndRef = React.useRef(null);
+
+      useEffect(() => {
+        const timer = setInterval(() => setNowMs(Date.now()), 10000);
+        return () => clearInterval(timer);
+      }, []);
+
+      useEffect(() => {
+        if (chatEndRef.current) {
+          chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [complaints, activeChatId]);
+
+      const activeComplaints = complaints.filter(c => nowMs <= (c.expiresAtMs || (c.createdAtMs + 3600000))).sort((a,b) => b.createdAtMs - a.createdAtMs);
+      const expiredComplaints = complaints.filter(c => nowMs > (c.expiresAtMs || (c.createdAtMs + 3600000))).sort((a,b) => b.createdAtMs - a.createdAtMs);
+
+      // Grouping Riwayat Terkunci Per Siswa (Agar rapi & tidak berantakan)
+      const groupedExpired = useMemo(() => {
+        const map = {};
+        expiredComplaints.forEach(c => {
+          const rawName = (c.studentName || 'Wali Murid').trim();
+          const key = rawName.toLowerCase();
+          if (!map[key]) {
+            map[key] = {
+              key,
+              studentName: rawName,
+              waliName: c.waliName || 'Wali Murid',
+              items: []
+            };
+          }
+          map[key].items.push(c);
+        });
+        return Object.values(map);
+      }, [expiredComplaints]);
+
+      const toggleStudent = (key) => {
+        setExpandedStudents(prev => ({ ...prev, [key]: !prev[key] }));
+      };
+
+      const handleSelectChat = (c) => {
+        if (!c) return;
+        setActiveChatId(c.id);
+        if (onMarkAsRead) {
+          onMarkAsRead('complaint', c.id);
+        }
+      };
+
+      useEffect(() => {
+        if (!activeChatId && activeComplaints.length > 0 && typeof window !== 'undefined' && window.innerWidth >= 768) {
+          handleSelectChat(activeComplaints[0]);
+        }
+      }, [activeComplaints.length]);
+
+      const activeChat = complaints.find(c => c.id === activeChatId);
+
+      return (
+        <div className="h-[calc(100vh-6rem)] animate-in fade-in duration-300 flex flex-col md:flex-row gap-4">
+          
+          {/* LEFT SIDEBAR: CHAT LIST (WhatsApp Mobile Responsive Layout) */}
+          <div className={`w-full md:w-80 lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-sm flex-col overflow-hidden shrink-0 ${activeChatId ? 'hidden md:flex' : 'flex'}`}>
+             <div className="p-4 sm:p-5 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
+               <div>
+                 <h2 className="text-base sm:text-lg font-black text-slate-800 flex items-center gap-2">
+                   <Icon name="message-square" size={20} className="text-emerald-600"/> Pesan Pengaduan
+                 </h2>
+                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">Sesi live chat aktif selama 1 jam.</p>
+               </div>
+               <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800">
+                 {activeComplaints.length} Live
+               </span>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-3 space-y-4">
+                {/* 1. SECTION LIVE CHAT (AKTIF < 1 JAM) */}
+                <div>
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-2 px-2 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Live Chat Aktif ({activeComplaints.length})
+                  </h3>
+                  {activeComplaints.length === 0 && (
+                    <div className="p-4 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                      <p className="text-xs text-slate-400 font-bold italic">Tidak ada chat aktif saat ini.</p>
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    {activeComplaints.map(c => {
+                      const isSelected = activeChatId === c.id;
+                      const remainingMinutes = Math.max(0, Math.floor((c.expiresAtMs - nowMs) / 60000));
+                      const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+
+                      return (
+                        <div 
+                          key={c.id} 
+                          onClick={() => handleSelectChat(c)}
+                          className={`p-3.5 rounded-2xl cursor-pointer transition-all border ${
+                            isSelected 
+                              ? 'bg-emerald-50 border-emerald-300 shadow-sm ring-2 ring-emerald-400/20' 
+                              : 'bg-white border-slate-100 hover:bg-slate-50 hover:border-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 truncate">
+                              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-black text-xs shrink-0">
+                                {c.studentName ? c.studentName.charAt(0).toUpperCase() : 'W'}
+                              </div>
+                              <h4 className="font-black text-slate-800 text-sm truncate">{c.studentName}</h4>
+                            </div>
+                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                          </div>
+                          
+                          <p className="text-xs font-black text-slate-700 truncate pl-10">{c.title}</p>
+                          {lastMsg && (
+                            <p className="text-xs text-slate-500 truncate pl-10 mt-0.5 font-medium">
+                              <span className="font-bold text-slate-600">{lastMsg.sender === 'Admin TU' ? 'Anda: ' : ''}</span>
+                              {lastMsg.text}
+                            </p>
+                          )}
+                          
+                          <div className="flex items-center justify-between mt-2 pl-10 text-[10px] text-slate-400 font-bold">
+                            <span className="flex items-center gap-1 text-emerald-600 bg-emerald-100/60 px-2 py-0.5 rounded-full font-mono font-bold">
+                              <Icon name="clock" size={10} /> Sisa {remainingMinutes} mnt
+                            </span>
+                            <span>{formatDateIndo(c.date)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. SECTION RIWAYAT PENGADUAN TERKUNCI (DIGROUPING PER SISWA) */}
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between px-2 mb-2">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                      Riwayat Terkunci ({expiredComplaints.length})
+                    </h3>
+                    <span className="text-[10px] font-bold text-slate-400">
+                      {groupedExpired.length} Wali Siswa
+                    </span>
+                  </div>
+
+                  {groupedExpired.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic text-center py-3">Belum ada riwayat pengaduan tersimpan.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {groupedExpired.map(group => {
+                        const isExpanded = expandedStudents[group.key] ?? false;
+                        const hasSelectedChild = group.items.some(i => i.id === activeChatId);
+
+                        return (
+                          <div 
+                            key={group.key}
+                            className={`rounded-2xl border transition-all overflow-hidden ${
+                              hasSelectedChild 
+                                ? 'border-blue-300 bg-blue-50/30 shadow-xs' 
+                                : 'border-slate-200 bg-slate-50/70 hover:bg-slate-50'
+                            }`}
+                          >
+                            {/* Accordion Header: Profil Siswa & Total Sub Pesan */}
+                            <button
+                              type="button"
+                              onClick={() => toggleStudent(group.key)}
+                              className="w-full p-3 flex items-center justify-between text-left transition-colors"
+                            >
+                              <div className="flex items-center gap-2.5 truncate">
+                                <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-extrabold text-xs shrink-0">
+                                  {group.studentName ? group.studentName.charAt(0).toUpperCase() : 'W'}
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="font-extrabold text-slate-800 text-xs truncate">
+                                    {group.studentName}
+                                  </h4>
+                                  <p className="text-[10px] text-slate-400 font-medium truncate">
+                                    {group.waliName || 'Wali Murid'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-200 text-slate-700 flex items-center gap-1">
+                                  <Icon name="lock" size={10} />
+                                  {group.items.length} Pesan
+                                </span>
+                                <Icon 
+                                  name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                                  size={14} 
+                                  className="text-slate-400" 
+                                />
+                              </div>
+                            </button>
+
+                            {/* Sub-Pesan Pesan Terkunci (Hanya Tampil Jika Accordion Dibuka) */}
+                            {isExpanded && (
+                              <div className="px-2 pb-2 space-y-1.5 border-t border-slate-200/60 pt-2 animate-in fade-in duration-150">
+                                {group.items.map(c => {
+                                  const isSelected = activeChatId === c.id;
+                                  const lastMsg = c.messages && c.messages.length > 0 ? c.messages[c.messages.length - 1] : null;
+
+                                  return (
+                                    <div
+                                      key={c.id}
+                                      onClick={() => handleSelectChat(c)}
+                                      className={`p-2.5 rounded-xl cursor-pointer transition-all border text-left ${
+                                        isSelected
+                                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <p className={`text-xs font-black truncate ${isSelected ? 'text-white' : 'text-slate-800'}`}>
+                                          {c.title}
+                                        </p>
+                                        <span className={`text-[9px] font-bold shrink-0 ml-1.5 ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                                          {formatDateIndo(c.date)}
+                                        </span>
+                                      </div>
+
+                                      {lastMsg && (
+                                        <p className={`text-[11px] truncate ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                                          {lastMsg.sender === 'Admin TU' ? 'Anda: ' : ''}{lastMsg.text}
+                                        </p>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+             </div>
+          </div>
+
+          {/* RIGHT SIDE: CHAT WINDOW */}
+          <div className={`w-full flex-1 bg-white rounded-3xl border border-slate-200 shadow-sm flex-col overflow-hidden ${!activeChatId ? 'hidden md:flex' : 'flex'}`}>
+            {!activeChat ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-slate-50/50">
+                <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-4 border border-emerald-100 shadow-inner">
+                  <Icon name="message-circle" size={40} />
+                </div>
+                <h3 className="text-xl font-black text-slate-800">Pilih Percakapan Chat</h3>
+                <p className="text-sm text-slate-500 mt-2 font-medium max-w-sm">Pilih pesan pengaduan di panel sebelah kiri untuk membalas obrolan wali murid secara real-time.</p>
+              </div>
+            ) : (
+              <>
+                {/* Chat Top Header with Mobile Back Button */}
+                <div className={`p-4 sm:p-5 border-b flex items-center justify-between shrink-0 ${nowMs <= activeChat.expiresAtMs ? 'bg-emerald-50/60 border-emerald-100' : 'bg-slate-100 border-slate-200'}`}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <button
+                      onClick={() => setActiveChatId(null)}
+                      className="md:hidden p-2 bg-white hover:bg-slate-100 text-slate-700 rounded-xl transition-colors shrink-0 border border-slate-200 flex items-center justify-center shadow-sm"
+                      title="Kembali ke Daftar Chat"
+                    >
+                      <Icon name="arrow-left" size={18} />
+                    </button>
+                    <div className="min-w-0">
+                      <h3 className="font-black text-slate-900 text-base sm:text-lg truncate">{activeChat.title}</h3>
+                      <p className="text-xs text-slate-600 font-bold truncate mt-0.5">Siswa: <span className="text-emerald-700">{activeChat.studentName}</span> • Wali: {activeChat.waliName || 'Wali Murid'}</p>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 ml-2">
+                    {nowMs <= activeChat.expiresAtMs ? (
+                       <div className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shadow-sm flex items-center gap-1.5">
+                         <span className="w-2 h-2 rounded-full bg-white animate-pulse"></span>
+                         LIVE CHAT
+                       </div>
+                    ) : (
+                       <div className="bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-black border border-slate-300 flex items-center gap-1.5">
+                         <Icon name="lock" size={14} /> EXPIRED
+                       </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* WhatsApp Chat Body */}
+                <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-[#f0f4f8] space-y-4">
+                  <div className="text-center my-3">
+                    <span className="bg-white/80 backdrop-blur-sm text-slate-500 text-[10px] font-black uppercase px-3.5 py-1.5 rounded-full border border-slate-200 shadow-sm">
+                      Sesi Obrolan Dibuka: {formatDateIndo(activeChat.date)}
+                    </span>
+                  </div>
+
+                  {activeChat.messages && activeChat.messages.map((msg, i) => {
+                    const isAdmin = msg.sender === 'Admin TU';
+                    return (
+                      <div key={i} className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
+                         <div className={`max-w-[88%] sm:max-w-[75%] p-3.5 sm:p-4 rounded-2xl shadow-sm ${
+                           isAdmin 
+                             ? 'bg-emerald-600 text-white rounded-tr-xs' 
+                             : 'bg-white border border-slate-200/90 rounded-tl-xs text-slate-800'
+                         }`}>
+                           <div className="flex items-center gap-1.5 mb-1 opacity-80">
+                             <Icon name={isAdmin ? 'shield-check' : 'user'} size={12} />
+                             <span className="text-[10px] font-black uppercase tracking-wider">{msg.sender}</span>
+                           </div>
+                           <p className="text-xs sm:text-sm font-semibold leading-relaxed whitespace-pre-wrap">{msg.text}</p>
+                           {msg.imageUrl && (
+                             <div className="mt-2.5">
+                               <img 
+                                 src={msg.imageUrl} 
+                                 alt="Lampiran" 
+                                 className="max-w-full max-h-64 object-cover rounded-xl shadow-md border border-slate-200 cursor-pointer hover:opacity-95 transition-opacity" 
+                                 onClick={() => setPreviewImage(msg.imageUrl)} 
+                               />
+                             </div>
+                           )}
+                         </div>
+                         <span className="text-[10px] text-slate-500 font-bold mt-1 px-1">{formatDateTimeIndo(msg.time, activeChat.date)}</span>
+                      </div>
+                    );
+                  })}
+                  <div ref={chatEndRef} />
+                </div>
+                
+                {/* Chat Input Bar */}
+                <div className="p-3.5 sm:p-4 bg-white border-t border-slate-200 shrink-0">
+                  {nowMs <= activeChat.expiresAtMs ? (
+                    <div className="flex items-center gap-2">
+                      <input type="file" id={`admin_file_${activeChat.id}`} className="hidden" accept="image/*" onChange={(e) => {
+                        const file = e.target.files[0];
+                        if(file) {
+                          const reader = new FileReader();
+                          reader.onload = (ev) => {
+                            onReplyComplaint(activeChat.id, replyText || '(Mengirim Lampiran)', 'Admin TU', ev.target.result);
+                            setReplyText('');
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }} />
+                      <button 
+                        type="button" 
+                        onClick={() => document.getElementById(`admin_file_${activeChat.id}`).click()} 
+                        className="p-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition-colors flex items-center justify-center shrink-0"
+                        title="Kirim Lampiran Gambar"
+                      >
+                        <Icon name="paperclip" size={18} />
+                      </button>
+                      <input 
+                        type="text" 
+                        value={replyText} 
+                        onChange={(e) => setReplyText(e.target.value)} 
+                        placeholder="Ketik balasan Anda..." 
+                        className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500" 
+                        onKeyDown={e => {
+                          if(e.key === 'Enter' && replyText.trim()) {
+                            onReplyComplaint(activeChat.id, replyText.trim(), 'Admin TU');
+                            setReplyText('');
+                          }
+                        }}
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          if(replyText.trim()) {
+                            onReplyComplaint(activeChat.id, replyText.trim(), 'Admin TU');
+                            setReplyText('');
+                          }
+                        }} 
+                        className="px-4 sm:px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md transition-colors flex items-center justify-center gap-2 font-black shrink-0 text-xs sm:text-sm"
+                      >
+                        <Icon name="send" size={18} /> <span className="hidden sm:inline">Kirim</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full py-3 bg-slate-100 border border-slate-200 rounded-xl text-center text-slate-500 text-xs font-bold flex items-center justify-center gap-2">
+                      <Icon name="lock" size={14} /> Sesi live chat 1 jam telah berakhir (Expired)
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 7.5. PENGATURAN APLIKASI PANEL ADMIN
+    // ==========================================
+    function AdminPengaturanView({ settings, onSaveSettings }) {
+      const [formData, setFormData] = useState({ ...settings });
+      const [newAdminPassword, setNewAdminPassword] = useState('');
+      const [newClassName, setNewClassName] = useState('');
+      const [newClassTarif, setNewClassTarif] = useState('');
+      const isDirtyRef = useRef(false);
+
+      // State untuk Form Tambah Preset Periode Manual
+      const [newPresetName, setNewPresetName] = useState('');
+      const [newPresetStartMonth, setNewPresetStartMonth] = useState('Juli');
+      const [newPresetStartYear, setNewPresetStartYear] = useState(2026);
+      const [newPresetEndMonth, setNewPresetEndMonth] = useState('Juni');
+      const [newPresetEndYear, setNewPresetEndYear] = useState(2027);
+      const [newPresetSemester, setNewPresetSemester] = useState('Semua');
+
+      useEffect(() => {
+        if (!isDirtyRef.current) {
+          setFormData({ ...settings });
+          setNewAdminPassword('');
+        }
+      }, [settings]);
+
+      // Helper untuk merubah formData sekaligus menjaga isDirtyRef & auto activePeriodName
+      const updateFormState = (patch) => {
+        isDirtyRef.current = true;
+        setFormData((prev) => {
+          const next = { ...prev, ...patch };
+          const semTag = (next.semester && next.semester !== 'Semua') ? ` (${next.semester})` : '';
+          const autoName = `Periode ${next.startMonth || 'Juli'} ${next.startYear || 2025} - ${next.endMonth || 'Juni'} ${next.endYear || 2026}${semTag}`;
+          return {
+            ...next,
+            activePeriodName: autoName
+          };
+        });
+      };
+
+      const handleAddClass = () => {
+        if (!newClassName.trim()) return;
+        isDirtyRef.current = false;
+        const updatedClasses = [...(formData.customClasses || []), { name: newClassName.trim(), tarif: Number(newClassTarif) || 0 }];
+        const updated = { ...formData, customClasses: updatedClasses };
+        setFormData(updated);
+        onSaveSettings(updated);
+        setNewClassName('');
+        setNewClassTarif('');
+      };
+
+      const handleDeleteClass = (idx) => {
+        isDirtyRef.current = false;
+        const updatedClasses = (formData.customClasses || []).filter((_, i) => i !== idx);
+        const updated = { ...formData, customClasses: updatedClasses };
+        setFormData(updated);
+        onSaveSettings(updated);
+      };
+
+      const handleUpdateClass = (idx, field, value) => {
+        isDirtyRef.current = true;
+        const updatedClasses = [...(formData.customClasses || [])];
+        updatedClasses[idx] = {
+          ...updatedClasses[idx],
+          [field]: field === 'tarif' ? (Number(value) || 0) : value
+        };
+        const updated = { ...formData, customClasses: updatedClasses };
+        setFormData(updated);
+      };
+
+      // Tambah Preset Periode Baru secara Manual
+      const handleAddPresetManual = () => {
+        isDirtyRef.current = false;
+        const sM = newPresetStartMonth || 'Juli';
+        const sY = Number(newPresetStartYear) || 2026;
+        const eM = newPresetEndMonth || 'Juni';
+        const eY = Number(newPresetEndYear) || 2027;
+        const sem = newPresetSemester || 'Semua';
+        const semTag = (sem && sem !== 'Semua') ? ` (${sem})` : '';
+        const name = newPresetName.trim() || `Periode ${sM} ${sY} - ${eM} ${eY}${semTag}`;
+
+        const newPeriod = {
+          id: Date.now().toString(),
+          name: name,
+          startMonth: sM,
+          startYear: sY,
+          endMonth: eM,
+          endYear: eY,
+          semester: sem,
+          isActive: false
+        };
+
+        const existingPeriods = formData.academicPeriods || [];
+        const updatedPeriods = [...existingPeriods, newPeriod];
+
+        const updatedFormData = {
+          ...formData,
+          academicPeriods: updatedPeriods
+        };
+
+        setFormData(updatedFormData);
+        onSaveSettings(updatedFormData);
+        setNewPresetName('');
+      };
+
+      // Edit langsung item preset di daftar
+      const handleUpdatePresetField = (idx, field, value) => {
+        isDirtyRef.current = true;
+        const updatedPeriods = [...(formData.academicPeriods || [])];
+        const val = (field === 'startYear' || field === 'endYear') ? (Number(value) || 0) : value;
+        updatedPeriods[idx] = {
+          ...updatedPeriods[idx],
+          [field]: val
+        };
+
+        let updatedFormData = { ...formData, academicPeriods: updatedPeriods };
+        if (updatedPeriods[idx].isActive) {
+          const semTag = (updatedPeriods[idx].semester && updatedPeriods[idx].semester !== 'Semua') ? ` (${updatedPeriods[idx].semester})` : '';
+          const autoName = updatedPeriods[idx].name || `Periode ${updatedPeriods[idx].startMonth} ${updatedPeriods[idx].startYear} - ${updatedPeriods[idx].endMonth} ${updatedPeriods[idx].endYear}${semTag}`;
+          updatedFormData = {
+            ...updatedFormData,
+            activePeriodName: autoName,
+            startMonth: updatedPeriods[idx].startMonth,
+            startYear: updatedPeriods[idx].startYear,
+            endMonth: updatedPeriods[idx].endMonth,
+            endYear: updatedPeriods[idx].endYear,
+            semester: updatedPeriods[idx].semester
+          };
+        }
+
+        setFormData(updatedFormData);
+      };
+
+      const handleSaveCurrentAsPreset = () => {
+        isDirtyRef.current = false;
+        const sM = formData.startMonth || 'Juli';
+        const sY = parseInt(formData.startYear) || 2025;
+        const eM = formData.endMonth || 'Juni';
+        const eY = parseInt(formData.endYear) || (sY + 1);
+        const sem = formData.semester || 'Semua';
+        const semTag = (sem && sem !== 'Semua') ? ` (${sem})` : '';
+        const newName = `Periode ${sM} ${sY} - ${eM} ${eY}${semTag}`;
+        
+        const newPeriod = {
+          id: Date.now().toString(),
+          name: newName,
+          startMonth: sM,
+          startYear: sY,
+          endMonth: eM,
+          endYear: eY,
+          semester: sem,
+          isActive: true
+        };
+
+        const existingPeriods = (formData.academicPeriods && formData.academicPeriods.length > 0)
+          ? formData.academicPeriods
+          : [];
+
+        const filtered = existingPeriods.filter(p => !(p.startMonth === sM && String(p.startYear) === String(sY) && p.endMonth === eM && String(p.endYear) === String(eY) && (p.semester || 'Semua') === sem));
+        const updatedPeriods = [newPeriod, ...filtered.map(p => ({ ...p, isActive: false }))];
+
+        const updatedFormData = {
+          ...formData,
+          activePeriodName: newName,
+          startMonth: sM,
+          startYear: sY,
+          endMonth: eM,
+          endYear: eY,
+          semester: sem,
+          academicYear: `${sY}/${eY}`,
+          academicPeriods: updatedPeriods
+        };
+
+        setFormData(updatedFormData);
+        onSaveSettings(updatedFormData);
+        alert(`Rentang "${newName}" berhasil disimpan dan langsung diterapkan sebagai periode aktif!`);
+      };
+
+      const handleApplyPreset = (p) => {
+        isDirtyRef.current = false;
+        const sY = parseInt(p.startYear) || 2025;
+        const eY = parseInt(p.endYear) || (sY + 1);
+        const updatedPeriods = (formData.academicPeriods || []).map(item => ({
+          ...item,
+          isActive: item.id === p.id || (item.startMonth === p.startMonth && String(item.startYear) === String(p.startYear) && (item.semester || 'Semua') === (p.semester || 'Semua'))
+        }));
+
+        const updatedFormData = {
+          ...formData,
+          activePeriodName: p.name,
+          startMonth: p.startMonth,
+          startYear: sY,
+          endMonth: p.endMonth,
+          endYear: eY,
+          semester: p.semester || 'Semua',
+          academicYear: p.name.replace(/[^0-9/]/g, '') || `${sY}/${eY}`,
+          academicPeriods: updatedPeriods
+        };
+
+        setFormData(updatedFormData);
+        onSaveSettings(updatedFormData);
+        alert(`Periode aktif berhasil diubah dan diterapkan ke: ${p.name}`);
+      };
+
+      const handleDeletePreset = (idx, pName) => {
+        if (!confirm(`Hapus preset "${pName}"?`)) return;
+        isDirtyRef.current = false;
+        const updatedPeriods = (formData.academicPeriods || []).filter((_, i) => i !== idx);
+        const updatedFormData = {
+          ...formData,
+          academicPeriods: updatedPeriods
+        };
+        setFormData(updatedFormData);
+        onSaveSettings(updatedFormData);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        isDirtyRef.current = false;
+        const semTag = (formData.semester && formData.semester !== 'Semua') ? ` (${formData.semester})` : '';
+        const autoName = `Periode ${formData.startMonth || 'Juli'} ${formData.startYear || 2025} - ${formData.endMonth || 'Juni'} ${formData.endYear || 2026}${semTag}`;
+        const payload = {
+          ...formData,
+          activePeriodName: autoName
+        };
+        if (newAdminPassword && newAdminPassword.trim().length > 0) {
+          payload.adminPassword = newAdminPassword.trim();
+        }
+        onSaveSettings(payload);
+        setNewAdminPassword('');
+      };
+
+      return (
+        <div className="bg-white p-4 sm:p-7 md:p-9 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-sm space-y-6 sm:space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+            <div className="flex items-start gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25 shrink-0">
+                <Icon name="sliders" size={24} />
+              </div>
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Pengaturan Aplikasi & Periode SPP</h2>
+                <p className="text-xs text-slate-500 font-medium mt-0.5">Konfigurasi identitas sekolah, periode aktif ajaran, kredensial login admin, gateway pembayaran, serta rombel kelompok kelas.</p>
+              </div>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6 text-xs">
+            {/* 1. Informasi Sekolah & Administrator */}
+            <div className="p-4 sm:p-6 bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-2xl sm:rounded-3xl border border-slate-200/90 space-y-4 sm:space-y-5">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200/70">
+                <h3 className="font-black text-slate-800 text-sm sm:text-base flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shadow-inner">
+                    <Icon name="school" size={17} />
+                  </span>
+                  <span>Identitas Sekolah & Akun Admin TU</span>
+                </h3>
+                <span className="text-[11px] font-extrabold text-blue-700 bg-blue-100/70 px-2.5 py-0.5 rounded-full">
+                  Konfigurasi Utama
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                <div>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="building" size={13} className="text-blue-600" />
+                    <span>Nama Lembaga / Sekolah</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.schoolName || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, schoolName: e.target.value }); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Contoh: PAUD SETIA BHAKTI"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="calendar" size={13} className="text-blue-600" />
+                    <span>Tahun Ajaran Default</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.academicYear || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, academicYear: e.target.value }); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Contoh: 2025/2026"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="map-pin" size={13} className="text-blue-600" />
+                    <span>Alamat Lengkap Sekolah</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, address: e.target.value }); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Alamat sekolah..."
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="phone" size={13} className="text-emerald-600" />
+                    <span>No. Kontak Resmi TU / WhatsApp</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.phone || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, phone: e.target.value }); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="08123456789"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="user-check" size={13} className="text-indigo-600" />
+                    <span>Nama Admin / Kasir TU</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.adminName || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, adminName: e.target.value }); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Nama Admin TU"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="user" size={13} className="text-indigo-600" />
+                    <span>Username Login Admin</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.adminUsername || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, adminUsername: e.target.value }); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                    placeholder="Username login"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                      <Icon name="lock" size={13} className="text-amber-600" />
+                      <span>Ganti Password Admin <span className="normal-case text-slate-400 font-normal">(Opsional)</span></span>
+                    </label>
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="Kosongkan jika tidak mau mengubah password"
+                    value={newAdminPassword}
+                    onChange={(e) => { isDirtyRef.current = true; setNewAdminPassword(e.target.value); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="flex items-center gap-1.5 font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-1.5">
+                    <Icon name="clock" size={13} className="text-purple-600" />
+                    <span>Tanggal Jatuh Tempo SPP (Tiap Bulan)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="31"
+                    value={formData.dueDateDay || 10}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, dueDateDay: parseInt(e.target.value) || 10 }); }}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-600 shadow-2xs text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Pengaturan Periode Pembayaran SPP */}
+            <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-emerald-100/80 pb-3">
+                <h3 className="font-extrabold text-emerald-950 text-sm flex items-center gap-2">
+                  <Icon name="calendar" size={18} className="text-emerald-700" />
+                  Pengaturan Periode Pembayaran SPP (Rentang Bulan & Tahun)
+                </h3>
+                <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Icon name="check-circle" size={12} /> Periode Aktif Berjalan
+                </span>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase mb-1 flex items-center justify-between">
+                  <span>Nama Periode SPP Aktif</span>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                    <Icon name="lock" size={11} /> Otomatis Mengikuti Periode Aktif
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={formData.activePeriodName || `Periode ${formData.startMonth || 'Juli'} ${formData.startYear || 2025} - ${formData.endMonth || 'Juni'} ${formData.endYear || 2026}${formData.semester && formData.semester !== 'Semua' ? ` (${formData.semester})` : ''}`}
+                  placeholder="Otomatis mengikuti rentang periode"
+                  className="w-full px-3.5 py-2.5 bg-slate-100 border border-emerald-200 rounded-xl font-bold text-slate-600 cursor-not-allowed focus:outline-none"
+                />
+              </div>
+
+              {/* Input Rentang Periode Aktif */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Bulan Mulai</label>
+                  <select
+                    value={formData.startMonth || 'Juli'}
+                    onChange={(e) => updateFormState({ startMonth: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {ALL_MONTHS.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Tahun Mulai</label>
+                  <input
+                    type="number"
+                    value={formData.startYear || 2025}
+                    onChange={(e) => updateFormState({ startYear: parseInt(e.target.value) || 2025 })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Bulan Akhir</label>
+                  <select
+                    value={formData.endMonth || 'Juni'}
+                    onChange={(e) => updateFormState({ endMonth: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {ALL_MONTHS.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Tahun Akhir</label>
+                  <input
+                    type="number"
+                    value={formData.endYear || 2026}
+                    onChange={(e) => updateFormState({ endYear: parseInt(e.target.value) || 2026 })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Pilihan Semester</label>
+                  <select
+                    value={formData.semester || 'Semua'}
+                    onChange={(e) => updateFormState({ semester: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    <option value="Semua">Semua Semester (1 Tahun Penuh)</option>
+                    <option value="Semester 1">Semester 1 (Ganjil)</option>
+                    <option value="Semester 2">Semester 2 (Genap)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Preset Cepat Semester */}
+              <div className="flex flex-wrap items-center gap-2 pt-1 pb-1">
+                <span className="text-[11px] font-black text-emerald-900 flex items-center gap-1">
+                  <Icon name="zap" size={13} className="text-amber-500" /> Set Cepat Rentang Semester:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const y = formData.startYear || 2025;
+                    updateFormState({
+                      semester: 'Semester 1',
+                      startMonth: 'Juli',
+                      startYear: y,
+                      endMonth: 'Desember',
+                      endYear: y
+                    });
+                  }}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-black border transition-all ${formData.semester === 'Semester 1' ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                >
+                  Semester 1 (Juli - Des)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const y = formData.startYear || 2025;
+                    const nextY = y + 1;
+                    updateFormState({
+                      semester: 'Semester 2',
+                      startMonth: 'Januari',
+                      startYear: nextY,
+                      endMonth: 'Juni',
+                      endYear: nextY
+                    });
+                  }}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-black border transition-all ${formData.semester === 'Semester 2' ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                >
+                  Semester 2 (Jan - Jun)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const y = formData.startYear || 2025;
+                    updateFormState({
+                      semester: 'Semua',
+                      startMonth: 'Juli',
+                      startYear: y,
+                      endMonth: 'Juni',
+                      endYear: y + 1
+                    });
+                  }}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-black border transition-all ${formData.semester === 'Semua' || !formData.semester ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
+                >
+                  1 Tahun Penuh (Juli - Jun)
+                </button>
+              </div>
+
+              {/* Preview Urutan Bulan yang Dihasilkan */}
+              <div className="p-3 bg-white rounded-xl border border-emerald-200/70 text-[11px] text-emerald-900 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="font-extrabold mr-1">Rangkaian Bulan Tagihan:</span>
+                  {getMonthsList(formData).slice(0, 4).join(', ')} ... {getMonthsList(formData).slice(-2).join(', ')}
+                  <span className="ml-2 font-black text-emerald-700">({getMonthsList(formData).length} Bulan)</span>
+                </div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 font-black rounded-lg text-[10px]">
+                  <Icon name="tag" size={11} />
+                  <span>{formData.semester || 'Semua Semester'}</span>
+                </div>
+              </div>
+
+              {/* Tombol Simpan & Terapkan Rentang Ini Langsung */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSaveCurrentAsPreset}
+                  className="py-2.5 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-xs transition-all flex items-center gap-2 shadow-md shadow-emerald-600/30"
+                >
+                  <Icon name="check-circle" size={16} />
+                  <span>Simpan & Terapkan Rentang Ini</span>
+                </button>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Menyimpan rentang bulan & tahun ini ke daftar preset dan menerapkannya langsung ke sistem.
+                </p>
+              </div>
+
+              {/* Kelola Daftar / Pilihan Periode Tambahan */}
+              <div className="pt-4 border-t border-emerald-100/80 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-extrabold text-xs uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                      <Icon name="list" size={14} className="text-emerald-700" />
+                      Daftar Pilihan Preset Periode Ajaran (Bisa Diisi & Disimpan ke Database)
+                    </h4>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Kelola daftar preset periode tersimpan. Anda dapat mengedit nama & rentang periode langsung di bawah ini.
+                    </p>
+                  </div>
+                  <span className="text-[11px] text-emerald-800 font-bold bg-emerald-100 px-2.5 py-1 rounded-full">
+                    {(formData.academicPeriods || []).length} Preset Tersimpan
+                  </span>
+                </div>
+
+                {/* List Preset Tersimpan dengan Editable Form Controls */}
+                <div className="space-y-3">
+                  {(formData.academicPeriods && formData.academicPeriods.length > 0) ? (
+                    formData.academicPeriods.map((p, idx) => {
+                      const isSelected = p.isActive || (
+                        formData.startMonth === p.startMonth && 
+                        String(formData.startYear) === String(p.startYear) && 
+                        formData.endMonth === p.endMonth && 
+                        String(formData.endYear) === String(p.endYear) &&
+                        (p.semester || 'Semua') === (formData.semester || 'Semua')
+                      );
+
+                      return (
+                        <div key={p.id || idx} className={`p-3.5 rounded-2xl border transition-all ${isSelected ? 'bg-emerald-100/80 border-emerald-400 shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
+                          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                            <div className="flex items-start sm:items-center gap-3 flex-1 min-w-[240px]">
+                              <span className={`w-7 h-7 rounded-xl font-black text-xs flex items-center justify-center shrink-0 ${isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                {idx + 1}
+                              </span>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
+                                <div className="sm:col-span-2">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Nama Preset Periode</label>
+                                  <input
+                                    type="text"
+                                    value={p.name || ''}
+                                    onChange={(e) => handleUpdatePresetField(idx, 'name', e.target.value)}
+                                    placeholder="Nama Preset Periode"
+                                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white text-xs"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Mulai (Bulan & Thn)</label>
+                                  <div className="flex gap-1">
+                                    <select
+                                      value={p.startMonth || 'Juli'}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'startMonth', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    >
+                                      {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <input
+                                      type="number"
+                                      value={p.startYear || 2025}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'startYear', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block mb-0.5">Akhir & Semester</label>
+                                  <div className="flex gap-1">
+                                    <select
+                                      value={p.endMonth || 'Juni'}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'endMonth', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    >
+                                      {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                    <input
+                                      type="number"
+                                      value={p.endYear || 2026}
+                                      onChange={(e) => handleUpdatePresetField(idx, 'endYear', e.target.value)}
+                                      className="w-1/2 px-2 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 justify-end pt-1 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                              <select
+                                value={p.semester || 'Semua'}
+                                onChange={(e) => handleUpdatePresetField(idx, 'semester', e.target.value)}
+                                className="px-2.5 py-1.5 bg-blue-50 border border-blue-200 text-blue-900 font-bold rounded-xl text-xs"
+                              >
+                                <option value="Semua">Semua Sem</option>
+                                <option value="Semester 1">Semester 1</option>
+                                <option value="Semester 2">Semester 2</option>
+                              </select>
+
+                              {isSelected ? (
+                                <span className="px-3 py-1.5 bg-emerald-600 text-white font-black text-[10px] rounded-xl flex items-center gap-1 shadow-xs">
+                                  <Icon name="check" size={12} /> Aktif
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApplyPreset(p)}
+                                  className="px-3 py-1.5 bg-white hover:bg-emerald-50 text-emerald-700 font-extrabold border border-emerald-300 rounded-xl text-[10px] transition-colors shadow-2xs"
+                                >
+                                  Terapkan
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeletePreset(idx, p.name)}
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-colors"
+                                title="Hapus Preset"
+                              >
+                                <Icon name="trash-2" size={15} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 bg-white rounded-xl border border-dashed border-emerald-200 text-center text-slate-400 text-xs">
+                      Belum ada preset tersimpan di database. Gunakan form di bawah untuk menambah preset baru.
+                    </div>
+                  )}
+                </div>
+
+                {/* Form Manual Tambah Preset Baru */}
+                <div className="p-4 bg-white rounded-2xl border border-emerald-200 space-y-3">
+                  <h5 className="font-extrabold text-slate-800 text-xs flex items-center gap-1.5">
+                    <Icon name="plus-circle" size={15} className="text-emerald-600" />
+                    Tambah Preset Periode Baru Manual
+                  </h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                    <div className="lg:col-span-2">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Nama Preset Periode</label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: Periode 2026/2027"
+                        value={newPresetName}
+                        onChange={(e) => setNewPresetName(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Bulan Mulai</label>
+                      <select
+                        value={newPresetStartMonth}
+                        onChange={(e) => setNewPresetStartMonth(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      >
+                        {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Tahun Mulai</label>
+                      <input
+                        type="number"
+                        value={newPresetStartYear}
+                        onChange={(e) => setNewPresetStartYear(parseInt(e.target.value) || 2026)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Bulan Akhir</label>
+                      <select
+                        value={newPresetEndMonth}
+                        onChange={(e) => setNewPresetEndMonth(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      >
+                        {ALL_MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-600 uppercase block mb-1">Tahun Akhir</label>
+                      <input
+                        type="number"
+                        value={newPresetEndYear}
+                        onChange={(e) => setNewPresetEndYear(parseInt(e.target.value) || 2027)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase">Semester:</label>
+                      <select
+                        value={newPresetSemester}
+                        onChange={(e) => setNewPresetSemester(e.target.value)}
+                        className="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 text-xs"
+                      >
+                        <option value="Semua">Semua Semester</option>
+                        <option value="Semester 1">Semester 1 (Ganjil)</option>
+                        <option value="Semester 2">Semester 2 (Genap)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddPresetManual}
+                      className="py-2 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs transition-colors flex items-center gap-1.5 shadow-sm"
+                    >
+                      <Icon name="plus" size={14} /> + Tambah Preset Periode Baru
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Integrasi Midtrans Payment Gateway */}
+            <div className="p-5 bg-indigo-50/50 rounded-2xl border border-indigo-100 space-y-4">
+              <h3 className="font-extrabold text-indigo-950 text-sm flex items-center gap-2">
+                <Icon name="credit-card" size={18} className="text-indigo-700" />
+                Integrasi Payment Gateway Midtrans
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Midtrans Client Key</label>
+                  <input
+                    type="text"
+                    value={formData.midtransClientKey || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, midtransClientKey: e.target.value }); }}
+                    placeholder="SB-Mid-client-..."
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase mb-1">Midtrans Server Key</label>
+                  <input
+                    type="password"
+                    value={formData.midtransServerKey || ''}
+                    onChange={(e) => { isDirtyRef.current = true; setFormData({ ...formData, midtransServerKey: e.target.value }); }}
+                    placeholder="SB-Mid-server-..."
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-xs font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 4. Pengaturan Kelompok Kelas & Besaran Tarif SPP (Input Manual) */}
+            <div className="p-5 bg-teal-50/50 rounded-2xl border border-teal-100 space-y-4">
+              <h3 className="font-extrabold text-teal-950 text-sm flex items-center gap-2">
+                <Icon name="layers" size={18} className="text-teal-700" />
+                Pengaturan Kelompok Kelas & Besaran Tarif SPP (Input Manual)
+              </h3>
+              <p className="text-xs text-slate-500">Anda dapat langsung mengedit nama kelas dan tarif SPP pada kolom di bawah ini, atau menambahkan kelas baru.</p>
+
+              <div className="space-y-3">
+                {(formData.customClasses || []).length > 0 ? (
+                  formData.customClasses.map((cls, idx) => (
+                    <div key={idx} className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="flex items-center gap-3 flex-1 min-w-[200px]">
+                        <span className="w-7 h-7 bg-teal-100 text-teal-800 rounded-lg font-black flex items-center justify-center text-xs shrink-0">{idx + 1}</span>
+                        <input
+                          type="text"
+                          value={cls.name || ''}
+                          onChange={(e) => handleUpdateClass(idx, 'name', e.target.value)}
+                          placeholder="Nama Kelas"
+                          className="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900 focus:bg-white text-xs"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="relative flex items-center">
+                          <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-black text-slate-500 text-xs">Rp</span>
+                          <input
+                            type="text"
+                            value={formatInputNumber(cls.tarif)}
+                            onChange={(e) => handleUpdateClass(idx, 'tarif', parseNumberOnly(e.target.value))}
+                            placeholder="0"
+                            className="w-36 pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-xl font-black text-emerald-700 text-right focus:bg-white focus:border-teal-500 focus:outline-none text-xs"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClass(idx)}
+                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                          title="Hapus Kelas"
+                        >
+                          <Icon name="trash-2" size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-4 bg-white rounded-xl border border-dashed border-teal-200 text-center text-slate-400 text-xs">
+                    Belum ada kelas yang didaftarkan. Isi form di bawah ini untuk menambahkan kelas baru secara manual.
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-2 flex flex-wrap gap-2 items-center">
+                <input
+                  type="text"
+                  placeholder="Nama Kelas Baru (Contoh: Kelas B2)"
+                  value={newClassName}
+                  onChange={(e) => setNewClassName(e.target.value)}
+                  className="flex-1 px-3.5 py-2 bg-white border border-slate-300 rounded-xl font-bold text-slate-900"
+                />
+                <div className="relative flex items-center">
+                  <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none font-black text-slate-500 text-sm">
+                    Rp
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="1.200.000"
+                    value={formatInputNumber(newClassTarif)}
+                    onChange={(e) => setNewClassTarif(parseNumberOnly(e.target.value))}
+                    className="w-40 pl-11 pr-3.5 py-2 bg-white border border-slate-300 rounded-xl font-black text-slate-900 text-right focus:border-teal-500 focus:outline-none shadow-inner"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddClass}
+                  className="py-2 px-4 bg-teal-700 hover:bg-teal-800 text-white font-extrabold rounded-xl shadow-sm transition-all"
+                >
+                  + Tambah Nama Kelas
+                </button>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end">
+              <button
+                type="submit"
+                className="py-3.5 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 text-sm"
+              >
+                <Icon name="save" size={18} />
+                <span>Simpan Seluruh Pengaturan</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    function KuitansiModal({ transaction, settings, onClose }) {
+      if (!transaction) return null;
+
+      return (
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div 
+            id="kuitansi-print-area" 
+            className="printable-kuitansi ticket-wrapper max-w-sm sm:max-w-md w-full bg-white rounded-[32px] overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 border border-slate-200"
+          >
+            {/* Close Button (Hidden on Print) */}
+            <button 
+              onClick={onClose} 
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors print:hidden z-20"
+              title="Tutup"
+            >
+              <Icon name="x" size={20} />
+            </button>
+
+            {/* Top Illustration & Header (Image 2) */}
+            {/* Top Illustration & Header */}
+            <div className="pt-8 pb-4 px-6 text-center space-y-2">
+              <div className="w-16 h-16 mx-auto relative flex items-center justify-center mb-1">
+                <div className="w-16 h-16 rounded-2xl bg-white border-2 border-blue-200 shadow-md p-2 flex items-center justify-center relative">
+                  <img src="logo.webp" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                  <div className="absolute -bottom-2 -right-2 w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white shadow-md text-white">
+                    <Icon name="check" size={16} className="text-white stroke-[3]" />
+                  </div>
+                </div>
+              </div>
+
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Payment Successful</h3>
+              <p className="text-xs text-blue-900 font-extrabold uppercase tracking-wide">{settings.schoolName || 'PAUD SETIA BHAKTI'}</p>
+              <div className="inline-block px-3 py-1 bg-blue-50 text-blue-700 font-extrabold text-[10px] rounded-full uppercase tracking-wider border border-blue-200">
+                Kuitansi Sah Pembayaran SPP
+              </div>
+            </div>
+
+            {/* Perforation Divider 1 with Left/Right Notches */}
+            <div className="ticket-divider-row">
+              <div className="ticket-notch ticket-notch-left"></div>
+              <div className="ticket-perforation"></div>
+              <div className="ticket-notch ticket-notch-right"></div>
+            </div>
+
+            {/* Section 1: Payment Details */}
+            <div className="px-7 py-3 space-y-2.5 text-xs">
+              <p className="font-extrabold text-slate-800 text-[13px] mb-2 tracking-tight">Payment Details</p>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Invoice Number</span>
+                <span className="font-mono font-bold text-slate-800">: {transaction.kuitansiNo || '-'}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Order Time</span>
+                <span className="font-semibold text-slate-800">: {formatDateIndo(transaction.date || '-')}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Payment Method</span>
+                <span className="font-bold text-slate-800">: {transaction.method || 'Tunai (di TU)'}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Payment Status</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-800">:</span>
+                  <span className="px-2.5 py-0.5 bg-emerald-500 text-white font-extrabold rounded-md text-[11px] shadow-sm">
+                    Successful
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Amount</span>
+                <div className="flex items-center gap-1.5 text-right">
+                  <span className="text-slate-800">:</span>
+                  <span className="font-black text-slate-900 text-sm">{formatRupiah(transaction.amount)}</span>
+                  {Boolean(transaction.keringananNote) && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      *keringanan
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Perforation Divider 2 with Left/Right Notches */}
+            <div className="ticket-divider-row">
+              <div className="ticket-notch ticket-notch-left"></div>
+              <div className="ticket-perforation"></div>
+              <div className="ticket-notch ticket-notch-right"></div>
+            </div>
+
+            {/* Section 2: Product Details */}
+            <div className="px-7 py-3 space-y-2.5 text-xs">
+              <p className="font-extrabold text-slate-800 text-[13px] mb-2 tracking-tight">Product Details</p>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium truncate max-w-[160px]">SPP {transaction.studentName}</span>
+                <div className="flex items-center gap-1.5 text-right">
+                  <span className="font-bold text-slate-800">: {formatRupiah(transaction.amount)}</span>
+                  {Boolean(transaction.keringananNote) && (
+                    <span className="text-[10px] font-black text-emerald-700 italic">*keringanan</span>
+                  )}
+                </div>
+              </div>
+
+              {Boolean(transaction.keringananNote) && (
+                <div className="flex items-start justify-between text-[11px] bg-emerald-50/80 p-2 rounded-xl border border-emerald-200">
+                  <span className="text-emerald-700 font-bold">Keterangan:</span>
+                  <span className="font-extrabold text-emerald-800 text-right">{transaction.keringananNote}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Kelas & Bulan</span>
+                <span className="font-semibold text-slate-800">: Kelas {transaction.kelas || 'B'} • {transaction.month}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Delivery / Admin</span>
+                <span className="font-semibold text-emerald-600">: Rp 0 (Bebas Biaya)</span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <span className="font-black text-slate-900 text-xs">Total Amount</span>
+                <span className="font-black text-blue-700 text-base">: {formatRupiah(transaction.amount)}</span>
+              </div>
+            </div>
+
+            {/* Serrated Bottom Edge */}
+            <div className="ticket-bottom-sawtooth mt-2"></div>
+
+            {/* Action Buttons */}
+            <div className="p-6 bg-slate-50/80 border-t border-slate-100 flex flex-col gap-2 print:hidden">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold rounded-2xl text-xs shadow-lg shadow-slate-900/15 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+              >
+                <Icon name="download" size={16} />
+                <span>Download PDF Receipt</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2 text-slate-500 hover:text-slate-800 text-xs font-bold transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function MidtransModal({ bill, student, settings, onClose, onConfirmSuccess }) {
+      const [method, setMethod] = useState('QRIS / GoPay / OVO');
+      const [isProcessing, setIsProcessing] = useState(false);
+
+      const handleConfirm = () => {
+        setIsProcessing(true);
+        setTimeout(() => {
+          setIsProcessing(false);
+          onConfirmSuccess(bill, method);
+        }, 600);
+      };
+
+      return (
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[32px] max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-blue-100/50 rounded-full blur-3xl -z-10 pointer-events-none"></div>
+
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-sky-400 text-white rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/25">
+                  <Icon name="credit-card" size={24} />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-base">Pembayaran SPP Online</h3>
+                  <p className="text-xs text-slate-500 font-medium">Gerbang Pembayaran Otomatis</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
+                <Icon name="x" size={20} />
+              </button>
+            </div>
+
+            {/* Summary Tagihan */}
+            <div className="p-4 bg-gradient-to-r from-blue-50 via-sky-50 to-indigo-50 rounded-2xl border border-blue-100/80 space-y-1">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-600">Murid:</span>
+                <span className="font-black text-slate-900">{student.name} ({student.kelas})</span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-slate-600">Tagihan Bulan:</span>
+                <span className="font-black text-blue-700">{bill.month}</span>
+              </div>
+              <div className="pt-2 border-t border-blue-200/60 flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-600">Total Pembayaran</span>
+                <span className="text-xl font-black text-blue-900">{formatRupiah(bill.amount)}</span>
+              </div>
+            </div>
+
+            {/* Payment Method Selector */}
+            <div className="space-y-2">
+              <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+                Pilih Metode Pembayaran
+              </label>
+
+              <div className="space-y-2">
+                {[
+                  { id: 'QRIS / GoPay / OVO', title: 'QRIS & e-Wallet', desc: 'GoPay, OVO, ShopeePay, Dana (Instan)', icon: 'smartphone' },
+                  { id: 'Transfer Bank (VA BCA/BNI/BRI)', title: 'Virtual Account Bank', desc: 'BCA, Mandiri, BNI, BRI, Permata', icon: 'building-2' },
+                  { id: 'Tunai (di Kantor TU)', title: 'Bayar Tunai di TU', desc: 'Langsung melalui staf tata usaha sekolah', icon: 'banknote' }
+                ].map((item) => (
+                  <label
+                    key={item.id}
+                    onClick={() => setMethod(item.id)}
+                    className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${
+                      method === item.id 
+                        ? 'bg-blue-50/70 border-blue-500 shadow-sm' 
+                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100/70'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${method === item.id ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                        <Icon name={item.icon} size={18} />
+                      </div>
+                      <div>
+                        <p className="font-extrabold text-xs text-slate-800">{item.title}</p>
+                        <p className="text-[11px] text-slate-500 font-medium">{item.desc}</p>
+                      </div>
+                    </div>
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${method === item.id ? 'border-blue-600 bg-blue-600' : 'border-slate-300'}`}>
+                      {method === item.id && <div className="w-2 h-2 rounded-full bg-white"></div>}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Confirm CTA */}
+            <div className="flex gap-3 pt-2">
+              <button 
+                type="button" 
+                onClick={onClose} 
+                disabled={isProcessing}
+                className="py-3 px-4 bg-slate-100 hover:bg-slate-200 font-bold rounded-2xl text-xs text-slate-600 transition-colors"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={isProcessing}
+                className="flex-1 py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-2xl text-xs shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+              >
+                {isProcessing ? (
+                  <>
+                    <Icon name="loader-2" size={16} className="animate-spin" />
+                    <span>Memproses Pembayaran...</span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="check-circle" size={16} />
+                    <span>Konfirmasi Pembayaran ({formatRupiah(bill.amount)})</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 9. MAIN APP CONTROLLER WITH SUPABASE SYNC
+    // ==========================================
+    
+    function AdminNoteCardItem({ n, onDeleteNote }) {
+      const hasReplies = Boolean(n.comments && n.comments.length > 0);
+      const [isOpen, setIsOpen] = useState(!hasReplies);
+      const [readCommentCount, setReadCommentCount] = useState(() => {
+        try {
+          const map = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+          return map[n.id] || 0;
+        } catch (e) {
+          return 0;
+        }
+      });
+
+      const unreadCount = Math.max(0, (n.comments?.length || 0) - readCommentCount);
+
+      const markAsRead = () => {
+        try {
+          const map = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+          map[n.id] = n.comments ? n.comments.length : 0;
+          localStorage.setItem('spp_admin_read_note_replies', JSON.stringify(map));
+          setReadCommentCount(map[n.id]);
+          window.dispatchEvent(new Event('spp_note_read_updated'));
+        } catch (e) {}
+      };
+
+      const handleToggle = () => {
+        const next = !isOpen;
+        setIsOpen(next);
+        if (next && unreadCount > 0) {
+          markAsRead();
+        }
+      };
+
+      useEffect(() => {
+        if (isOpen && unreadCount > 0) {
+          markAsRead();
+        }
+      }, [isOpen, n.comments]);
+
+      return (
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col transition-all">
+          <button
+            type="button"
+            onClick={handleToggle}
+            className="w-full p-4 sm:p-5 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center text-left hover:bg-slate-100/70 transition-colors cursor-pointer"
+          >
+            <div className="flex-1 min-w-0 pr-3">
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-teal-100 text-teal-800 rounded-lg text-[10px] font-black uppercase">
+                  <Icon name="tag" size={11} /> {n.category || 'Catatan TU'}
+                </span>
+                {unreadCount > 0 ? (
+                  <span className="px-2.5 py-0.5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center gap-1 animate-pulse">
+                    <Icon name="message-circle" size={11} /> {unreadCount} Balasan Baru
+                  </span>
+                ) : hasReplies ? (
+                  <span className="px-2.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-black flex items-center gap-1">
+                    <Icon name="message-circle" size={11} /> {n.comments.length} Balasan Masuk
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 bg-slate-200/70 text-slate-600 rounded-full text-[10px] font-bold">
+                    Menunggu Tanggapan
+                  </span>
+                )}
+              </div>
+              <h4 className="font-black text-slate-800 text-sm sm:text-base truncate">Siswa: {n.studentName}</h4>
+              <p className="text-xs text-slate-500 font-bold mt-0.5 flex items-center gap-1">
+                <Icon name="calendar" size={12} className="text-teal-600" /> {formatDateTimeIndo(n.date)}
+                {hasReplies && (
+                  <span className="text-blue-600 font-bold ml-2 text-[11px]">
+                    • {isOpen ? 'Tutup percakapan' : 'Klik untuk buka riwayat percakapan'}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 rounded-xl bg-slate-200/60 flex items-center justify-center text-slate-600 transition-transform">
+                <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} />
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onDeleteNote && onDeleteNote(n.id); }}
+                className="w-8 h-8 bg-rose-50 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl transition-colors flex items-center justify-center shadow-xs"
+                title="Hapus Catatan"
+              >
+                <Icon name="trash-2" size={14} />
+              </button>
+            </div>
+          </button>
+
+          {isOpen && (
+            <div className="animate-in fade-in duration-200">
+              <div className="p-5 text-sm text-slate-700 font-medium whitespace-pre-wrap leading-relaxed bg-white">
+                {n.content}
+              </div>
+              <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100">
+                <p className="text-xs font-black text-slate-600 uppercase mb-2 flex items-center gap-1.5">
+                  <Icon name="message-circle" size={13} className="text-blue-600"/> Balasan Wali Murid ({n.comments ? n.comments.length : 0})
+                </p>
+                {n.comments && n.comments.length > 0 ? (
+                  <div className="space-y-2 mt-2">
+                    {n.comments.map((cm, i) => (
+                      <div key={i} className="bg-white p-3.5 border border-slate-200 rounded-2xl shadow-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-[11px] font-black text-slate-800 flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                            {cm.sender}
+                          </p>
+                          <span className="text-[10px] text-slate-500 font-bold">{formatDateTimeIndo(cm.time, n.date)}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium leading-relaxed">{cm.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 italic">Belum ada tanggapan dari wali murid.</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function AdminCatatanView({ students, notes, onAddNote, onDeleteNote }) {
+      const [selectedStudent, setSelectedStudent] = useState('');
+      const [content, setContent] = useState('');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!selectedStudent || !content.trim()) return;
+        const student = students.find(s => s.id === selectedStudent);
+        if (!student) return;
+        const now = new Date();
+        const clockStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
+        onAddNote({
+          studentId: student.id,
+          studentName: student.name,
+          category: 'Catatan TU',
+          title: `Catatan Tata Usaha (TU)`,
+          content: content.trim(),
+          date: `${formatDateIndo(now)} • ${clockStr} WIB`,
+          comments: []
+        });
+        setContent('');
+        setSelectedStudent('');
+      };
+
+      return (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3"><Icon name="edit-3" size={28} className="text-teal-600"/> Catatan Siswa (Tata Usaha)</h2>
+              <p className="text-sm text-slate-500 font-medium mt-1">Pilih nama siswa dan langsung ketik pesan atau catatan TU yang akan masuk ke portal wali murid.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <form onSubmit={handleSubmit} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5 sticky top-24">
+                <h3 className="font-black text-slate-800 border-b border-slate-100 pb-3 flex items-center gap-2">
+                  <Icon name="send" size={18} className="text-teal-600" />
+                  Kirim Catatan Siswa
+                </h3>
+                
+                <div className="space-y-2">
+                  <label className="block text-xs font-black text-slate-700 uppercase">Pilih Siswa</label>
+                  <SearchableStudentSelect 
+                    required 
+                    students={students}
+                    value={selectedStudent} 
+                    onChange={e => setSelectedStudent(e.target.value)} 
+                    placeholder="-- Cari & Pilih Siswa --"
+                    theme="teal"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-black text-slate-700 uppercase">Isi Pesan / Catatan TU</label>
+                  <textarea 
+                    required 
+                    value={content} 
+                    onChange={e => setContent(e.target.value)} 
+                    rows="6" 
+                    placeholder="Tuliskan catatan atau pesan TU langsung untuk siswa ini..." 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                  ></textarea>
+                </div>
+
+                <button type="submit" className="w-full py-3.5 bg-teal-600 hover:bg-teal-700 text-white font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-2">
+                  <Icon name="send" size={18} /> Kirim Pesan ke Siswa
+                </button>
+              </form>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+               {notes.length === 0 ? (
+                 <div className="bg-white p-8 rounded-3xl border border-slate-200 text-center shadow-sm">
+                   <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-3"><Icon name="inbox" size={32}/></div>
+                   <p className="text-slate-500 font-bold">Belum ada catatan siswa yang dikirimkan.</p>
+                 </div>
+               ) : (
+                 notes.sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now())).map(n => (
+                   <AdminNoteCardItem key={n.id} n={n} onDeleteNote={onDeleteNote} />
+                 ))
+               )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ==========================================
+    // 7.6. MONITOR TUNGGAKAN & FOLLOW-UP WHATSAPP
+    // ==========================================
+    function AdminTunggakanView({ students, transactions, settings, navigateTo }) {
+      const [filterKelas, setFilterKelas] = useState('Semua Kelas');
+      const [filterMonth, setFilterMonth] = useState('Semua Bulan');
+      const [filterStatus, setFilterStatus] = useState('tunggakan');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [copiedStudentId, setCopiedStudentId] = useState(null);
+
+      const periodsList = useMemo(() => {
+        const list = settings?.periods ? [...settings.periods] : [];
+        const sStartM = settings?.startMonth || 'Juli';
+        const sStartY = parseInt(settings?.startYear) || 2026;
+        const sEndM = settings?.endMonth || 'Juni';
+        const sEndY = parseInt(settings?.endYear) || 2027;
+
+        if (list.length === 0) {
+          list.push({
+            id: 'active-default',
+            name: `Periode ${sStartM} ${sStartY} - ${sEndM} ${sEndY}`,
+            startMonth: sStartM,
+            startYear: sStartY,
+            endMonth: sEndM,
+            endYear: sEndY,
+            semester: settings?.semester || 'Semua',
+            isActive: true
+          });
+        }
+        return list;
+      }, [settings]);
+
+      const activePeriod = useMemo(() => {
+        return periodsList.find(p => p.isActive) || periodsList[0] || null;
+      }, [periodsList]);
+
+      const [filterPeriod, setFilterPeriod] = useState(() => {
+        return activePeriod ? String(activePeriod.id) : 'all';
+      });
+
+      useEffect(() => {
+        if (activePeriod && (!filterPeriod || filterPeriod === 'all')) {
+          setFilterPeriod(String(activePeriod.id));
+        }
+      }, [activePeriod]);
+
+      const selectedPeriodObj = useMemo(() => {
+        const curId = filterPeriod || (activePeriod ? String(activePeriod.id) : 'all');
+        if (curId === 'all') return null;
+        return periodsList.find(p => String(p.id) === String(curId)) || null;
+      }, [filterPeriod, activePeriod, periodsList]);
+
+      const periodStartYear = useMemo(() => {
+        if (selectedPeriodObj) return parseInt(selectedPeriodObj.startYear) || 2026;
+        return parseInt(settings?.startYear) || 2026;
+      }, [selectedPeriodObj, settings?.startYear]);
+
+      // Semester otomatis terisi dari pengaturan (settings.semester) atau periode terpilih
+      const defaultSemester = useMemo(() => {
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      }, [activePeriod, settings?.semester]);
+
+      const [filterSemester, setFilterSemester] = useState(() => {
+        return detectSemesterFromPeriod(activePeriod, settings?.semester || 'all');
+      });
+
+      // Sinkronisasi otomatis semester saat periode ajaran berubah
+      useEffect(() => {
+        if (selectedPeriodObj) {
+          setFilterSemester(detectSemesterFromPeriod(selectedPeriodObj, defaultSemester));
+        } else {
+          setFilterSemester(defaultSemester);
+        }
+      }, [selectedPeriodObj, defaultSemester]);
+
+      const baseAcademicMonths = useMemo(() => {
+        const sysEarliest = getSystemEarliestPeriodStart(settings);
+        const targetEndObj = selectedPeriodObj || settings;
+        const endM = targetEndObj?.endMonth || settings?.endMonth || 'Juni';
+        const endY = parseInt(targetEndObj?.endYear || settings?.endYear) || (sysEarliest.year + 1);
+
+        let startM = sysEarliest.month;
+        let startY = sysEarliest.year;
+        if (selectedPeriodObj && !selectedPeriodObj.isActive && selectedPeriodObj.startMonth && selectedPeriodObj.startYear) {
+          startM = selectedPeriodObj.startMonth;
+          startY = parseInt(selectedPeriodObj.startYear, 10);
+        }
+
+        return getMonthsList(startM, '', endM, startY, endY);
+      }, [selectedPeriodObj, settings]);
+      const academicMonths = useMemo(() => getSemesterMonths(baseAcademicMonths, filterSemester), [baseAcademicMonths, filterSemester]);
+      const activeStudents = useMemo(() => students.filter(s => s.statusAktif !== false), [students]);
+
+      // Bulan yang SUDAH BERJALAN / JATUH TEMPO s/d tanggal hari ini dalam tahun ajaran ini
+      const dueAcademicMonths = useMemo(() => {
+        return academicMonths.filter(m => isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10));
+      }, [academicMonths, settings?.dueDateDay]);
+
+      // Calculate debt status per student
+      const studentDebtList = useMemo(() => {
+        return activeStudents.map(student => {
+          const studentTrx = transactions.filter(t => 
+            (t.studentId === student.id || (t.studentName && t.studentName.toLowerCase().trim() === student.name.toLowerCase().trim())) &&
+            (t.status === 'Lunas' || t.status === 'lunas' || t.status === 'Berhasil' || t.status === 'Sukses')
+          );
+          const paidMonths = studentTrx.map(t => (t.month || '').trim().toLowerCase());
+          
+          // Bulan yang masuk perhitungan SPP & tunggakan HANYA yang jatuh pada masa aktif siswa
+          const studentDueMonths = dueAcademicMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+          const studentAcademicMonths = academicMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
+
+          // Yang menunggak HANYA bulan yang telah jatuh tempo/berjalan s/d saat ini yang belum dibayar
+          const unpaidMonths = studentDueMonths.filter(m => {
+            const mLower = m.trim().toLowerCase();
+            return !paidMonths.some(pm => pm === mLower || (pm && mLower.startsWith(pm)));
+          });
+          const futureUnpaidMonths = studentAcademicMonths.filter(m => 
+            !isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10) && 
+            !paidMonths.some(pm => pm === m.trim().toLowerCase() || (pm && m.trim().toLowerCase().startsWith(pm)))
+          );
+          const tarif = Number(student.tarif) || 0;
+          const currentClassDebt = unpaidMonths.length * tarif;
+          const previousArrears = Number(student.arrearsAmount) || 0;
+          const totalDebt = currentClassDebt + previousArrears;
+          const isLunas = unpaidMonths.length === 0 && previousArrears === 0;
+
+          return {
+            student,
+            unpaidMonths,
+            futureUnpaidMonths,
+            paidMonthsCount: paidMonths.length,
+            totalDebt,
+            isLunas
+          };
+        });
+      }, [activeStudents, transactions, academicMonths, dueAcademicMonths, periodStartYear, settings]);
+
+      const totalStudents = activeStudents.length;
+      const studentsWithDebt = studentDebtList.filter(item => !item.isLunas);
+      const studentsLunas = studentDebtList.filter(item => item.isLunas);
+      const totalNominalTunggakan = studentsWithDebt.reduce((sum, item) => sum + item.totalDebt, 0);
+      const pelunasanPercentage = totalStudents > 0 ? Math.round((studentsLunas.length / totalStudents) * 100) : 100;
+
+      const filteredList = useMemo(() => {
+        return studentDebtList.filter(item => {
+          const { student, unpaidMonths, isLunas } = item;
+          if (filterStatus === 'tunggakan' && isLunas) return false;
+          if (filterStatus === 'lunas' && !isLunas) return false;
+          
+          if (filterKelas !== 'Semua Kelas' && student.kelas !== filterKelas) return false;
+
+          if (filterMonth !== 'Semua Bulan') {
+            const hasMonthUnpaid = unpaidMonths.some(m => m.toLowerCase().includes(filterMonth.toLowerCase()));
+            if (!hasMonthUnpaid) return false;
+          }
+
+          if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            const matchName = student.name.toLowerCase().includes(q);
+            const matchNis = (student.nis || '').toLowerCase().includes(q);
+            const matchWali = (student.wali || '').toLowerCase().includes(q);
+            if (!matchName && !matchNis && !matchWali) return false;
+          }
+
+          return true;
+        });
+      }, [studentDebtList, filterStatus, filterKelas, filterMonth, searchQuery]);
+
+      const generateWhatsAppMessage = (student, unpaidMonths, totalDebt) => {
+        const monthsStr = unpaidMonths.length > 0 ? unpaidMonths.join(', ') : '-';
+        const hasPrevArrears = Number(student.arrearsAmount) > 0;
+        
+        return `Yth. Bapak/Ibu ${student.wali || 'Wali Murid'} dari ananda *${student.name}* (Kelas: ${student.kelas}, NIS: ${student.nis}),\n\n` +
+          `Semoga senantiasa dalam keadaan sehat dan penuh berkah.\n\n` +
+          `Kami dari Bagian Tata Usaha (TU) *${settings.schoolName}* bermaksud menginformasikan status pembayaran SPP yang belum terselesaikan s/d bulan berjalan ini:\n\n` +
+          `📌 *Rincian Tagihan SPP:*\n` +
+          `• Tarif SPP: *${formatRupiah(student.tarif)}/bulan*${student.keringanan_note ? ` (Keringanan: ${student.keringanan_note})` : ''}\n` +
+          (unpaidMonths.length > 0 ? `• Bulan Tertunggak (s/d Bulan Berjalan): *${monthsStr}* (${unpaidMonths.length} bulan)\n` : '') +
+          (hasPrevArrears ? `• Sisa Tunggakan Kelas Sebelumnya: *${formatRupiah(student.arrearsAmount)}* (${student.arrearsNote || 'Tunggakan Kelas Sebelumnya'})\n` : '') +
+          `• Total Tagihan: *${formatRupiah(totalDebt)}*\n\n` +
+          `Pembayaran dapat ditransfer ke rekening resmi sekolah atau diserahkan langsung di kantor TU.\n` +
+          `Apabila Bapak/Ibu telah melakukan pembayaran sebelumnya, mohon konfirmasikan bukti transfer kepada kami.\n\n` +
+          `Terima kasih banyak atas perhatian dan kerja samanya. 🙏\n\n` +
+          `_Tata Usaha ${settings.schoolName}_`;
+      };
+
+      const handleWhatsAppClick = (student, unpaidMonths, totalDebt) => {
+        if (!student.telepon) {
+          alert(`Nomor telepon / WhatsApp untuk wali murid ${student.name} belum didaftarkan di data murid. Silakan lengkapi nomor telepon pada menu Data Murid.`);
+          return;
+        }
+
+        let cleanPhone = student.telepon.replace(/[^0-9]/g, '');
+        if (cleanPhone.startsWith('0')) {
+          cleanPhone = '62' + cleanPhone.slice(1);
+        } else if (cleanPhone.startsWith('8')) {
+          cleanPhone = '62' + cleanPhone;
+        }
+
+        const message = generateWhatsAppMessage(student, unpaidMonths, totalDebt);
+        const url = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+      };
+
+      const handleCopyMessage = (student, unpaidMonths, totalDebt) => {
+        const message = generateWhatsAppMessage(student, unpaidMonths, totalDebt);
+        navigator.clipboard.writeText(message).then(() => {
+          setCopiedStudentId(student.id);
+          setTimeout(() => setCopiedStudentId(null), 3000);
+        }).catch(() => {
+          alert("Gagal menyalin pesan.");
+        });
+      };
+
+      const availableClasses = useMemo(() => {
+        const fromSettings = (settings.customClasses || []).map(c => c.name);
+        const fromStudents = activeStudents.map(s => s.kelas).filter(Boolean);
+        return Array.from(new Set([...fromSettings, ...fromStudents]));
+      }, [settings, activeStudents]);
+
+      return (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-800 rounded-full text-[11px] font-black uppercase mb-2 border border-amber-200">
+                <Icon name="phone-call" size={14} className="text-amber-600" /> Follow-Up Tagihan SPP
+              </div>
+              <h2 className="text-2xl font-black text-slate-800 tracking-tight">Siswa Belum Bayar & Follow Up WhatsApp</h2>
+              <p className="text-xs text-slate-500 font-medium mt-1">
+                Pantau siswa yang memiliki tunggakan SPP s/d bulan berjalan dan hubungi wali murid langsung via WhatsApp 1-klik pesan terformat.
+              </p>
+            </div>
+
+            <button
+              onClick={() => navigateTo('transaksi')}
+              className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-xl text-xs transition-colors flex items-center gap-2 shadow-sm shrink-0"
+            >
+              <Icon name="plus-circle" size={16} /> Catat Bayar Manual
+            </button>
+          </div>
+
+          {/* 4 Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-rose-500"></div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <Icon name="alert-circle" size={24} />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase">Siswa Belum Lunas</p>
+                <p className="text-2xl font-black text-rose-600 mt-0.5">{studentsWithDebt.length} Siswa</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 font-black text-sm border border-amber-200 shadow-2xs">
+                Rp
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                  <span>Total Tunggakan</span>
+                  <span className="text-[9px] text-amber-600 font-extrabold lowercase bg-amber-50 px-1 rounded border border-amber-200">(s/d sekarang)</span>
+                </p>
+                <p className="text-xl font-black text-amber-700 mt-0.5">{formatRupiah(totalNominalTunggakan)}</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500"></div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <Icon name="check-circle-2" size={24} />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase">Siswa Sudah Lunas</p>
+                <p className="text-2xl font-black text-emerald-700 mt-0.5">{studentsLunas.length} Siswa</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm flex items-center gap-4 relative overflow-hidden">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500"></div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Icon name="pie-chart" size={24} />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-slate-400 uppercase">Tingkat Pelunasan</p>
+                <p className="text-2xl font-black text-blue-700 mt-0.5">{pelunasanPercentage}%</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="bg-white p-4 sm:p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-3.5 items-stretch lg:items-center justify-between">
+            <div className="relative w-full sm:w-80 lg:w-80 flex items-center">
+              <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <Icon name="search" size={16} />
+              </div>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Cari nama siswa, NIS, wali..."
+                className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white shadow-xs transition-all"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-center gap-2.5 w-full lg:w-auto text-xs font-bold">
+              <select
+                value={filterStatus}
+                onChange={e => setFilterStatus(e.target.value)}
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+              >
+                <option value="tunggakan">Hanya Belum Lunas ({studentsWithDebt.length})</option>
+                <option value="semua">Semua Siswa ({totalStudents})</option>
+                <option value="lunas">Hanya Sudah Lunas ({studentsLunas.length})</option>
+              </select>
+
+              <select
+                value={filterPeriod || (activePeriod ? String(activePeriod.id) : 'all')}
+                onChange={e => {
+                  const newId = e.target.value;
+                  setFilterPeriod(newId);
+                  const matchP = periodsList.find(p => String(p.id) === String(newId));
+                  setFilterSemester(detectSemesterFromPeriod(matchP, defaultSemester));
+                }}
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+              >
+                <option value="all">Semua Periode</option>
+                {periodsList.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.name || `Periode ${p.startMonth} ${p.startYear} - ${p.endMonth} ${p.endYear}`} {p.isActive ? '(Aktif)' : ''}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={filterSemester}
+                onChange={e => setFilterSemester(e.target.value)}
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-blue-50/80 border border-blue-200 rounded-xl text-blue-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+              >
+                <option value="all">Semua Semester</option>
+                <option value="1">Semester 1 (Ganjil)</option>
+                <option value="2">Semester 2 (Genap)</option>
+              </select>
+
+              <select
+                value={filterKelas}
+                onChange={e => setFilterKelas(e.target.value)}
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs"
+              >
+                <option value="Semua Kelas">Semua Kelas</option>
+                {availableClasses.map(cls => (
+                  <option key={cls} value={cls}>{cls}</option>
+                ))}
+              </select>
+
+              <select
+                value={filterMonth}
+                onChange={e => setFilterMonth(e.target.value)}
+                className="w-full sm:w-auto min-h-[42px] px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-xs sm:col-span-2 lg:col-span-1"
+              >
+                <option value="Semua Bulan">Semua Bulan Periode</option>
+                {academicMonths.map(m => {
+                  const isDue = isMonthDueOrElapsed(m, new Date(), settings?.dueDateDay || 10);
+                  return (
+                    <option key={m} value={m}>
+                      {m} {isDue ? '(Berjalan/Due)' : '(Mendatang)'}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+            {filteredList.length === 0 ? (
+              <div className="p-12 text-center flex flex-col items-center justify-center">
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
+                  <Icon name="check-circle" size={32} />
+                </div>
+                <h3 className="font-black text-slate-800 text-lg">Tidak Ada Data Tertunggak</h3>
+                <p className="text-xs text-slate-500 font-medium mt-1">
+                  {filterStatus === 'tunggakan' 
+                    ? 'Semua murid pada filter ini telah melunasi pembayaran SPP s/d bulan berjalan.' 
+                    : 'Tidak ada murid yang sesuai dengan filter pencarian.'}
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredList.map(({ student, unpaidMonths, futureUnpaidMonths, totalDebt, isLunas }) => (
+                  <div key={student.id} className="p-5 sm:p-6 hover:bg-slate-50/70 transition-colors flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex items-start gap-4 min-w-[280px]">
+                      <div className="w-12 h-12 rounded-2xl bg-teal-100 border border-teal-200 flex items-center justify-center font-bold text-teal-800 text-lg shrink-0 overflow-hidden shadow-inner">
+                        {student.fotoUrl ? (
+                          <img src={student.fotoUrl} alt={student.name} className="w-full h-full object-cover" />
+                        ) : (
+                          student.name.charAt(0).toUpperCase()
+                        )}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-black text-slate-800 text-base">{student.name}</h4>
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-extrabold uppercase">
+                            {student.kelas}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 mt-0.5">
+                          <span>NIS: <strong className="text-slate-700">{student.nis}</strong></span>
+                          <span>•</span>
+                          <span>Tarif: <strong className="text-blue-700 font-black">{formatRupiah(student.tarif)}/bln</strong></span>
+                          {student.keringanan_note && (
+                            <span className="px-2 py-0.5 bg-amber-100 text-amber-900 rounded-md text-[10px] font-black border border-amber-200">
+                              Keringanan: {student.keringanan_note}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-600">
+                          <span className="font-medium">Wali: <strong className="text-slate-800">{student.wali || '-'}</strong></span>
+                          {student.telepon ? (
+                            <span className="inline-flex items-center gap-1 font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 text-[11px]">
+                              <Icon name="phone" size={11} /> {student.telepon}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-rose-500 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100">
+                              No WA Belum Diisi
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 lg:px-4">
+                      {isLunas ? (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-xs font-black">
+                          <Icon name="check-circle-2" size={14} /> Lunas s/d Bulan Berjalan
+                        </div>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {unpaidMonths.length > 0 && (
+                            <>
+                              <p className="text-[11px] font-black text-rose-600 uppercase tracking-wider flex items-center gap-1">
+                                <Icon name="clock" size={12} /> {unpaidMonths.length} Bulan Menunggak (s/d Bulan Berjalan):
+                              </p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {unpaidMonths.map((m, idx) => (
+                                  <span key={idx} className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-extrabold">
+                                    {m}
+                                  </span>
+                                ))}
+                              </div>
+                            </>
+                          )}
+                          {Number(student.arrearsAmount) > 0 && (
+                            <div className="mt-1 px-2.5 py-1 bg-amber-50 border border-amber-300 rounded-lg text-[11px] font-extrabold text-amber-900 inline-flex items-center gap-1.5">
+                              <Icon name="alert-triangle" size={12} className="text-amber-600" />
+                              <span>Tunggakan Bawaan Kelas Sebelumnya: {formatRupiah(student.arrearsAmount)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between lg:justify-end gap-3 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+                      <div className="text-left lg:text-right">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Total Tagihan</p>
+                        <p className={`text-lg font-black ${isLunas ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {isLunas ? 'Rp 0' : formatRupiah(totalDebt)}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {!isLunas && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleWhatsAppClick(student, unpaidMonths, totalDebt)}
+                              className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black rounded-xl text-xs transition-all shadow-md shadow-emerald-600/25 flex items-center gap-1.5"
+                              title="Kirim pesan penagihan langsung ke WhatsApp wali murid"
+                            >
+                              <Icon name="message-circle" size={16} />
+                              <span>Chat WA</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopyMessage(student, unpaidMonths, totalDebt)}
+                              className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-colors border border-slate-200"
+                              title="Salin Pesan Follow Up"
+                            >
+                              <Icon name={copiedStudentId === student.id ? "check" : "copy"} size={16} className={copiedStudentId === student.id ? "text-emerald-600" : ""} />
+                            </button>
+                          </>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => navigateTo('transaksi')}
+                          className="px-3 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold rounded-xl text-xs transition-colors border border-blue-200"
+                          title="Buka menu catat pembayaran manual"
+                        >
+                          Bayar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+  
+    function KickedOutModal({ info, onClose }) {
+      if (!info) return null;
+      return (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-md z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl border border-rose-100 text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 via-rose-500 to-rose-600"></div>
+
+            <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner ring-8 ring-rose-50/50">
+              <Icon name="alert-triangle" size={32} />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">
+                Akun Login di Perangkat Lain
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Sesi akun <span className="font-bold text-slate-900 underline decoration-rose-400">{info.userName}</span> pada perangkat ini telah dinonaktifkan otomatis.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 text-left space-y-2 text-xs">
+              <div className="flex items-center justify-between text-slate-500 font-semibold">
+                <span>Perangkat Baru:</span>
+                <span className="font-black text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm flex items-center gap-1.5">
+                  <Icon name="smartphone" size={14} className="text-blue-600" />
+                  {info.device || 'Perangkat Lain'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-slate-500 font-semibold">
+                <span>Waktu Login:</span>
+                <span className="font-bold text-slate-700">{info.time || 'Baru saja'}</span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400 italic">
+              Keamanan: Satu akun hanya dapat digunakan aktif pada satu perangkat dalam satu waktu.
+            </p>
+
+            <button
+              onClick={onClose}
+              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black rounded-2xl shadow-lg shadow-blue-500/25 transition-all text-sm flex items-center justify-center gap-2 active:scale-95"
+            >
+              <Icon name="log-in" size={18} />
+              Mengerti & Masuk Kembali
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function App({ initialHandoff = null }) {
+      const handoffConsumedRef = useRef(false);
+      // Isolasi sesi per-tab (sessionStorage) dan per-role (localStorage) agar refresh admin tidak menimpa user
+      const [currentUser, setCurrentUser] = useState(() => {
+        try {
+          // 1. Prioritas utama: Cek sesi aktif tab ini (sessionStorage)
+          const tabSession = sessionStorage.getItem('spp_tab_session');
+          if (tabSession) {
+            return JSON.parse(tabSession);
+          }
+
+          // 2. Cek apakah URL tab ini dibuka spesifik untuk role tertentu
+          const urlParams = new URLSearchParams(window.location.search);
+          const roleParam = urlParams.get('role') || (window.location.hash.includes('admin') ? 'admin' : (window.location.hash.includes('wali') || window.location.hash.includes('parent') ? 'parent' : null));
+
+          if (roleParam === 'admin') {
+            const adminSaved = localStorage.getItem('spp_admin_session');
+            if (adminSaved) {
+              sessionStorage.setItem('spp_tab_session', adminSaved);
+              return JSON.parse(adminSaved);
+            }
+          } else if (roleParam === 'parent') {
+            const parentSaved = localStorage.getItem('spp_parent_session');
+            if (parentSaved) {
+              sessionStorage.setItem('spp_tab_session', parentSaved);
+              return JSON.parse(parentSaved);
+            }
+          }
+
+          // 3. Cek intended role tab ini
+          const intendedRole = sessionStorage.getItem('spp_intended_role');
+          if (intendedRole === 'admin') {
+            const adminSaved = localStorage.getItem('spp_admin_session');
+            if (adminSaved) {
+              sessionStorage.setItem('spp_tab_session', adminSaved);
+              return JSON.parse(adminSaved);
+            }
+          } else if (intendedRole === 'parent') {
+            const parentSaved = localStorage.getItem('spp_parent_session');
+            if (parentSaved) {
+              sessionStorage.setItem('spp_tab_session', parentSaved);
+              return JSON.parse(parentSaved);
+            }
+          }
+
+          // 4. Fallback ke login yang tersimpan
+          const adminSaved = localStorage.getItem('spp_admin_session');
+          const parentSaved = localStorage.getItem('spp_parent_session');
+          if (adminSaved && !parentSaved) {
+            sessionStorage.setItem('spp_tab_session', adminSaved);
+            return JSON.parse(adminSaved);
+          }
+          if (parentSaved && !adminSaved) {
+            sessionStorage.setItem('spp_tab_session', parentSaved);
+            return JSON.parse(parentSaved);
+          }
+          const legacy = localStorage.getItem('spp_user_session');
+          if (legacy) {
+            sessionStorage.setItem('spp_tab_session', legacy);
+            return JSON.parse(legacy);
+          }
+          return null;
+        } catch (e) {
+          return null;
+        }
+      });
+      const [mySessionToken, setMySessionToken] = useState(() => {
+        try {
+          return sessionStorage.getItem('spp_my_session_token') || localStorage.getItem('spp_my_session_token') || '';
+        } catch (e) {
+          return '';
+        }
+      });
+      const [kickedModal, setKickedModal] = useState(null);
+
+      const currentUserRef = useRef(currentUser);
+      currentUserRef.current = currentUser;
+      const mySessionTokenRef = useRef(mySessionToken);
+      mySessionTokenRef.current = mySessionToken;
+
+      const [currentView, setCurrentView] = useState('dashboard');
+      const [isAdminMobileMenuOpen, setIsAdminMobileMenuOpen] = useState(false);
+      const [showAdminMobileBell, setShowAdminMobileBell] = useState(false);
+
+      useEffect(() => {
+        setShowAdminMobileBell(false);
+      }, [currentView]);
+
+      const [adminExpandedGroup, setAdminExpandedGroup] = useState(() => {
+        if (['transaksi', 'tunggakan', 'laporan'].includes('dashboard')) return 'keuangan';
+        if (['siswa', 'catatan'].includes('dashboard')) return 'kesiswaan';
+        if (['pengumuman', 'pengaduan'].includes('dashboard')) return 'komunikasi';
+        return 'dashboard';
+      });
+      const [isRefreshing, setIsRefreshing] = useState(false);
+      const [envConfig, setEnvConfig] = useState({});
+      
+      const [settings, setSettings] = useState(() => {
+        if (initialHandoff && initialHandoff.settings) return initialHandoff.settings;
+        try {
+          const c = localStorage.getItem('spp_extended_settings') || localStorage.getItem('spp_cached_settings');
+          return c ? JSON.parse(c) : DEFAULT_SETTINGS;
+        } catch(e) { return DEFAULT_SETTINGS; }
+      });
+      const [students, setStudents] = useState(() => {
+        if (initialHandoff && Array.isArray(initialHandoff.students) && initialHandoff.students.length > 0) {
+          return initialHandoff.students;
+        }
+        try {
+          const c = localStorage.getItem('spp_cached_students');
+          return c ? JSON.parse(c) : [];
+        } catch(e) { return []; }
+      });
+      const [transactions, setTransactions] = useState(() => {
+        try {
+          const c = localStorage.getItem('spp_cached_transactions');
+          if (!c) return [];
+          return JSON.parse(c).map(t => ({ ...t, date: formatDateIndo(t.date) }));
+        } catch(e) { return []; }
+      });
+      const [announcements, setAnnouncements] = useState(() => {
+        try {
+          const c = localStorage.getItem('spp_cached_announcements');
+          if (!c) return [];
+          return JSON.parse(c).map(a => ({ ...a, date: formatDateIndo(a.date) }));
+        } catch(e) { return []; }
+      });
+      const [complaints, setComplaints] = useState(() => {
+        try {
+          const c = localStorage.getItem('spp_cached_complaints');
+          if (!c) return [];
+          return JSON.parse(c).map(cp => ({
+            ...cp,
+            date: formatDateIndo(cp.date),
+            messages: Array.isArray(cp.messages)
+              ? cp.messages.map(m => ({ ...m, time: formatDateTimeIndo(m.time, cp.date) }))
+              : []
+          }));
+        } catch(e) { return []; }
+      });
+      const [notes, setNotes] = useState(() => {
+        try {
+          const c = localStorage.getItem('spp_cached_notes');
+          if (!c) return [];
+          return JSON.parse(c).map(n => ({
+            ...n,
+            date: formatDateTimeIndo(n.date),
+            comments: Array.isArray(n.comments)
+              ? n.comments.map(cm => ({ ...cm, time: formatDateTimeIndo(cm.time, n.date) }))
+              : []
+          }));
+        } catch(e) { return []; }
+      });
+
+      const [selectedKuitansi, setSelectedKuitansi] = useState(null);
+      const [activeMidtransBill, setActiveMidtransBill] = useState(null);
+      const [toast, setToast] = useState(null);
+      const [crudPopup, setCrudPopup] = useState(null);
+      const [pendingUser, setPendingUser] = useState(() => (initialHandoff && initialHandoff.userObj ? initialHandoff.userObj : null));
+      const [isLoadingPortal, setIsLoadingPortal] = useState(() => Boolean(initialHandoff && initialHandoff.userObj));
+
+      // Notifikasi Admin & Hitungan Unread (Dideklarasikan di level teratas komponen App sesuai Rules of Hooks)
+      const [notesReadSync, setNotesReadSync] = useState(0);
+      useEffect(() => {
+        const handleNoteReadSync = () => setNotesReadSync(s => s + 1);
+        window.addEventListener('spp_note_read_updated', handleNoteReadSync);
+        return () => window.removeEventListener('spp_note_read_updated', handleNoteReadSync);
+      }, []);
+
+      const unreadNotesRepliesList = useMemo(() => {
+        try {
+          const readMap = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+          return (notes || []).map(n => {
+            const readCount = readMap[n.id] || 0;
+            const comments = Array.isArray(n.comments) ? n.comments : [];
+            const unreadCount = Math.max(0, comments.length - readCount);
+            if (unreadCount <= 0) return null;
+            const lastComment = comments[comments.length - 1];
+            return {
+              ...n,
+              unreadCount,
+              lastCommentText: lastComment ? `${lastComment.sender}: "${lastComment.text}"` : 'Balasan baru masuk'
+            };
+          }).filter(Boolean);
+        } catch (e) {
+          return [];
+        }
+      }, [notes, isRefreshing, notesReadSync]);
+
+      const pendingComplaints = useMemo(() => complaints.filter(isComplaintPending), [complaints]);
+      const unreadTransactions = useMemo(() => transactions.filter(t => !t.isRead), [transactions]);
+      const totalAdminUnread = pendingComplaints.length + unreadTransactions.length + unreadNotesRepliesList.length;
+
+      const showToast = (title, message, type = 'success', extra = {}) => {
+        setToast({ title, message, type });
+        setCrudPopup({
+          title,
+          message,
+          type,
+          ...extra
+        });
+        setTimeout(() => {
+          setToast(null);
+        }, 4000);
+      };
+
+      const showConfirmPopup = ({ title, message, onConfirm, onCancel, confirmText, cancelText, details }) => {
+        setCrudPopup({
+          title,
+          message,
+          type: 'confirm',
+          onConfirm,
+          onCancel,
+          confirmText,
+          cancelText,
+          details
+        });
+      };
+
+      const handleForceLogout = useCallback((userName, device = 'Perangkat lain', time = 'Baru saja') => {
+        ensureDashboardCss();
+        const active = currentUserRef.current;
+        setCurrentUser(null);
+        setMySessionToken('');
+        currentUserRef.current = null;
+        mySessionTokenRef.current = '';
+        try {
+          sessionStorage.removeItem('spp_tab_session');
+          sessionStorage.removeItem('spp_my_session_token');
+          if (active?.role === 'admin') {
+            localStorage.removeItem('spp_admin_session');
+            localStorage.removeItem('spp_admin_token');
+          } else if (active?.role === 'parent') {
+            localStorage.removeItem('spp_parent_session');
+            localStorage.removeItem('spp_parent_token');
+          }
+          localStorage.removeItem('spp_user_session');
+          localStorage.removeItem('spp_my_session_token');
+        } catch (e) {}
+        setKickedModal({
+          userName: userName || 'Pengguna',
+          device: device,
+          time: time
+        });
+      }, []);
+
+      const handleUserLogout = useCallback(() => {
+        const active = currentUserRef.current;
+        setCurrentUser(null);
+        setMySessionToken('');
+        currentUserRef.current = null;
+        mySessionTokenRef.current = '';
+        try {
+          sessionStorage.removeItem('spp_tab_session');
+          sessionStorage.removeItem('spp_my_session_token');
+          if (active?.role === 'admin') {
+            localStorage.removeItem('spp_admin_session');
+            localStorage.removeItem('spp_admin_token');
+          } else if (active?.role === 'parent') {
+            localStorage.removeItem('spp_parent_session');
+            localStorage.removeItem('spp_parent_token');
+          }
+          localStorage.removeItem('spp_user_session');
+          localStorage.removeItem('spp_my_session_token');
+        } catch (e) {}
+      }, []);
+
+      const handleUserLogin = async (userObj, opts = {}) => {
+        const cssReadyPromise = ensureDashboardCss();
+        const newSessionToken = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+        try {
+          // Simpan sesi independen untuk tab saat ini
+          sessionStorage.setItem('spp_tab_session', JSON.stringify(userObj));
+          sessionStorage.setItem('spp_intended_role', userObj.role);
+          sessionStorage.setItem('spp_my_session_token', newSessionToken);
+
+          // Simpan terpisah per-role di localStorage agar login admin tidak menimpa user
+          if (userObj.role === 'admin') {
+            localStorage.setItem('spp_admin_session', JSON.stringify(userObj));
+            localStorage.setItem('spp_admin_token', newSessionToken);
+          } else {
+            localStorage.setItem('spp_parent_session', JSON.stringify(userObj));
+            localStorage.setItem('spp_parent_token', newSessionToken);
+          }
+        } catch (e) {}
+        setMySessionToken(newSessionToken);
+        mySessionTokenRef.current = newSessionToken;
+
+        const deviceType = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Smartphone (HP)' : 'Komputer (PC/Laptop)';
+        const loginTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            if (userObj.role === 'parent' && userObj.student) {
+              const sessionPayload = { session_token: newSessionToken };
+              if (userObj.student.arrearsNote && String(userObj.student.arrearsNote).startsWith('sess_')) {
+                sessionPayload.arrears_note = '';
+              }
+              await supabase.from('students').update(sessionPayload).eq('id', userObj.student.id);
+            }
+
+            const userKey = userObj.role === 'parent' ? ('student_' + userObj.student.id) : 'admin_account';
+            const authChannel = supabase.channel('spp_single_session_channel');
+            authChannel.subscribe((status) => {
+              if (status === 'SUBSCRIBED') {
+                authChannel.send({
+                  type: 'broadcast',
+                  event: 'single_session_login',
+                  payload: {
+                    userKey,
+                    sessionToken: newSessionToken,
+                    device: deviceType,
+                    time: loginTime
+                  }
+                });
+              }
+            });
+          } catch (err) {
+            console.warn("Gagal sinkronisasi sesi ke database:", err);
+          }
+        }
+
+        await cssReadyPromise;
+        if (!opts || !opts.alreadyLoading) {
+          setPendingUser(userObj);
+          setIsLoadingPortal(true);
+        }
+      };
+
+      const fetchData = useCallback(async (isManual = false) => {
+        const supabase = getSupabaseClient();
+        if (isManual) {
+          setIsRefreshing(true);
+          showToast("Data Diperbarui", "Memuat ulang seluruh data siswa, transaksi, berita & pengaduan...", "info");
+        }
+
+        try {
+          if (supabase) {
+            const activeUser = currentUserRef.current;
+            const shouldFetchAll = isManual || !!activeUser;
+
+            if (!shouldFetchAll) {
+              // Mode Tamu / Awal Login: Hanya muat 'students' & 'settings' secara paralel (mengeliminasi 6 rantai sekuensial)
+              const [stRes, stgRes] = await Promise.allSettled([
+                supabase.from('students').select('*'),
+                supabase.from('settings').select('*').limit(1)
+              ]);
+
+              if (stRes.status === 'fulfilled' && stRes.value && stRes.value.data) {
+                const mappedStudents = stRes.value.data.map(mapStudentFromDb);
+                setStudents(mappedStudents);
+                try { localStorage.setItem('spp_cached_students', JSON.stringify(mappedStudents)); } catch(e) {}
+              }
+
+              if (stgRes.status === 'fulfilled' && stgRes.value && stgRes.value.data && stgRes.value.data.length > 0) {
+                const mappedSettings = mapSettingsFromDb(stgRes.value.data[0]);
+                setSettings(mappedSettings);
+                try { localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings)); } catch(e) {}
+              }
+            } else {
+              // Mode Sesi Pengguna: Ambil seluruh data secara konkruen / paralel sekaligus
+              const [stRes, trRes, anRes, cpRes, ntRes, stgRes] = await Promise.allSettled([
+                supabase.from('students').select('*'),
+                supabase.from('transactions').select('*'),
+                supabase.from('announcements').select('*'),
+                supabase.from('complaints').select('*'),
+                supabase.from('student_notes').select('*'),
+                supabase.from('settings').select('*').limit(1)
+              ]);
+
+              if (stRes.status === 'fulfilled' && stRes.value && stRes.value.data) {
+                const mappedStudents = stRes.value.data.map(mapStudentFromDb);
+                setStudents(mappedStudents);
+                try { localStorage.setItem('spp_cached_students', JSON.stringify(mappedStudents)); } catch(e) {}
+
+                // Cek validitas sesi siswa aktif di perangkat ini
+                const activeToken = mySessionTokenRef.current;
+                if (activeUser && activeUser.role === 'parent' && activeUser.student && activeToken) {
+                  const freshSt = mappedStudents.find(s => s.id === activeUser.student.id);
+                  if (freshSt && freshSt.sessionToken && freshSt.sessionToken !== activeToken) {
+                    handleForceLogout(freshSt.name, 'Perangkat lain');
+                    return;
+                  }
+                }
+              }
+
+              if (trRes.status === 'fulfilled' && trRes.value && trRes.value.data) {
+                const mappedTr = trRes.value.data.map(mapTransactionFromDb);
+                setTransactions(mappedTr);
+                try { localStorage.setItem('spp_cached_transactions', JSON.stringify(mappedTr)); } catch(e) {}
+              }
+
+              if (anRes.status === 'fulfilled' && anRes.value && anRes.value.data) {
+                const mappedAn = anRes.value.data.map(mapAnnouncementFromDb);
+                setAnnouncements(mappedAn);
+                try { localStorage.setItem('spp_cached_announcements', JSON.stringify(mappedAn)); } catch(e) {}
+              }
+
+              if (cpRes.status === 'fulfilled' && cpRes.value && cpRes.value.data) {
+                const mappedCp = cpRes.value.data.map(mapComplaintFromDb);
+                setComplaints(mappedCp);
+                try { localStorage.setItem('spp_cached_complaints', JSON.stringify(mappedCp)); } catch(e) {}
+              }
+
+              if (ntRes.status === 'fulfilled' && ntRes.value && ntRes.value.data) {
+                const mappedNt = ntRes.value.data.map(mapNoteFromDb);
+                setNotes(mappedNt);
+                try { localStorage.setItem('spp_cached_notes', JSON.stringify(mappedNt)); } catch(e) {}
+              }
+
+              if (stgRes.status === 'fulfilled' && stgRes.value && stgRes.value.data && stgRes.value.data.length > 0) {
+                const mappedSettings = mapSettingsFromDb(stgRes.value.data[0]);
+                setSettings(mappedSettings);
+                try { localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings)); } catch(e) {}
+              }
+            }
+          }
+        } catch (e) {
+          console.log("Sync local data.");
+        } finally {
+          if (isManual) {
+            setTimeout(() => setIsRefreshing(false), 600);
+          }
+        }
+      }, [handleForceLogout]);
+
+      // Realtime listener broadcast saat ada login baru dari device lain
+      useEffect(() => {
+        const supabase = getSupabaseClient();
+        if (!supabase) return;
+
+        const authChannel = supabase.channel('spp_single_session_channel');
+        authChannel.on('broadcast', { event: 'single_session_login' }, (msg) => {
+          const payload = msg.payload || {};
+          const activeUser = currentUserRef.current;
+          const activeToken = mySessionTokenRef.current;
+          if (!activeUser || !activeToken) return;
+
+          const myKey = activeUser.role === 'parent' ? ('student_' + activeUser.student?.id) : 'admin_account';
+          // Pastikan admin hanya menendang sesama admin di device lain, dan user hanya menendang akun siswa yang sama
+          if (payload.userKey === myKey && payload.sessionToken && payload.sessionToken !== activeToken) {
+            handleForceLogout(
+              activeUser.role === 'parent' ? activeUser.student?.name : (activeUser.name || 'Admin'),
+              payload.device || 'Perangkat lain',
+              payload.time || 'Baru saja'
+            );
+          }
+        }).subscribe();
+
+        return () => {
+          supabase.removeChannel(authChannel);
+        };
+      }, [handleForceLogout]);
+
+      useEffect(() => {
+        fetchData(false);
+        const interval = setInterval(() => {
+          fetchData(false);
+        }, 30000);
+        return () => clearInterval(interval);
+      }, [fetchData]);
+
+      // Saat pengguna berhasil login, sinkronkan seluruh transaksi dan pengumuman secara instan
+      useEffect(() => {
+        try { document.documentElement.classList.remove('spp-has-session'); } catch (e) {}
+        if (initialHandoff && initialHandoff.userObj && !handoffConsumedRef.current) {
+          handoffConsumedRef.current = true;
+          handleUserLogin(initialHandoff.userObj, { alreadyLoading: true });
+        }
+      }, []);
+
+      useEffect(() => {
+        if (currentUser || isLoadingPortal) {
+          ensureDashboardCss();
+        }
+        if (currentUser) {
+          fetchData(false);
+        }
+      }, [currentUser, isLoadingPortal, fetchData]);
+
+      const handleUpdateSettings = async (newSettings) => {
+        setSettings(newSettings);
+        try {
+          localStorage.setItem('spp_extended_settings', JSON.stringify(newSettings));
+          localStorage.setItem('spp_cached_settings', JSON.stringify(newSettings));
+        } catch (e) {}
+        showToast("Pengaturan Disimpan", "Pengaturan sekolah & database berhasil diperbarui.", "success");
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            const activePeriodName = newSettings.activePeriodName ||
+              (newSettings.academicPeriods && newSettings.academicPeriods.find(p => p.isActive)?.name) ||
+              `Periode ${newSettings.academicYear || '2025/2026'}`;
+
+            const extendedPayload = {
+              school_name: newSettings.schoolName,
+              address: newSettings.address,
+              phone: newSettings.phone,
+              academic_year: newSettings.academicYear,
+              active_period_name: activePeriodName,
+              semester: newSettings.semester || 'Semua',
+              admin_name: newSettings.adminName,
+              admin_username: newSettings.adminUsername,
+              due_date_day: Number(newSettings.dueDateDay) || 10,
+              midtrans_client_key: newSettings.midtransClientKey || '',
+              midtrans_server_key: newSettings.midtransServerKey || '',
+              start_month: newSettings.startMonth,
+              start_year: Number(newSettings.startYear) || 2025,
+              end_month: newSettings.endMonth,
+              end_year: Number(newSettings.endYear) || 2026,
+              academic_periods: JSON.stringify(newSettings.academicPeriods || []),
+              custom_classes: JSON.stringify(newSettings.customClasses || [])
+            };
+
+            if (newSettings.adminPassword && newSettings.adminPassword.trim().length > 0) {
+              extendedPayload.admin_password = newSettings.adminPassword.trim();
+            }
+
+            let res;
+            if (newSettings.id) {
+              res = await supabase.from('settings').update(extendedPayload).eq('id', newSettings.id);
+            } else {
+              res = await supabase.from('settings').insert([extendedPayload]);
+            }
+
+            if (res && res.error) {
+              console.warn("Retrying update with fallback base payload:", res.error);
+              const basePayload = {
+                school_name: newSettings.schoolName,
+                address: newSettings.address,
+                phone: newSettings.phone,
+                academic_year: newSettings.academicYear,
+                active_period_name: activePeriodName,
+                semester: newSettings.semester || 'Semua',
+                admin_name: newSettings.adminName,
+                admin_username: newSettings.adminUsername,
+                due_date_day: Number(newSettings.dueDateDay) || 10,
+                midtrans_client_key: newSettings.midtransClientKey || '',
+                midtrans_server_key: newSettings.midtransServerKey || '',
+                start_month: newSettings.startMonth || 'Juli',
+                start_year: Number(newSettings.startYear) || 2025,
+                end_month: newSettings.endMonth || 'Juni',
+                end_year: Number(newSettings.endYear) || 2026,
+                academic_periods: JSON.stringify(newSettings.academicPeriods || []),
+                custom_classes: JSON.stringify(newSettings.customClasses || [])
+              };
+              if (newSettings.adminPassword && newSettings.adminPassword.trim().length > 0) {
+                basePayload.admin_password = newSettings.adminPassword.trim();
+              }
+              if (newSettings.id) {
+                await supabase.from('settings').update(basePayload).eq('id', newSettings.id);
+              } else {
+                await supabase.from('settings').insert([basePayload]);
+              }
+            }
+          } catch (err) {
+            console.error("Gagal simpan settings ke Supabase:", err);
+          }
+        }
+      };
+
+      const handleAddAnnouncement = async (annData) => {
+        const formattedDate = formatDateIndo(annData.date || new Date());
+        const newAnn = { id: Date.now(), ...annData, date: formattedDate };
+        setAnnouncements(prev => [newAnn, ...prev]);
+        showToast("Berita Ditambahkan", `Berita "${annData.title}" berhasil ditambahkan & disinkronkan.`, "success");
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            await supabase.from('announcements').insert([{
+              title: annData.title,
+              content: annData.content,
+              image_url: annData.imageUrl || '',
+              date: formattedDate
+            }]);
+          } catch (err) {
+            console.error("Gagal simpan pengumuman ke Supabase:", err);
+          }
+        }
+      };
+
+      const handleUpdateAnnouncement = async (id, updatedObj) => {
+        const formattedObj = { ...updatedObj, date: formatDateIndo(updatedObj.date || new Date()) };
+        setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...formattedObj } : a));
+        showToast("Berita Diperbarui", `Perubahan berita "${updatedObj.title}" berhasil disimpan.`, "success");
+
+        const supabase = getSupabaseClient();
+        if (supabase && typeof id !== 'number') {
+          try {
+            await supabase.from('announcements').update({
+              title: formattedObj.title,
+              content: formattedObj.content,
+              image_url: formattedObj.imageUrl || '',
+              date: formattedObj.date
+            }).eq('id', id);
+          } catch (err) {
+            console.error("Gagal update pengumuman ke Supabase:", err);
+          }
+        }
+      };
+
+      const handleDeleteAnnouncement = async (id) => {
+        const target = announcements.find(a => a.id === id);
+        showConfirmPopup({
+          title: "Hapus Berita Pengumuman?",
+          message: `Apakah Anda yakin ingin menghapus pengumuman "${target ? target.title : ''}" dari portal? Data yang dihapus tidak dapat dipulihkan.`,
+          confirmText: "Ya, Hapus",
+          cancelText: "Batal",
+          onConfirm: async () => {
+            setAnnouncements(prev => prev.filter(a => a.id !== id));
+            showToast("Berita Dihapus", `Berita "${target ? target.title : ''}" telah berhasil dihapus dari sistem.`, "delete");
+
+            const supabase = getSupabaseClient();
+            if (supabase && typeof id !== 'number') {
+              try {
+                await supabase.from('announcements').delete().eq('id', id);
+              } catch (err) {
+                console.error("Gagal hapus pengumuman dari Supabase:", err);
+              }
+            }
+          }
+        });
+      };
+
+      const handleAddComplaint = async (compData) => {
+        const now = Date.now();
+        const nowObj = new Date(now);
+        const formattedDate = formatDateIndo(compData.date || nowObj);
+        const clockStr = nowObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
+        const initialMessages = [{ 
+          sender: 'Wali Murid', 
+          senderRole: 'parent',
+          text: compData.content, 
+          time: `${formattedDate} • ${clockStr} WIB`
+        }];
+        const newComp = { 
+          id: now, 
+          ...compData,
+          date: formattedDate,
+          createdAtMs: now,
+          expiresAtMs: now + 3600000,
+          isRead: false,
+          messages: initialMessages,
+          status: 'Belum Ditangani'
+        };
+        setComplaints(prev => [newComp, ...prev]);
+        showToast("Pengaduan Terkirim", "Pengaduan Anda telah terkirim ke Admin TU. Sesi obrolan aktif selama 1 jam.", "success");
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            const validStudentId = (compData.studentId && typeof compData.studentId === 'string' && compData.studentId.includes('-')) ? compData.studentId : null;
+            const { data } = await supabase.from('complaints').insert([{
+              student_id: validStudentId,
+              student_name: compData.studentName,
+              wali_name: compData.waliName,
+              title: compData.title,
+              content: compData.content,
+              admin_reply: '',
+              messages: JSON.stringify(initialMessages),
+              status: 'Belum Ditangani',
+              is_read: false,
+              date: formattedDate
+            }]).select();
+            if (data && data[0]) {
+              const mapped = mapComplaintFromDb(data[0]);
+              setComplaints(prev => prev.map(c => c.id === now ? mapped : c));
+            }
+          } catch (err) {}
+        }
+      };
+
+      const handleReplyComplaint = async (id, replyText, senderRole = 'Admin TU', imageUrl = null) => {
+        let updatedMessages = [];
+        let updatedStatus = 'Sudah Ditangani';
+        const isFromAdmin = senderRole === 'Admin TU';
+
+        setComplaints(prev => prev.map(c => {
+          if (c.id === id) {
+            const isExpired = Date.now() > (c.expiresAtMs || (c.createdAtMs + 3600000));
+            if (isExpired) return c; // Sesi 1 jam telah berakhir
+
+            const nowObj = new Date();
+            const clockStr = nowObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace(/\./g, ':');
+            const newMsg = {
+              sender: senderRole,
+              senderRole: isFromAdmin ? 'admin' : 'parent',
+              text: replyText,
+              imageUrl: imageUrl,
+              time: `${formatDateIndo(nowObj)} • ${clockStr} WIB`
+            };
+            const existingMsgs = (c.messages && c.messages.length > 0) 
+              ? [...c.messages] 
+              : [{ sender: 'Wali Murid', text: c.content, time: '-' }];
+
+            if (c.adminReply && existingMsgs.length === 1) {
+              existingMsgs.push({ sender: 'Admin TU', text: c.adminReply, time: '-' });
+            }
+
+            updatedMessages = [...existingMsgs, newMsg];
+            updatedStatus = isFromAdmin ? 'Sudah Ditangani' : c.status;
+
+            return { 
+              ...c, 
+              adminReply: isFromAdmin ? replyText : c.adminReply,
+              messages: updatedMessages, 
+              status: updatedStatus,
+              isRead: isFromAdmin ? true : false
+            };
+          }
+          return c;
+        }));
+
+        showToast("Pesan Terkirim", `Pesan balasan dari ${senderRole} berhasil terkirim.`, "success");
+
+        const supabase = getSupabaseClient();
+        if (supabase && typeof id !== 'number') {
+          try {
+            await supabase.from('complaints').update({
+              admin_reply: replyText,
+              messages: JSON.stringify(updatedMessages),
+              status: updatedStatus,
+              is_read: isFromAdmin ? true : false
+            }).eq('id', id);
+          } catch (err) {}
+        }
+      };
+
+      const handleToggleComplaintStatus = async (id) => {
+        let nextStatus = 'Belum Ditangani';
+        setComplaints(prev => prev.map(c => {
+          if (c.id === id) {
+            nextStatus = c.status === 'Sudah Ditangani' ? 'Belum Ditangani' : 'Sudah Ditangani';
+            return { ...c, status: nextStatus };
+          }
+          return c;
+        }));
+        showToast("Status Pengaduan", `Status pengaduan diubah menjadi "${nextStatus}".`, "info");
+
+        const supabase = getSupabaseClient();
+        if (supabase && typeof id !== 'number') {
+          try {
+            await supabase.from('complaints').update({ status: nextStatus }).eq('id', id);
+          } catch (err) {}
+        }
+      };
+
+      const handleMarkReadNotification = async (type, id) => {
+        const supabase = getSupabaseClient();
+        if (type === 'complaint') {
+          try {
+            const list = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
+            if (!list.includes(id)) {
+              list.push(id);
+              localStorage.setItem('spp_admin_read_complaints', JSON.stringify(list));
+            }
+          } catch(e) {}
+          setComplaints(prev => prev.map(c => c.id === id ? { ...c, isRead: true } : c));
+          if (supabase && typeof id !== 'number') {
+            try { await supabase.from('complaints').update({ is_read: true }).eq('id', id); } catch (err) {}
+          }
+        } else if (type === 'transaction') {
+          try {
+            const list = JSON.parse(localStorage.getItem('spp_admin_read_trx') || '[]');
+            if (!list.includes(id)) {
+              list.push(id);
+              localStorage.setItem('spp_admin_read_trx', JSON.stringify(list));
+            }
+          } catch(e) {}
+          setTransactions(prev => prev.map(t => t.id === id ? { ...t, isRead: true } : t));
+          if (supabase && typeof id !== 'number') {
+            try { await supabase.from('transactions').update({ is_read: true }).eq('id', id); } catch (err) {}
+          }
+        }
+      };
+
+      const handleAddCommentNote = async (noteId, commentObj) => {
+        const supabase = getSupabaseClient();
+        setNotes(prev => prev.map(n => {
+          if (n.id === noteId) {
+            const updatedComments = [...(n.comments || []), commentObj];
+            if (supabase && typeof noteId !== 'number') {
+              supabase.from('student_notes').update({ comments: JSON.stringify(updatedComments) }).eq('id', noteId).then();
+            }
+            return { ...n, comments: updatedComments };
+          }
+          return n;
+        }));
+        showToast("Komentar Terkirim", "Komentar berhasil ditambahkan pada catatan evaluasi.", "success");
+      };
+
+      const handleAddNote = async (noteData) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) {
+        showToast('Database connection missing', 'error');
+        return;
+      }
+      
+      const validStudentId = (noteData.studentId && typeof noteData.studentId === 'string' && noteData.studentId.includes('-')) ? noteData.studentId : null;
+      const dbPayload = {
+        student_id: validStudentId,
+        student_name: noteData.studentName,
+        title: noteData.title,
+        content: noteData.content,
+        category: noteData.category,
+        date: noteData.date,
+        comments: JSON.stringify(noteData.comments || []),
+        is_read: false
+      };
+      
+      const { data, error } = await supabase.from('student_notes').insert([dbPayload]).select();
+      if (!error && data) {
+         setNotes(prev => [mapNoteFromDb(data[0]), ...prev]);
+         showToast('Catatan siswa berhasil dikirim!', 'success');
+      } else {
+         showToast('Gagal mengirim catatan: ' + (error ? error.message : ''), 'error');
+      }
+    };
+    
+    const handleAddStudent = async (stObj) => {
+        const defaultPwd = stObj.password || (stObj.nis ? `Sb${stObj.nis}` : '123456');
+        const newStudent = { id: Date.now(), ...stObj, password: defaultPwd };
+        setStudents(prev => {
+          const next = [...prev, newStudent];
+          try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
+        showToast("Data Murid Ditambahkan", `Murid atas nama ${stObj.name} (NIS: ${stObj.nis}) berhasil diinput.`, "success");
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            await supabase.from('students').insert([{
+              nis: stObj.nis,
+              nipd: stObj.nipd || stObj.nis || '',
+              nisn: stObj.nisn || '',
+              name: stObj.name,
+              jk: stObj.jk || 'L',
+              tempat_lahir: stObj.tempatLahir || '',
+              tanggal_lahir: stObj.tanggalLahir || '',
+              nik: stObj.nik || '',
+              agama: stObj.agama || 'Islam',
+              alamat: stObj.alamat || '',
+              rt: stObj.rt || '',
+              rw: stObj.rw || '',
+              kelas: stObj.kelas,
+              tarif: stObj.tarif,
+              wali: stObj.wali,
+              telepon: stObj.telepon,
+              password: defaultPwd,
+              photo_url: stObj.fotoUrl || '',
+              status: stObj.statusAktif ? 'Aktif' : 'Non-Aktif',
+              keringanan_note: stObj.keringanan_note || '',
+              arrears_amount: Number(stObj.arrearsAmount) || 0,
+              arrears_note: stObj.arrearsNote || '',
+              start_active_month: stObj.startActiveMonth || '',
+              start_active_year: stObj.startActiveYear ? Number(stObj.startActiveYear) : null,
+              class_history: JSON.stringify(stObj.classHistory || [])
+            }]);
+          } catch (err) {}
+        }
+      };
+
+      const handleUpdateStudent = async (id, updatedObj) => {
+        setStudents(prev => {
+          const next = prev.map(s => (s.id === id || (updatedObj.nis && s.nis === updatedObj.nis)) ? { ...s, ...updatedObj } : s);
+          try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
+
+        setCurrentUser(prev => {
+          if (prev && prev.role === 'parent' && prev.student && (prev.student.id === id || prev.student.nis === updatedObj.nis)) {
+            if (updatedObj.statusAktif === false || (updatedObj.status && updatedObj.status.toLowerCase() !== 'aktif')) {
+              try {
+                sessionStorage.removeItem('spp_tab_session');
+                localStorage.removeItem('spp_parent_session');
+              } catch (e) {}
+              alert('Akun siswa telah dinonaktifkan / keluar / lulus oleh Admin (Status: OFF). Sesi akses login telah ditutup.');
+              return null;
+            }
+            const updatedUser = {
+              ...prev,
+              student: { ...prev.student, ...updatedObj }
+            };
+            try {
+              sessionStorage.setItem('spp_tab_session', JSON.stringify(updatedUser));
+              localStorage.setItem('spp_parent_session', JSON.stringify(updatedUser));
+            } catch (e) {}
+            return updatedUser;
+          }
+          return prev;
+        });
+        const studentNameDisplay = updatedObj.name || 'tersebut';
+        showToast("Data Murid Diperbarui", `Profil siswa ${studentNameDisplay} berhasil diperbarui.`, "success");
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            const dbUpdateObj = {};
+            if ('nis' in updatedObj) dbUpdateObj.nis = updatedObj.nis;
+            if ('nipd' in updatedObj) dbUpdateObj.nipd = updatedObj.nipd;
+            if ('nisn' in updatedObj) dbUpdateObj.nisn = updatedObj.nisn;
+            if ('name' in updatedObj) dbUpdateObj.name = updatedObj.name;
+            if ('jk' in updatedObj) dbUpdateObj.jk = updatedObj.jk;
+            if ('tempatLahir' in updatedObj) dbUpdateObj.tempat_lahir = updatedObj.tempatLahir;
+            if ('tanggalLahir' in updatedObj) dbUpdateObj.tanggal_lahir = updatedObj.tanggalLahir;
+            if ('nik' in updatedObj) dbUpdateObj.nik = updatedObj.nik;
+            if ('agama' in updatedObj) dbUpdateObj.agama = updatedObj.agama;
+            if ('alamat' in updatedObj) dbUpdateObj.alamat = updatedObj.alamat;
+            if ('rt' in updatedObj) dbUpdateObj.rt = updatedObj.rt;
+            if ('rw' in updatedObj) dbUpdateObj.rw = updatedObj.rw;
+            if ('kelas' in updatedObj) dbUpdateObj.kelas = updatedObj.kelas;
+            if ('tarif' in updatedObj) dbUpdateObj.tarif = updatedObj.tarif;
+            if ('wali' in updatedObj) dbUpdateObj.wali = updatedObj.wali;
+            if ('telepon' in updatedObj) dbUpdateObj.telepon = updatedObj.telepon;
+            if ('password' in updatedObj) dbUpdateObj.password = updatedObj.password;
+            if ('fotoUrl' in updatedObj) dbUpdateObj.photo_url = updatedObj.fotoUrl;
+            if ('statusAktif' in updatedObj) {
+              if (updatedObj.statusAktif === false) {
+                dbUpdateObj.status = updatedObj.status || 'Non-Aktif';
+              } else {
+                dbUpdateObj.status = 'Aktif';
+              }
+            } else if ('status' in updatedObj) {
+              dbUpdateObj.status = updatedObj.status;
+            }
+            if ('keringanan_note' in updatedObj) dbUpdateObj.keringanan_note = updatedObj.keringanan_note;
+            if ('arrearsAmount' in updatedObj) dbUpdateObj.arrears_amount = Number(updatedObj.arrearsAmount) || 0;
+            if ('arrearsNote' in updatedObj) dbUpdateObj.arrears_note = updatedObj.arrearsNote;
+            if ('startActiveMonth' in updatedObj) dbUpdateObj.start_active_month = updatedObj.startActiveMonth || '';
+            if ('startActiveYear' in updatedObj) dbUpdateObj.start_active_year = updatedObj.startActiveYear ? Number(updatedObj.startActiveYear) : null;
+            if ('classHistory' in updatedObj) dbUpdateObj.class_history = JSON.stringify(updatedObj.classHistory);
+            if (updatedObj.completedLevels) {
+              try {
+                localStorage.setItem('spp_completed_levels_' + id, JSON.stringify(updatedObj.completedLevels));
+                if (updatedObj.nis) localStorage.setItem('spp_completed_levels_' + updatedObj.nis, JSON.stringify(updatedObj.completedLevels));
+              } catch (e) {}
+            }
+            if (updatedObj.statusAktif === false || (updatedObj.status && updatedObj.status.toLowerCase() !== 'aktif')) {
+              dbUpdateObj.session_token = null;
+            }
+            
+            if (typeof id === 'string' && id.includes('-')) {
+              await supabase.from('students').update(dbUpdateObj).eq('id', id);
+            } else if (updatedObj.nis) {
+              await supabase.from('students').update(dbUpdateObj).eq('nis', updatedObj.nis);
+            } else {
+              await supabase.from('students').update(dbUpdateObj).eq('id', id);
+            }
+          } catch (err) {
+            console.error("Gagal update student ke Supabase:", err);
+          }
+        }
+      };
+
+      const handleDeleteStudent = async (id) => {
+        const target = students.find(s => s.id === id);
+        showConfirmPopup({
+          title: "Hapus Data Murid?",
+          message: `Apakah Anda yakin ingin menghapus data murid "${target ? target.name : ''}" (NIS: ${target?.nis || '-'})? Semua histori transaksi dan data kesiswaan akan ikut terhapus.`,
+          confirmText: "Ya, Hapus Data",
+          cancelText: "Batal",
+          details: target ? {
+            'Nama Siswa': target.name,
+            'NIS / NISN': `${target.nis || '-'} / ${target.nisn || '-'}`,
+            'Kelas / Jenjang': target.kelas || '-'
+          } : null,
+          onConfirm: async () => {
+            setStudents(prev => {
+              const next = prev.filter(s => s.id !== id);
+              try { localStorage.setItem('spp_cached_students', JSON.stringify(next)); } catch(e) {}
+              return next;
+            });
+            showToast("Data Murid Dihapus", `Data murid ${target ? target.name : ''} telah berhasil dihapus.`, "delete");
+
+            const supabase = getSupabaseClient();
+            if (supabase && typeof id !== 'number') {
+              try {
+                await supabase.from('students').delete().eq('id', id);
+              } catch (err) {}
+            }
+          }
+        });
+      };
+
+      const handleAddTransaction = async (trxObj) => {
+        const newTrx = { id: Date.now(), ...trxObj };
+        setTransactions(prev => [newTrx, ...prev]);
+        setSelectedKuitansi(newTrx);
+        showToast("Pembayaran Berhasil", `Pembayaran SPP ${trxObj.month} a.n ${trxObj.studentName} tercatat!`, "success", {
+          details: {
+            'Nama Siswa': trxObj.studentName,
+            'Bulan SPP': trxObj.month,
+            'Nominal': formatRupiah(trxObj.amount),
+            'Metode': trxObj.method || 'Tunai / Manual',
+            'No. Kuitansi': trxObj.kuitansiNo
+          },
+          extraActionText: 'Cetak Kuitansi',
+          extraActionIcon: 'printer',
+          onExtraAction: () => setSelectedKuitansi(newTrx)
+        });
+
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          try {
+            const validStudentId = (trxObj.studentId && typeof trxObj.studentId === 'string' && trxObj.studentId.includes('-')) ? trxObj.studentId : null;
+            await supabase.from('transactions').insert([{
+              student_id: validStudentId,
+              student_name: trxObj.studentName,
+              kelas: trxObj.kelas,
+              month: trxObj.month,
+              amount: trxObj.amount,
+              method: trxObj.method,
+              status: 'Lunas',
+              date: trxObj.date,
+              kuitansi_no: trxObj.kuitansiNo,
+              is_read: false
+            }]);
+          } catch (err) {}
+        }
+      };
+
+      if (isLoadingPortal && pendingUser) {
+        return (
+          <LoadingBarScreen
+            userRole={pendingUser.role}
+            userName={pendingUser.role === 'admin' ? pendingUser.name : pendingUser.student.name}
+            onComplete={() => {
+              setCurrentUser(pendingUser);
+              setIsLoadingPortal(false);
+              setPendingUser(null);
+            }}
+          />
+        );
+      }
+
+      if (!currentUser) {
+        return (
+          <>
+            <LoginView
+              onLogin={handleUserLogin}
+              settings={settings}
+              students={students}
+            />
+            {kickedModal && (
+              <KickedOutModal
+                info={kickedModal}
+                onClose={() => setKickedModal(null)}
+              />
+            )}
+          </>
+        );
+      }
+
+      const RefreshLoadingOverlay = () => (
+        <div className="fixed inset-0 z-[99999] bg-slate-950/70 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-200 select-none overflow-hidden">
+          <div className="loading-glass-card rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-white/20 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in-95 duration-200 text-white z-10">
+            {/* Ambient Decorative Blurs */}
+            <div className="absolute -top-10 -left-10 w-32 h-32 bg-cyan-500/20 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-blue-600/25 rounded-full blur-2xl pointer-events-none"></div>
+
+            <div className="w-20 h-20 bg-white/10 rounded-full p-2 mb-4 border border-cyan-400/30 flex items-center justify-center relative shadow-inner">
+              <div className="w-16 h-16 rounded-full border-4 border-cyan-400 border-t-transparent animate-spin absolute inset-0 m-auto"></div>
+              <img src="logo.webp" alt="PAUD Setia Bhakti" className="w-10 h-10 object-contain relative z-10 animate-pulse" />
+            </div>
+
+            <h3 className="text-lg font-black text-white tracking-tight">Menyinkronkan Data...</h3>
+            <p className="text-xs text-slate-300 font-medium mt-1 leading-relaxed">
+              Harap tunggu sebentar, memperbarui data SPP, siswa & transaksi terbaru...
+            </p>
+
+            <div className="w-full bg-slate-950/80 h-2 rounded-full mt-5 overflow-hidden relative border border-white/15">
+              <div className="bg-gradient-to-r from-blue-600 via-cyan-400 to-sky-300 h-full w-full animate-loading-bar shadow-[0_0_10px_#22d3ee]"></div>
+            </div>
+          </div>
+        </div>
+      );
+
+      if (currentUser.role === 'parent') {
+        const liveStudent = students.find(s => 
+          currentUser.student && (s.id === currentUser.student.id || s.nis === currentUser.student.nis)
+        ) || currentUser.student;
+
+        // CEK STATUS AKTIF SISWA (ON / OFF): Jika dinonaktifkan (OFF), keluar, atau lulus -> otomatis keluarkan sesi login
+        const isStudentStillActive = liveStudent && liveStudent.statusAktif !== false && (!liveStudent.status || liveStudent.status.toLowerCase() === 'aktif');
+        if (!isStudentStillActive) {
+          try {
+            sessionStorage.removeItem('spp_tab_session');
+            localStorage.removeItem('spp_parent_session');
+          } catch (e) {}
+          setTimeout(() => {
+            setCurrentUser(null);
+            alert('Akun siswa ini berstatus Non-Aktif / Keluar / Lulus (Status: OFF). Akses portal wali murid telah ditutup oleh pihak sekolah.');
+          }, 50);
+          return null;
+        }
+
+        return (
+          <>
+            <ParentDashboardView
+              student={liveStudent}
+              transactions={transactions}
+              announcements={announcements}
+              complaints={complaints}
+              notes={notes}
+              settings={settings}
+              onLogout={handleUserLogout}
+              onShowKuitansi={(trx) => setSelectedKuitansi(trx)}
+              onPayMidtrans={(bill) => setActiveMidtransBill(bill)}
+              onAddComplaint={handleAddComplaint}
+              onAddCommentNote={handleAddCommentNote}
+              onReplyComplaint={handleReplyComplaint}
+              onUpdateParentSettings={handleUpdateStudent}
+              onRefresh={fetchData}
+              isRefreshing={isRefreshing}
+            />
+
+            {isRefreshing && <RefreshLoadingOverlay />}
+
+            {selectedKuitansi && (
+              <KuitansiModal
+                transaction={selectedKuitansi}
+                settings={settings}
+                onClose={() => setSelectedKuitansi(null)}
+              />
+            )}
+
+            {activeMidtransBill && (
+              <MidtransModal
+                bill={activeMidtransBill}
+                student={currentUser.student}
+                settings={settings}
+                onClose={() => setActiveMidtransBill(null)}
+                onConfirmSuccess={(bill, method) => {
+                  const newTrx = {
+                    id: Date.now(),
+                    studentId: currentUser.student.id,
+                    studentName: currentUser.student.name,
+                    kelas: currentUser.student.kelas,
+                    month: bill.month,
+                    amount: bill.amount,
+                    method: method,
+                    status: 'Lunas',
+                    isRead: false,
+                    date: formatDateIndo(new Date()),
+                    kuitansiNo: `K-${new Date().getFullYear()}${String(new Date().getMonth()+1).padStart(2,'0')}-${Math.floor(100+Math.random()*900)}`
+                  };
+                  handleAddTransaction(newTrx);
+                  if (bill.isArrearsPayment) {
+                    handleUpdateStudent(currentUser.student.id, {
+                      ...currentUser.student,
+                      arrearsAmount: 0,
+                      arrearsNote: `Lunas via Midtrans Online (${newTrx.date})`
+                    });
+                  }
+                  setSelectedKuitansi(newTrx);
+                  setActiveMidtransBill(null);
+                }}
+              />
+            )}
+
+            <ToastNotification toast={toast} onClose={() => setToast(null)} />
+            <CrudPopupModal popup={crudPopup} onClose={() => setCrudPopup(null)} />
+          </>
+        );
+      }
+
+      return (
+        <>
+          <div className="min-h-screen bg-aesthetic-pattern flex flex-col w-full text-slate-800 relative">
+            {/* Ambient Smurf Glowing Orbs */}
+            <div className="smurf-ambient-orb smurf-orb-1"></div>
+            <div className="smurf-ambient-orb smurf-orb-2"></div>
+            <div className="smurf-ambient-orb smurf-orb-3"></div>
+
+            {/* ROOT-LEVEL ADMIN NOTIFICATION MODAL (FLOATING DROPDOWN DARI ATAS) */}
+            {showAdminMobileBell && (
+              <div className="fixed inset-0 z-[9999] pointer-events-auto">
+                <div 
+                  className="fixed inset-0 bg-slate-900/20 backdrop-blur-[2px] z-[9999]" 
+                  onClick={() => setShowAdminMobileBell(false)} 
+                />
+                <div className="fixed inset-x-3 sm:inset-x-auto sm:right-8 top-[72px] sm:top-20 z-[10000] w-auto max-w-sm sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 max-h-[82vh] overflow-y-auto">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <Icon name="bell" size={14} />
+                      </div>
+                      <h4 className="font-extrabold text-xs uppercase text-slate-800 tracking-wide">Notifikasi Admin TU</h4>
+                      {totalAdminUnread > 0 && (
+                        <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
+                          {totalAdminUnread} Baru
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {totalAdminUnread > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            complaints.forEach(c => handleMarkReadNotification('complaint', c.id));
+                            transactions.forEach(t => handleMarkReadNotification('transaction', t.id));
+                          }}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                        >
+                          Tandai Dibaca
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminMobileBell(false)}
+                        className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-800 text-xs font-bold transition-colors"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2 text-xs max-h-80 overflow-y-auto pr-0.5">
+                    {totalAdminUnread === 0 ? (
+                      <div className="text-center py-6 text-slate-400 font-medium">
+                        <Icon name="bell-off" size={26} className="mx-auto mb-1.5 text-slate-300" />
+                        Semua pengaduan dan transaksi telah ditinjau.
+                      </div>
+                    ) : (
+                      <>
+                        {pendingComplaints.map(c => (
+                          <div 
+                            key={'pending_' + c.id}
+                            onClick={() => {
+                              handleMarkReadNotification('complaint', c.id);
+                              setShowAdminMobileBell(false);
+                              setCurrentView('pengaduan');
+                            }}
+                            className="p-3 rounded-2xl border border-amber-300 bg-amber-50/90 cursor-pointer hover:scale-[0.99] transition-all text-amber-950 font-bold shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-black truncate flex items-center gap-1.5 text-amber-900">
+                                <Icon name="message-circle" size={13} className="text-amber-600 shrink-0" />
+                                Aduan: {c.studentName || 'Wali Murid'}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-500 text-white shrink-0">Menunggu</span>
+                            </div>
+                            <p className="text-[11px] text-amber-800 line-clamp-1 font-medium">{c.title || c.description || 'Pengaduan baru dari wali murid'}</p>
+                            {c.date && <span className="text-[9.5px] text-amber-700/80 font-semibold mt-1 block">{formatDateIndo(c.date)}</span>}
+                          </div>
+                        ))}
+                        {unreadTransactions.map(t => (
+                          <div 
+                            key={'trx_' + t.id}
+                            onClick={() => {
+                              handleMarkReadNotification('transaction', t.id);
+                              setShowAdminMobileBell(false);
+                              setCurrentView('transaksi');
+                            }}
+                            className="p-3 rounded-2xl border border-blue-200 bg-blue-50/90 cursor-pointer hover:scale-[0.99] transition-all text-blue-950 font-bold shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-black truncate flex items-center gap-1.5 text-blue-900">
+                                <Icon name="credit-card" size={13} className="text-blue-600 shrink-0" />
+                                {t.studentName} ({t.month || 'SPP'})
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-blue-600 text-white shrink-0">{t.status || 'Lunas'}</span>
+                            </div>
+                            <p className="text-[11px] text-blue-800 font-semibold">{formatRupiah(t.amount)} • {formatDateIndo(t.date)}</p>
+                          </div>
+                        ))}
+                        {unreadNotesRepliesList.map(n => (
+                          <div 
+                            key={'note_reply_' + n.id}
+                            onClick={() => {
+                              setShowAdminMobileBell(false);
+                              setCurrentView('catatan');
+                            }}
+                            className="p-3 rounded-2xl border border-teal-200 bg-teal-50/90 cursor-pointer hover:scale-[0.99] transition-all text-teal-950 font-bold shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-black truncate flex items-center gap-1.5 text-teal-900">
+                                <Icon name="message-circle" size={13} className="text-teal-600 shrink-0" />
+                                Catatan: {n.studentName}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-black bg-rose-500 text-white shrink-0 animate-pulse">
+                                {n.unreadCount} Balasan Baru
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-teal-800 line-clamp-1 font-medium">{n.lastCommentText}</p>
+                            {n.date && <span className="text-[9.5px] text-teal-700/80 font-semibold mt-1 block">{formatDateTimeIndo(n.date)}</span>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TOP MOBILE APP BAR with Refresh, Bell, and 3-Line Hamburger Menu for Admin */}
+            <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#072a6b]/95 via-[#0d3b8f]/95 to-[#1554c2]/95 backdrop-blur-xl px-4 sm:px-6 py-3.5 border-b border-cyan-400/30 shadow-xl shadow-blue-950/20 flex items-center justify-between min-h-[66px] text-white">
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-400 via-indigo-600 to-blue-700 p-0.5 shadow-lg shadow-blue-950/50 overflow-hidden shrink-0 flex items-center justify-center ring-2 ring-cyan-400/30">
+                  <img src="logo.webp" alt="PAUD Setia Bhakti" className="w-8 h-8 object-contain filter drop-shadow" />
+                </div>
+                <div className="min-w-0">
+                  <h1 className="text-base font-black text-white truncate tracking-tight">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h1>
+                  <div className="flex items-center gap-1.5 text-xs font-extrabold text-cyan-300 truncate mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Admin TU • {settings.adminName || 'Admin'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons: [Refresh] [Lonceng] [Garis 3] */}
+              <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                {/* Refresh / Sinkronisasi Button on Mobile */}
+                <button
+                  type="button"
+                  onClick={() => fetchData(true)}
+                  disabled={isRefreshing}
+                  className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                  aria-label="Sinkronisasi Data"
+                  title="Sinkronisasi Data"
+                >
+                  <Icon name="refresh-cw" size={18} className={isRefreshing ? 'animate-spin text-cyan-300' : 'text-white'} />
+                </button>
+
+                {/* Notification Bell Button on Mobile */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdminMobileBell(!showAdminMobileBell);
+                    setIsAdminMobileMenuOpen(false);
+                  }}
+                  className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex items-center justify-center transition-all border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                  aria-label="Lihat Notifikasi Admin"
+                  title="Notifikasi"
+                >
+                  <Icon name="bell" size={19} />
+                  {totalAdminUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-black flex items-center justify-center animate-pulse ring-2 ring-white shadow-md">
+                      {totalAdminUnread > 9 ? '9+' : totalAdminUnread}
+                    </span>
+                  )}
+                </button>
+
+                {/* Rounded Dark Frosted 3-Line Hamburger Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdminMobileMenuOpen(!isAdminMobileMenuOpen);
+                    setShowAdminMobileBell(false);
+                  }}
+                  className="relative w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/20 active:scale-95 text-white flex flex-col items-center justify-center gap-[4.5px] p-2.5 transition-all shadow-lg border border-white/15 focus:outline-none ring-1 ring-white/10 shrink-0 backdrop-blur-md"
+                  aria-label="Buka Menu Admin"
+                  title="Menu Navigasi"
+                >
+                  <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 rotate-45 translate-y-[7px]' : 'w-5'}`}></span>
+                  <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'opacity-0 w-0' : 'w-4 self-start ml-0.5'}`}></span>
+                  <span className={`h-[2.5px] bg-white rounded-full transition-all duration-300 ${isAdminMobileMenuOpen ? 'w-5 -rotate-45 -translate-y-[7px]' : 'w-5'}`}></span>
+                </button>
+              </div>
+            </div>
+
+            {/* MOBILE SLIDE-OUT NAVIGATION DRAWER - Admin */}
+            {isAdminMobileMenuOpen && (
+              <div className="md:hidden fixed inset-0 z-50 overflow-hidden animate-in fade-in duration-200">
+                <div 
+                  className="absolute inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity" 
+                  onClick={() => setIsAdminMobileMenuOpen(false)}
+                ></div>
+
+                <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] smurf-mobile-drawer text-white flex flex-col justify-between shadow-2xl z-10 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
+                  {/* Luminous Glow Orbs in Drawer */}
+                  <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/15 blur-3xl pointer-events-none"></div>
+                  <div className="absolute bottom-20 -left-10 w-40 h-40 rounded-full bg-cyan-500/10 blur-3xl pointer-events-none"></div>
+
+                  <div className="p-4 sm:p-5 relative z-10">
+                    {/* Drawer Header */}
+                    <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/15 flex items-center justify-center p-1.5 shadow-md shrink-0">
+                          <img src="logo.webp" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-sm font-black text-white leading-tight truncate">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h2>
+                          <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider block truncate">Panel Administrator TU</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsAdminMobileMenuOpen(false)}
+                        className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white flex items-center justify-center transition-colors border border-white/10 active:scale-95 shrink-0"
+                      >
+                        <Icon name="x" size={18} />
+                      </button>
+                    </div>
+
+                    {/* Admin User Chip in Drawer */}
+                    <div className="p-3.5 rounded-2xl bg-slate-900/80 backdrop-blur-xl border border-white/10 flex items-center gap-3 mb-4 shadow-lg shadow-black/30">
+                      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-lg border border-white/20 overflow-hidden shrink-0 shadow-md">
+                        {settings.adminName ? settings.adminName.charAt(0) : 'A'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-black text-white truncate capitalize">{settings.adminName || 'Admin TU'}</p>
+                        <p className="text-xs text-slate-400 font-bold truncate mt-0.5">Tahun Ajaran {settings.academicYear || 'Aktif'}</p>
+                      </div>
+                    </div>
+
+                    {/* Admin Navigation Groups */}
+                    <div className="space-y-1.5">
+                      {[
+                        { id: 'dashboard', label: 'Dashboard', icon: 'home', defaultView: 'dashboard', views: ['dashboard'] },
+                        { 
+                          id: 'keuangan', 
+                          label: 'Keuangan SPP', 
+                          icon: 'credit-card', 
+                          defaultView: 'transaksi', 
+                          views: ['transaksi', 'tunggakan', 'laporan'],
+                          subItems: [
+                            { id: 'transaksi', label: 'Catat Bayar Manual', icon: 'plus-circle' },
+                            { id: 'tunggakan', label: 'Follow-Up Tunggakan', icon: 'phone-call', badge: students.filter(s => (s.unpaidMonths && s.unpaidMonths.length > 0) || (s.unpaidCount > 0)).length || null, badgeType: 'danger' },
+                            { id: 'laporan', label: 'Cetak Laporan PDF', icon: 'printer' }
+                          ]
+                        },
+                        { 
+                          id: 'kesiswaan', 
+                          label: 'Kesiswaan', 
+                          icon: 'users', 
+                          defaultView: 'siswa', 
+                          views: ['siswa', 'catatan'], 
+                          badge: null,
+                          subItems: [
+                            { id: 'siswa', label: 'Data Murid', icon: 'user-check' },
+                            { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text' }
+                          ]
+                        },
+                        { 
+                          id: 'komunikasi', 
+                          label: 'Komunikasi', 
+                          icon: 'message-square', 
+                          defaultView: 'pengumuman', 
+                          views: ['pengumuman', 'pengaduan'], 
+                          badge: (complaints.filter(isComplaintPending).length) || null,
+                          badgeType: 'danger',
+                          subItems: [
+                            { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper' },
+                            { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: (complaints.filter(isComplaintPending).length) || null, badgeType: 'danger' }
+                          ]
+                        },
+                        { id: 'pengaturan', label: 'Pengaturan', icon: 'settings', defaultView: 'pengaturan', views: ['pengaturan'] }
+                      ].map(group => {
+                        const isGroupActive = group.views.includes(currentView);
+                        const isExpanded = adminExpandedGroup === group.id;
+
+                        return (
+                          <div key={group.id} className="w-full">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (group.subItems) {
+                                  if (isExpanded) {
+                                    setAdminExpandedGroup(null);
+                                  } else {
+                                    setAdminExpandedGroup(group.id);
+                                    if (!isGroupActive) {
+                                      setCurrentView(group.defaultView);
+                                    }
+                                  }
+                                } else {
+                                  setAdminExpandedGroup(group.id);
+                                  setCurrentView(group.defaultView);
+                                  setIsAdminMobileMenuOpen(false);
+                                }
+                              }}
+                              className={`w-full min-h-[44px] py-2.5 px-3.5 rounded-xl flex items-center justify-between text-xs sm:text-sm font-extrabold transition-all duration-200 active:scale-[0.99] ${
+                                isGroupActive
+                                  ? 'smurf-nav-active'
+                                  : 'smurf-nav-item'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1 truncate">
+                                <Icon name={group.icon} size={18} className="shrink-0" />
+                                <span className="truncate capitalize">{group.label}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {group.badge !== undefined && group.badge !== null && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                    group.badge === 0 
+                                      ? 'badge-zero-muted'
+                                      : group.badgeType === 'danger'
+                                        ? 'badge-danger-active animate-pulse ring-1 ring-rose-300'
+                                        : 'badge-cyan-active'
+                                  }`}>
+                                    {group.badge}
+                                  </span>
+                                )}
+                                {group.subItems && (
+                                  <Icon name="chevron-down" size={16} className={`transition-transform duration-200 shrink-0 ${isExpanded ? 'rotate-180' : ''}`} />
+                                )}
+                              </div>
+                            </button>
+
+                            {group.subItems && isExpanded && (
+                              <div className="border-l-2 border-slate-800 ml-4 pl-3 mt-1.5 space-y-1">
+                                {group.subItems.map(sub => (
+                                  <button
+                                    key={sub.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setCurrentView(sub.id);
+                                      setAdminExpandedGroup(group.id);
+                                      setIsAdminMobileMenuOpen(false);
+                                    }}
+                                    className={`w-full min-h-[40px] py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-between transition-all active:scale-[0.99] ${
+                                      currentView === sub.id
+                                        ? 'bg-white/15 text-white font-black border border-white/15 shadow-xs'
+                                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1 truncate">
+                                      <Icon name={sub.icon} size={15} className="shrink-0" />
+                                      <span className="truncate capitalize">{sub.label}</span>
+                                    </div>
+                                    {sub.badge > 0 && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500 text-white animate-pulse shrink-0">
+                                        {sub.badge}
+                                      </span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Ornamental Corak Pattern at Bottom of Admin Mobile Drawer */}
+                  <div className="mt-auto relative z-10">
+                    <SidebarBottomOrnament roleLabel="Panel Admin TU" />
+                  </div>
+
+                  {/* Sticky Drawer Footer Actions */}
+                  <div className="sticky bottom-0 bg-slate-950/90 backdrop-blur-lg border-t border-white/10 p-4 space-y-2 relative z-10">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetchData(true);
+                        setIsAdminMobileMenuOpen(false);
+                      }}
+                      className="w-full min-h-[42px] py-2.5 px-3.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-white/10 text-white text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                    >
+                      <Icon name="refresh-cw" size={15} className={`shrink-0 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+                      <span className="truncate">Sinkronisasi Data Baru</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdminMobileMenuOpen(false);
+                        handleUserLogout();
+                      }}
+                      className="w-full min-h-[42px] py-2.5 px-3.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/20 text-xs font-bold flex items-center justify-center gap-2 active:scale-95 transition-all shadow-sm"
+                    >
+                      <Icon name="log-out" size={15} className="shrink-0" />
+                      <span className="truncate">Keluar Akun Admin TU</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="w-full flex-1 bg-[#ebf1f8] flex flex-col md:flex-row min-h-screen mobile-full-height">
+              {/* ROYAL BLUE SIDEBAR - Hidden on mobile */}
+              <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
+                
+                {/* Subtle Ambient Highlights in Admin Sidebar */}
+                <div className="absolute -bottom-10 -left-10 w-64 h-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none select-none z-0"></div>
+                <div className="absolute top-20 right-0 w-48 h-48 rounded-full bg-indigo-500/10 blur-[60px] pointer-events-none select-none z-0"></div>
+
+                <div className="relative z-10">
+                  {/* Brand / School Header with Frosted Glass Container (Matching Image 3) */}
+                  <div className="p-4 sm:p-5 m-3 sm:m-4 mb-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex items-center gap-3.5 shadow-lg shadow-blue-950/20">
+                    <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-white border border-white/30 overflow-hidden shrink-0 shadow-md">
+                      <img src="logo.webp" alt="PAUD Setia Bhakti" className="w-9 h-9 object-contain filter drop-shadow" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h1 className="font-black text-sm sm:text-base leading-tight text-white tracking-tight truncate">{settings.schoolName || 'PAUD SETIA BHAKTI'}</h1>
+                      <div className="inline-flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-full bg-cyan-400/20 border border-cyan-400/30">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="text-[10px] font-black text-cyan-200 uppercase tracking-wider">Admin Panel</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Admin Navigation - Pill Style Groups */}
+                  <nav className="px-3 pr-3 py-2 sm:py-3 space-y-1.5 font-extrabold text-sm relative">
+                    {[
+                      { id: 'dashboard', label: 'Dashboard', icon: 'home', defaultView: 'dashboard', views: ['dashboard'] },
+                      { 
+                        id: 'keuangan', 
+                        label: 'Keuangan SPP', 
+                        icon: 'credit-card', 
+                        defaultView: 'transaksi', 
+                        views: ['transaksi', 'tunggakan', 'laporan'],
+                        subItems: [
+                          { id: 'transaksi', label: 'Catat Bayar Manual', icon: 'plus-circle' },
+                          { id: 'tunggakan', label: 'Follow-Up Tunggakan', icon: 'phone-call', badge: students.filter(s => (s.unpaidMonths && s.unpaidMonths.length > 0) || (s.unpaidCount > 0)).length || null, badgeType: 'danger' },
+                          { id: 'laporan', label: 'Cetak Laporan PDF', icon: 'printer' }
+                        ]
+                      },
+                      { 
+                        id: 'kesiswaan', 
+                        label: 'Kesiswaan', 
+                        icon: 'users', 
+                        defaultView: 'siswa', 
+                        views: ['siswa', 'catatan'], 
+                        badge: (unreadNotesRepliesList.length > 0 ? unreadNotesRepliesList.length : null),
+                        badgeType: 'danger',
+                        subItems: [
+                          { id: 'siswa', label: 'Data Murid', icon: 'user-check' },
+                          { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text', badge: (unreadNotesRepliesList.length > 0 ? unreadNotesRepliesList.length : null), badgeType: 'danger' }
+                        ]
+                      },
+                      { 
+                        id: 'komunikasi', 
+                        label: 'Komunikasi', 
+                        icon: 'message-square', 
+                        defaultView: 'pengumuman', 
+                        views: ['pengumuman', 'pengaduan'], 
+                        badge: (complaints.filter(c => isComplaintPending(c)).length) || null,
+                        badgeType: 'danger',
+                        subItems: [
+                          { id: 'pengumuman', label: 'Pengumuman Sekolah', icon: 'newspaper' },
+                          { id: 'pengaduan', label: 'Pengaduan Wali', icon: 'message-circle', badge: (complaints.filter(c => isComplaintPending(c)).length) || null, badgeType: 'danger' }
+                        ]
+                      },
+                      { id: 'pengaturan', label: 'Pengaturan', icon: 'settings', defaultView: 'pengaturan', views: ['pengaturan'] }
+                    ].map(group => {
+                      const isGroupActive = group.views.includes(currentView);
+                      const isExpanded = adminExpandedGroup === group.id;
+
+                      return (
+                        <div key={group.id} className="w-full">
+                          <button
+                            onClick={() => {
+                              if (group.subItems) {
+                                if (isExpanded) {
+                                  setAdminExpandedGroup(null);
+                                } else {
+                                  setAdminExpandedGroup(group.id);
+                                  if (!isGroupActive) {
+                                    setCurrentView(group.defaultView);
+                                  }
+                                }
+                              } else {
+                                setAdminExpandedGroup(group.id);
+                                setCurrentView(group.defaultView);
+                              }
+                            }}
+                            className={`w-full py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap rounded-2xl ${
+                              isGroupActive
+                                ? 'smurf-nav-active'
+                                : 'smurf-nav-item'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3 truncate">
+                              <Icon name={group.icon} size={18} />
+                              <span className="truncate">{group.label}</span>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              {group.badge !== undefined && group.badge !== null && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                  group.badge === 0 
+                                    ? 'badge-zero-muted'
+                                    : group.badgeType === 'danger'
+                                      ? 'badge-danger-active animate-pulse ring-1 ring-rose-300'
+                                      : group.badgeType === 'sky'
+                                        ? 'badge-cyan-active'
+                                        : 'badge-purple-active'
+                                }`}>
+                                  {group.badge}
+                                </span>
+                              )}
+
+                              {group.subItems && (
+                                <Icon 
+                                  name="chevron-down" 
+                                  size={15} 
+                                  className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
+                                />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Sub-Items when Expanded */}
+                          {group.subItems && isExpanded && (
+                            <div className="mt-1 ml-2 space-y-0.5 py-1">
+                              {group.subItems.map(sub => (
+                                <button
+                                  key={sub.id}
+                                  onClick={() => {
+                                    setCurrentView(sub.id);
+                                    setAdminExpandedGroup(group.id);
+                                  }}
+                                  className={`w-full px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
+                                    currentView === sub.id
+                                      ? 'bg-white text-sky-800 font-black shadow-md border border-cyan-300'
+                                      : 'text-white/80 hover:text-white hover:bg-white/15'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 truncate">
+                                    <Icon name={sub.icon} size={14} />
+                                    <span className="truncate">{sub.label}</span>
+                                  </div>
+                                  {sub.badge !== undefined && sub.badge !== null && (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black transition-all ${
+                                      sub.badge === 0
+                                        ? 'badge-zero-muted'
+                                        : sub.badgeType === 'danger'
+                                          ? 'badge-danger-active animate-pulse ring-1 ring-rose-300'
+                                          : sub.badgeType === 'sky'
+                                            ? 'badge-cyan-active'
+                                            : sub.badgeType === 'purple'
+                                              ? 'badge-purple-active'
+                                              : 'badge-cyan-active'
+                                    }`}>
+                                      {sub.badge}
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </nav>
+                </div>
+
+                {/* Bottom Admin Sidebar Section: Decorative Corak Ornament + Admin Profile Chip */}
+                <div className="mt-auto relative z-10 hidden md:block">
+                  <SidebarBottomOrnament roleLabel="Panel Admin TU" />
+                  <div className="p-3 sm:p-3.5 m-3 sm:m-4 mt-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 text-white relative z-10 shadow-lg shadow-blue-950/20">
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="relative shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-black text-sm text-white border border-white/25">
+                            {settings.adminName ? settings.adminName.charAt(0) : 'A'}
+                          </div>
+                          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-slate-900 animate-pulse"></span>
+                        </div>
+                        <div className="truncate flex-1">
+                          <p className="text-sm font-black text-white truncate">{settings.adminName || 'Admin TU'}</p>
+                          <p className="text-xs text-blue-100/80 font-semibold truncate">Tahun Ajaran {settings.academicYear || 'Aktif'}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleUserLogout}
+                        title="Keluar Akun Admin"
+                        className="p-2 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/90 hover:text-white transition-all shadow-sm shrink-0"
+                      >
+                        <Icon name="log-out" size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+
+            {/* MAIN AESTHETIC CONTENT CARD */}
+            <main className="flex-1 bg-aesthetic-pattern flex flex-col min-w-0 min-h-0 overflow-y-auto mobile-nav-spacer relative">
+              <PanelAestheticBg />
+              {/* Header Top Bar */}
+              <header className="px-4 sm:px-6 md:px-10 pt-7 sm:pt-8 pb-4 sm:pb-5 border-b border-slate-200/80 flex flex-col gap-3.5 sm:gap-4 bg-white/95 backdrop-blur-md relative z-20 md:sticky md:top-0 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 tracking-tight leading-snug">
+                        {currentView === 'dashboard' && 'Dashboard Utama'}
+                        {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && 'Keuangan & Tagihan SPP'}
+                        {['siswa', 'catatan'].includes(currentView) && 'Data Kesiswaan'}
+                        {['pengumuman', 'pengaduan'].includes(currentView) && 'Komunikasi & Layanan'}
+                        {currentView === 'pengaturan' && 'Pengaturan Aplikasi'}
+                      </h2>
+                      <span className="hidden sm:inline-flex items-center px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
+                        {currentView === 'transaksi' && 'Catat Bayar'}
+                        {currentView === 'tunggakan' && 'Follow-Up Tunggakan'}
+                        {currentView === 'laporan' && 'Laporan PDF'}
+                        {currentView === 'siswa' && 'Data Murid'}
+                        {currentView === 'catatan' && 'Catatan TU'}
+                        {currentView === 'pengumuman' && 'Pengumuman'}
+                        {currentView === 'pengaduan' && 'Aduan Masuk'}
+                        {currentView === 'dashboard' && 'Statistik'}
+                        {currentView === 'pengaturan' && 'Konfigurasi'}
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm md:text-base text-slate-500 font-medium mt-1">
+                      {currentView === 'dashboard' && 'Ringkasan operasional dan grafik penerimaan SPP'}
+                      {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && 'Kelola pencatatan bayar manual, pantau tunggakan & cetak laporan'}
+                      {['siswa', 'catatan'].includes(currentView) && 'Kelola database murid aktif, kelas dan catatan konseling'}
+                      {['pengumuman', 'pengaduan'].includes(currentView) && 'Publikasi pengumuman sekolah dan tanggapi pengaduan wali'}
+                      {currentView === 'pengaturan' && 'Konfigurasi identitas sekolah, tarif SPP dan periode semester'}
+                    </p>
+                  </div>
+
+                  {/* Header Actions - Tampil hanya di desktop, di mobile sudah ada di top bar & drawer */}
+                  <div className="hidden md:flex items-center gap-2.5 sm:gap-3 shrink-0">
+                    {/* Desktop Notification Bell (Samakan fitur dengan mobile header) */}
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminMobileBell(prev => !prev)}
+                      title="Notifikasi Masuk (Pengaduan, Transaksi & Balasan Catatan Siswa)"
+                      className={`relative px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm cursor-pointer ${
+                        totalAdminUnread > 0
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <Icon name="bell" size={17} className={totalAdminUnread > 0 ? 'text-rose-600' : 'text-slate-600'} />
+                      <span className="hidden sm:inline">Notifikasi</span>
+                      {totalAdminUnread > 0 && (
+                        <span className="px-1.5 py-0.2 min-w-[18px] text-center bg-rose-500 text-white rounded-full text-[10px] font-black animate-pulse shadow-xs">
+                          {totalAdminUnread > 99 ? '99+' : totalAdminUnread}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => fetchData(true)}
+                      title="Sinkronisasi Data"
+                      className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
+                    >
+                      <Icon name="refresh-cw" size={17} className={isRefreshing ? 'animate-spin text-blue-600' : ''} />
+                      <span className="hidden sm:inline">Sinkronisasi</span>
+                    </button>
+
+                    <button
+                      onClick={handleUserLogout}
+                      title="Keluar Akun Admin"
+                      className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-sm font-bold border border-rose-200 transition-colors flex items-center gap-2 shadow-sm"
+                    >
+                      <Icon name="log-out" size={17} />
+                      <span className="hidden sm:inline">Keluar</span>
+                    </button>
+                  </div>
+                </div>
+              </header>
+
+              {/* Mobile Sub-Navigation Pills for Admin Multi-View Sections */}
+              {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && (
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
+                  <button
+                    onClick={() => setCurrentView('transaksi')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'transaksi' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="credit-card" size={13} />
+                    <span>Catat Bayar</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('tunggakan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'tunggakan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="alert-circle" size={13} className={currentView === 'tunggakan' ? 'text-amber-200' : 'text-amber-500'} />
+                    <span>Tunggakan</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('laporan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'laporan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="file-text" size={13} />
+                    <span>Laporan PDF</span>
+                  </button>
+                </div>
+              )}
+
+              {['siswa', 'catatan'].includes(currentView) && (
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
+                  <button
+                    onClick={() => setCurrentView('siswa')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'siswa' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="users" size={13} />
+                    <span>Data Murid ({students.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('catatan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'catatan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="file-edit" size={13} />
+                    <span>Catatan TU</span>
+                  </button>
+                </div>
+              )}
+
+              {['pengumuman', 'pengaduan'].includes(currentView) && (
+                <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
+                  <button
+                    onClick={() => setCurrentView('pengumuman')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'pengumuman' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="newspaper" size={13} />
+                    <span>Pengumuman</span>
+                  </button>
+                  <button
+                    onClick={() => setCurrentView('pengaduan')}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
+                      currentView === 'pengaduan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    <Icon name="message-square" size={13} />
+                    <span>Pengaduan Wali</span>
+                    {complaints.filter(c => isComplaintPending(c)).length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                        {complaints.filter(c => isComplaintPending(c)).length}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              <div key={currentView} className="px-3.5 py-4 sm:px-6 md:p-10 space-y-6 sm:space-y-8 flex-1 animate-tab-switch relative z-10">
+            {currentView === 'dashboard' && (
+              <DashboardView
+                students={students}
+                transactions={transactions}
+                announcements={announcements}
+                complaints={complaints}
+                notes={notes}
+                settings={settings}
+                navigateTo={(v) => setCurrentView(v)}
+                onShowKuitansi={(trx) => setSelectedKuitansi(trx)}
+                onMarkReadNotification={handleMarkReadNotification}
+                onRefresh={fetchData}
+                isRefreshing={isRefreshing}
+              />
+            )}
+
+            {currentView === 'siswa' && (
+              <SiswaListView
+                students={students}
+                settings={settings}
+                transactions={transactions}
+                onAddStudent={handleAddStudent}
+                onUpdateStudent={handleUpdateStudent}
+                onDeleteStudent={handleDeleteStudent}
+                showToast={showToast}
+              />
+            )}
+
+            {currentView === 'transaksi' && (
+              <TransaksiView
+                students={students}
+                transactions={transactions}
+                settings={settings}
+                onAddTransaction={handleAddTransaction}
+                onShowKuitansi={(trx) => setSelectedKuitansi(trx)}
+                onUpdateStudent={handleUpdateStudent}
+              />
+            )}
+
+            {currentView === 'laporan' && (
+              <LaporanView
+                students={students}
+                transactions={transactions}
+                settings={settings}
+              />
+            )}
+
+            {currentView === 'pengumuman' && (
+              <AdminPengumumanView
+                announcements={announcements}
+                onAddAnnouncement={handleAddAnnouncement}
+                onUpdateAnnouncement={handleUpdateAnnouncement}
+                onDeleteAnnouncement={handleDeleteAnnouncement}
+              />
+            )}
+
+            {currentView === 'pengaduan' && (
+              <AdminPengaduanView
+                complaints={complaints}
+                onReplyComplaint={handleReplyComplaint}
+                onToggleComplaintStatus={handleToggleComplaintStatus}
+                onMarkAsRead={handleMarkReadNotification}
+              />
+            )}
+
+            {currentView === 'tunggakan' && (
+              <AdminTunggakanView
+                students={students}
+                transactions={transactions}
+                settings={settings}
+                navigateTo={(v) => setCurrentView(v)}
+              />
+            )}
+
+            {currentView === 'catatan' && (
+              <AdminCatatanView
+                students={students}
+                notes={notes}
+                onAddNote={handleAddNote}
+                onDeleteNote={(id) => {
+                  showConfirmPopup({
+                    title: "Hapus Catatan Kesiswaan?",
+                    message: "Apakah Anda yakin ingin menghapus catatan bimbingan/evaluasi murid ini? Data yang dihapus tidak dapat dipulihkan.",
+                    confirmText: "Ya, Hapus",
+                    cancelText: "Batal",
+                    onConfirm: async () => {
+                      const supabase = getSupabaseClient();
+                      if (supabase && typeof id !== 'number') {
+                        await supabase.from('student_notes').delete().eq('id', id);
+                      }
+                      setNotes(prev => prev.filter(n => n.id !== id));
+                      showToast('Catatan berhasil dihapus', 'delete');
+                    }
+                  });
+                }}
+              />
+            )}
+              {currentView === 'pengaturan' && (
+              <AdminPengaturanView
+                settings={settings}
+                onSaveSettings={handleUpdateSettings}
+              />
+            )}
+
+              </div>
+            </main>
+          </div>
+
+        </div>
+
+        {isRefreshing && <RefreshLoadingOverlay />}
+
+        {selectedKuitansi && (
+          <KuitansiModal
+            transaction={selectedKuitansi}
+            settings={settings}
+            onClose={() => setSelectedKuitansi(null)}
+          />
+        )}
+
+        <ToastNotification toast={toast} onClose={() => setToast(null)} />
+        <CrudPopupModal popup={crudPopup} onClose={() => setCrudPopup(null)} />
+      </>
+    );
+    }
+
+    window.__SPP_MountFullApp = function(existingRoot, handoff) {
+      try { document.documentElement.classList.remove('spp-has-session'); } catch (e) {}
+      const targetRoot = existingRoot || ReactDOM.createRoot(document.getElementById('root'));
+      targetRoot.render(<App initialHandoff={handoff || window.__SPP_LOGIN_HANDOFF || null} />);
+      return targetRoot;
+    };
+
+    if (!window.__SPP_DEFER_APP_MOUNT) {
+      window.__SPP_MountFullApp();
+    }

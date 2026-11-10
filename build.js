@@ -328,18 +328,11 @@ function buildBootAppCode(appJsUrl, dashCssUrl) {
 
   const hasSavedSession = () => {
     try {
-      if (sessionStorage.getItem('spp_tab_session')) return true;
-      const urlParams = new URLSearchParams(window.location.search);
-      const roleParam = urlParams.get('role') || (window.location.hash.includes('admin') ? 'admin' : (window.location.hash.includes('wali') || window.location.hash.includes('parent') ? 'parent' : null));
-      if (roleParam === 'admin' && localStorage.getItem('spp_admin_session')) return true;
-      if (roleParam === 'parent' && localStorage.getItem('spp_parent_session')) return true;
-      const intendedRole = sessionStorage.getItem('spp_intended_role');
-      if (intendedRole === 'admin' && localStorage.getItem('spp_admin_session')) return true;
-      if (intendedRole === 'parent' && localStorage.getItem('spp_parent_session')) return true;
-      const adminSaved = localStorage.getItem('spp_admin_session');
-      const parentSaved = localStorage.getItem('spp_parent_session');
-      if ((adminSaved && !parentSaved) || (parentSaved && !adminSaved)) return true;
-      if (localStorage.getItem('spp_user_session')) return true;
+      const tabRaw = sessionStorage.getItem('spp_tab_session');
+      if (tabRaw && tabRaw.trim().length > 2) {
+        const parsed = JSON.parse(tabRaw);
+        if (parsed && typeof parsed === 'object' && parsed.role) return true;
+      }
     } catch (e) {}
     return false;
   };
@@ -859,7 +852,7 @@ ${buildBootAppCode(appJsVersionedUrl, dashCssVersionedUrl)}
   const ssrHtml = renderLoginSsrHtml(source, ast, loginIcons, ssrSettings);
 
   const safeLoginCss = loginMinCss.replace(/<\/style>/gi, '<\\/style>');
-  const inlineSessionBoot = `(function(){window.__SPP_DASHBOARD_CSS_HREF='${dashCssVersionedUrl}';try{var p=new URLSearchParams(location.search),r=p.get('role')||(location.hash.indexOf('admin')!==-1?'admin':(location.hash.indexOf('wali')!==-1||location.hash.indexOf('parent')!==-1?'parent':null)),i=sessionStorage.getItem('spp_intended_role'),a=localStorage.getItem('spp_admin_session'),pr=localStorage.getItem('spp_parent_session');if(sessionStorage.getItem('spp_tab_session')||(r==='admin'&&a)||(r==='parent'&&pr)||(i==='admin'&&a)||(i==='parent'&&pr)||(a&&!pr)||(pr&&!a)||localStorage.getItem('spp_user_session')){document.documentElement.classList.add('spp-has-session');var l=document.createElement('link');l.id='spp-dashboard-css';l.rel='stylesheet';l.href='${dashCssVersionedUrl}';l.onload=function(){this.dataset.loaded='1';};document.head.appendChild(l);setTimeout(function(){try{document.documentElement.classList.remove('spp-has-session');}catch(e){}},8000);}}catch(e){}})();`;
+  const inlineSessionBoot = `(function(){window.__SPP_DASHBOARD_CSS_HREF='${dashCssVersionedUrl}';try{var ts=sessionStorage.getItem('spp_tab_session');if(ts&&ts.length>2){document.documentElement.classList.add('spp-has-session');var l=document.createElement('link');l.id='spp-dashboard-css';l.rel='stylesheet';l.href='${dashCssVersionedUrl}';l.onload=function(){this.dataset.loaded='1';};document.head.appendChild(l);setTimeout(function(){try{document.documentElement.classList.remove('spp-has-session');}catch(e){}},8000);}}catch(e){}})();`;
 
   let updatedHtml = htmlTemplate
     .replace(/<style id="spp-login-css">[\s\S]*?<\/style>/, `<style id="spp-login-css">${safeLoginCss}html.spp-has-session #root{opacity:0;pointer-events:none}</style>`)

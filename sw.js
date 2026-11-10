@@ -3,14 +3,14 @@
  * Provides high-efficiency caching, instant load times, and offline capabilities.
  */
 
-const CACHE_NAME = 'spp-cache-2ad8394a';
+const CACHE_NAME = 'spp-cache-b5c55870';
 const STATIC_ASSETS = [
   './',
   'index.html',
   'logo.webp',
   'favicon.svg',
   'env.js?v=8ee00723',
-  'login.min.js?v=4dafdab6',
+  'login.min.js?v=b8f101af',
   'libs/react.production.min.js',
   'libs/react-dom.production.min.js'
 ];

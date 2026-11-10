@@ -479,6 +479,7 @@
         adminName: row.admin_name || localExt.adminName || 'Sarah Aura Alamanda',
         adminUsername: row.admin_username || localExt.adminUsername || 'Sarah',
         adminPassword: row.admin_password || localExt.adminPassword || '',
+        sessionToken: row.session_token || '',
         dueDateDay: Number(row.due_date_day || localExt.dueDateDay || 10),
         midtransClientKey: row.midtrans_client_key || localExt.midtransClientKey || (window.AppEnv?.midtransClientKey || ''),
         midtransServerKey: row.midtrans_server_key || localExt.midtransServerKey || '',
@@ -2453,7 +2454,11 @@ function ParentDashboardView({
       }, [myNotes, readNotes]);
 
       const unreadComplaintsCount = useMemo(() => {
-        return myComplaints.filter(c => c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length).length;
+        return myComplaints.filter(c => {
+          const msgs = c.messages || [];
+          const hasAdminReply = msgs.some(m => m.sender === 'Admin TU' || m.sender?.toLowerCase().includes('admin') || m.sender?.toLowerCase().includes('tu')) || !!c.adminReply;
+          return msgs.length > 0 ? (readComplaintMsgs[c.id] || 0) < msgs.length : (hasAdminReply && !readComplaintMsgs[c.id]);
+        }).length;
       }, [myComplaints, readComplaintMsgs]);
 
       const unreadAnnCount = useMemo(() => {
@@ -2559,8 +2564,10 @@ function ParentDashboardView({
           const updated = { ...readComplaintMsgs };
           let changed = false;
           myComplaints.forEach(c => {
-            if (c.messages && (readComplaintMsgs[c.id] || 0) < c.messages.length) {
-              updated[c.id] = c.messages.length;
+            const msgs = c.messages || [];
+            const nextCount = msgs.length > 0 ? msgs.length : (c.adminReply ? 1 : 0);
+            if (nextCount > 0 && (readComplaintMsgs[c.id] || 0) < nextCount) {
+              updated[c.id] = nextCount;
               changed = true;
             }
           });
@@ -3151,10 +3158,10 @@ function ParentDashboardView({
             <div className="smurf-ambient-orb smurf-orb-2"></div>
             <div className="smurf-ambient-orb smurf-orb-3"></div>
             {/* LEFT ROYAL BLUE SIDEBAR - Hidden on mobile, replaced by bottom nav */}
-            <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
+            <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden md:sticky md:top-0 md:h-screen md:self-start md:overflow-y-auto no-scrollbar hide-on-mobile-nav">
               
               {/* Subtle Ambient Highlights in Sidebar */}
-              <div className="absolute -bottom-10 -left-10 w-64 h-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none select-none z-0"></div>
+              <div className="absolute bottom-0 -left-10 w-64 h-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none select-none z-0"></div>
               <div className="absolute top-20 right-0 w-48 h-48 rounded-full bg-indigo-500/10 blur-[60px] pointer-events-none select-none z-0"></div>
 
               <div className="relative z-10">
@@ -4810,6 +4817,10 @@ function ParentDashboardView({
       navigateTo, 
       onShowKuitansi,
       onMarkReadNotification,
+      onMarkAllRead,
+      onOpenNotifications,
+      totalAdminUnread,
+      unreadNotesReplies = [],
       onRefresh,
       isRefreshing
     }) {
@@ -4827,6 +4838,7 @@ function ParentDashboardView({
       const unreadComplaints = useMemo(() => complaints.filter(c => isComplaintPending(c)), [complaints]);
       const unreadTrx = useMemo(() => transactions.filter(t => !t.isRead), [transactions]);
       const totalUnreadCount = unreadComplaints.length + unreadTrx.length;
+      const effectiveUnreadCount = typeof totalAdminUnread === 'number' ? totalAdminUnread : (totalUnreadCount + (unreadNotesReplies ? unreadNotesReplies.length : 0));
 
       const pemasukanPerKelas = useMemo(() => {
         const data = {};
@@ -4854,19 +4866,24 @@ function ParentDashboardView({
                       <Icon name="bell" size={14} />
                     </div>
                     <h4 className="font-extrabold text-xs uppercase text-slate-800 tracking-wide">Notifikasi Admin</h4>
-                    {totalUnreadCount > 0 && (
+                    {effectiveUnreadCount > 0 && (
                       <span className="px-2 py-0.5 bg-rose-100 text-rose-700 text-[10px] font-black rounded-full">
-                        {totalUnreadCount} Baru
+                        {effectiveUnreadCount} Baru
                       </span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {totalUnreadCount > 0 && (
+                    {effectiveUnreadCount > 0 && (
                       <button
                         type="button"
                         onClick={() => {
-                          complaints.forEach(c => onMarkReadNotification && onMarkReadNotification('complaint', c.id));
-                          transactions.forEach(t => onMarkReadNotification && onMarkReadNotification('transaction', t.id));
+                          if (onMarkAllRead) {
+                            onMarkAllRead();
+                          } else {
+                            complaints.forEach(c => onMarkReadNotification && onMarkReadNotification('complaint', c.id));
+                            transactions.forEach(t => onMarkReadNotification && onMarkReadNotification('transaction', t.id));
+                            (unreadNotesReplies || []).forEach(n => onMarkReadNotification && onMarkReadNotification('note', n.id));
+                          }
                         }}
                         className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
                       >
@@ -4884,12 +4901,32 @@ function ParentDashboardView({
                 </div>
 
                 <div className="space-y-2 max-h-80 overflow-y-auto text-xs pr-0.5">
-                  {complaints.length === 0 && transactions.length === 0 && (
+                  {complaints.length === 0 && transactions.length === 0 && (!unreadNotesReplies || unreadNotesReplies.length === 0) && (
                     <div className="text-center py-6 text-slate-400 font-medium">
                       <Icon name="bell-off" size={26} className="mx-auto mb-1.5 text-slate-300" />
                       Belum ada aktivitas notifikasi.
                     </div>
                   )}
+
+                  {/* Unread Catatan Siswa Replies */}
+                  {(unreadNotesReplies || []).map(n => (
+                    <div 
+                      key={'dash_note_' + n.id}
+                      onClick={() => {
+                        onMarkReadNotification && onMarkReadNotification('note', n.id);
+                        setShowBellDropdown(false);
+                        navigateTo('catatan');
+                      }}
+                      className="p-3 rounded-2xl border border-teal-200 bg-teal-50/90 cursor-pointer hover:scale-[0.99] transition-all text-teal-950 font-bold shadow-2xs"
+                    >
+                      <div className="flex justify-between items-center mb-1 gap-2">
+                        <span className="text-teal-900 font-extrabold truncate">Catatan: {n.studentName}</span>
+                        <span className="px-1.5 py-0.5 bg-rose-500 text-white rounded text-[9px] font-black shrink-0">{n.unreadCount} Balasan Baru</span>
+                      </div>
+                      <p className="text-[11px] text-teal-800 truncate">{n.lastCommentText}</p>
+                      {n.date && <span className="text-[9.5px] text-teal-700/80 font-semibold mt-1 block">{formatDateTimeIndo(n.date)}</span>}
+                    </div>
+                  ))}
 
                   {/* Pending Complaints */}
                   {complaints.filter(isComplaintPending).map(c => (
@@ -4986,20 +5023,19 @@ function ParentDashboardView({
                 <button
                   type="button"
                   onClick={() => {
-                    const next = !showBellDropdown;
-                    setShowBellDropdown(next);
-                    if (next) {
-                      complaints.forEach(c => onMarkReadNotification && onMarkReadNotification('complaint', c.id));
-                      transactions.forEach(t => onMarkReadNotification && onMarkReadNotification('transaction', t.id));
+                    if (onOpenNotifications) {
+                      onOpenNotifications();
+                    } else {
+                      setShowBellDropdown(prev => !prev);
                     }
                   }}
                   className="p-3 bg-sky-50 hover:bg-sky-100 rounded-2xl text-sky-800 relative transition-colors border border-sky-200 shadow-sm"
                   title="Notifikasi Admin"
                 >
                   <Icon name="bell" size={20} />
-                  {totalUnreadCount > 0 && (
+                  {effectiveUnreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center border-2 border-white animate-pulse shadow-md">
-                      {totalUnreadCount}
+                      {effectiveUnreadCount}
                     </span>
                   )}
                 </button>
@@ -11777,17 +11813,26 @@ function ParentDashboardView({
     // 9. MAIN APP CONTROLLER WITH SUPABASE SYNC
     // ==========================================
     
-    function AdminNoteCardItem({ n, onDeleteNote }) {
+    function AdminNoteCardItem({ n, onDeleteNote, onMarkNoteRead }) {
       const hasReplies = Boolean(n.comments && n.comments.length > 0);
       const [isOpen, setIsOpen] = useState(!hasReplies);
-      const [readCommentCount, setReadCommentCount] = useState(() => {
+      const getStoredReadCount = () => {
         try {
           const map = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
-          return map[n.id] || 0;
+          if (map[n.id] !== undefined) return map[n.id];
+          return n.isRead ? (n.comments ? n.comments.length : 0) : 0;
         } catch (e) {
           return 0;
         }
-      });
+      };
+      const [readCommentCount, setReadCommentCount] = useState(getStoredReadCount);
+
+      useEffect(() => {
+        const syncReadCount = () => setReadCommentCount(getStoredReadCount());
+        syncReadCount();
+        window.addEventListener('spp_note_read_updated', syncReadCount);
+        return () => window.removeEventListener('spp_note_read_updated', syncReadCount);
+      }, [n.id, n.comments?.length, n.isRead]);
 
       const unreadCount = Math.max(0, (n.comments?.length || 0) - readCommentCount);
 
@@ -11798,6 +11843,7 @@ function ParentDashboardView({
           localStorage.setItem('spp_admin_read_note_replies', JSON.stringify(map));
           setReadCommentCount(map[n.id]);
           window.dispatchEvent(new Event('spp_note_read_updated'));
+          if (onMarkNoteRead) onMarkNoteRead(n);
         } catch (e) {}
       };
 
@@ -11901,7 +11947,7 @@ function ParentDashboardView({
       );
     }
 
-    function AdminCatatanView({ students, notes, onAddNote, onDeleteNote }) {
+    function AdminCatatanView({ students, notes, onAddNote, onDeleteNote, onMarkNoteRead }) {
       const [selectedStudent, setSelectedStudent] = useState('');
       const [content, setContent] = useState('');
 
@@ -11979,8 +12025,8 @@ function ParentDashboardView({
                    <p className="text-slate-500 font-bold">Belum ada catatan siswa yang dikirimkan.</p>
                  </div>
                ) : (
-                 notes.sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now())).map(n => (
-                   <AdminNoteCardItem key={n.id} n={n} onDeleteNote={onDeleteNote} />
+                 [...notes].sort((a,b) => new Date(b.created_at || Date.now()) - new Date(a.created_at || Date.now())).map(n => (
+                   <AdminNoteCardItem key={n.id} n={n} onDeleteNote={onDeleteNote} onMarkNoteRead={onMarkNoteRead} />
                  ))
                )}
             </div>
@@ -12563,64 +12609,15 @@ function ParentDashboardView({
 
     function App({ initialHandoff = null }) {
       const handoffConsumedRef = useRef(false);
-      // Isolasi sesi per-tab (sessionStorage) dan per-role (localStorage) agar refresh admin tidak menimpa user
+      // Isolasi sesi ketat per-tab (hanya sessionStorage) agar copy URL ke tab baru wajib login ulang
       const [currentUser, setCurrentUser] = useState(() => {
         try {
-          // 1. Prioritas utama: Cek sesi aktif tab ini (sessionStorage)
           const tabSession = sessionStorage.getItem('spp_tab_session');
-          if (tabSession) {
-            return JSON.parse(tabSession);
-          }
-
-          // 2. Cek apakah URL tab ini dibuka spesifik untuk role tertentu
-          const urlParams = new URLSearchParams(window.location.search);
-          const roleParam = urlParams.get('role') || (window.location.hash.includes('admin') ? 'admin' : (window.location.hash.includes('wali') || window.location.hash.includes('parent') ? 'parent' : null));
-
-          if (roleParam === 'admin') {
-            const adminSaved = localStorage.getItem('spp_admin_session');
-            if (adminSaved) {
-              sessionStorage.setItem('spp_tab_session', adminSaved);
-              return JSON.parse(adminSaved);
+          if (tabSession && tabSession.trim().length > 2) {
+            const parsed = JSON.parse(tabSession);
+            if (parsed && typeof parsed === 'object' && parsed.role) {
+              return parsed;
             }
-          } else if (roleParam === 'parent') {
-            const parentSaved = localStorage.getItem('spp_parent_session');
-            if (parentSaved) {
-              sessionStorage.setItem('spp_tab_session', parentSaved);
-              return JSON.parse(parentSaved);
-            }
-          }
-
-          // 3. Cek intended role tab ini
-          const intendedRole = sessionStorage.getItem('spp_intended_role');
-          if (intendedRole === 'admin') {
-            const adminSaved = localStorage.getItem('spp_admin_session');
-            if (adminSaved) {
-              sessionStorage.setItem('spp_tab_session', adminSaved);
-              return JSON.parse(adminSaved);
-            }
-          } else if (intendedRole === 'parent') {
-            const parentSaved = localStorage.getItem('spp_parent_session');
-            if (parentSaved) {
-              sessionStorage.setItem('spp_tab_session', parentSaved);
-              return JSON.parse(parentSaved);
-            }
-          }
-
-          // 4. Fallback ke login yang tersimpan
-          const adminSaved = localStorage.getItem('spp_admin_session');
-          const parentSaved = localStorage.getItem('spp_parent_session');
-          if (adminSaved && !parentSaved) {
-            sessionStorage.setItem('spp_tab_session', adminSaved);
-            return JSON.parse(adminSaved);
-          }
-          if (parentSaved && !adminSaved) {
-            sessionStorage.setItem('spp_tab_session', parentSaved);
-            return JSON.parse(parentSaved);
-          }
-          const legacy = localStorage.getItem('spp_user_session');
-          if (legacy) {
-            sessionStorage.setItem('spp_tab_session', legacy);
-            return JSON.parse(legacy);
           }
           return null;
         } catch (e) {
@@ -12629,17 +12626,26 @@ function ParentDashboardView({
       });
       const [mySessionToken, setMySessionToken] = useState(() => {
         try {
-          return sessionStorage.getItem('spp_my_session_token') || localStorage.getItem('spp_my_session_token') || '';
+          return sessionStorage.getItem('spp_my_session_token') || '';
         } catch (e) {
           return '';
         }
       });
+      const [pendingUser, setPendingUser] = useState(() => (initialHandoff && initialHandoff.userObj ? initialHandoff.userObj : null));
+      const [isLoadingPortal, setIsLoadingPortal] = useState(() => Boolean(initialHandoff && initialHandoff.userObj));
       const [kickedModal, setKickedModal] = useState(null);
 
       const currentUserRef = useRef(currentUser);
       currentUserRef.current = currentUser;
+      const pendingUserRef = useRef(pendingUser);
+      pendingUserRef.current = pendingUser;
       const mySessionTokenRef = useRef(mySessionToken);
       mySessionTokenRef.current = mySessionToken;
+      const authChannelRef = useRef(null);
+      const bcChannelRef = useRef(null);
+      const pendingBroadcastRef = useRef(null);
+      const sessionSyncPendingRef = useRef(false);
+      const lastVisibilityFetchRef = useRef(0);
 
       const [currentView, setCurrentView] = useState('dashboard');
       const [isAdminMobileMenuOpen, setIsAdminMobileMenuOpen] = useState(false);
@@ -12719,8 +12725,6 @@ function ParentDashboardView({
       const [activeMidtransBill, setActiveMidtransBill] = useState(null);
       const [toast, setToast] = useState(null);
       const [crudPopup, setCrudPopup] = useState(null);
-      const [pendingUser, setPendingUser] = useState(() => (initialHandoff && initialHandoff.userObj ? initialHandoff.userObj : null));
-      const [isLoadingPortal, setIsLoadingPortal] = useState(() => Boolean(initialHandoff && initialHandoff.userObj));
 
       // Notifikasi Admin & Hitungan Unread (Dideklarasikan di level teratas komponen App sesuai Rules of Hooks)
       const [notesReadSync, setNotesReadSync] = useState(0);
@@ -12734,8 +12738,9 @@ function ParentDashboardView({
         try {
           const readMap = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
           return (notes || []).map(n => {
-            const readCount = readMap[n.id] || 0;
             const comments = Array.isArray(n.comments) ? n.comments : [];
+            if (n.isRead && readMap[n.id] === undefined) return null;
+            const readCount = readMap[n.id] || 0;
             const unreadCount = Math.max(0, comments.length - readCount);
             if (unreadCount <= 0) return null;
             const lastComment = comments[comments.length - 1];
@@ -12782,21 +12787,20 @@ function ParentDashboardView({
 
       const handleForceLogout = useCallback((userName, device = 'Perangkat lain', time = 'Baru saja') => {
         ensureDashboardCss();
-        const active = currentUserRef.current;
         setCurrentUser(null);
+        setPendingUser(null);
+        setIsLoadingPortal(false);
         setMySessionToken('');
         currentUserRef.current = null;
+        pendingUserRef.current = null;
         mySessionTokenRef.current = '';
         try {
           sessionStorage.removeItem('spp_tab_session');
           sessionStorage.removeItem('spp_my_session_token');
-          if (active?.role === 'admin') {
-            localStorage.removeItem('spp_admin_session');
-            localStorage.removeItem('spp_admin_token');
-          } else if (active?.role === 'parent') {
-            localStorage.removeItem('spp_parent_session');
-            localStorage.removeItem('spp_parent_token');
-          }
+          localStorage.removeItem('spp_admin_session');
+          localStorage.removeItem('spp_admin_token');
+          localStorage.removeItem('spp_parent_session');
+          localStorage.removeItem('spp_parent_token');
           localStorage.removeItem('spp_user_session');
           localStorage.removeItem('spp_my_session_token');
         } catch (e) {}
@@ -12808,21 +12812,20 @@ function ParentDashboardView({
       }, []);
 
       const handleUserLogout = useCallback(() => {
-        const active = currentUserRef.current;
         setCurrentUser(null);
+        setPendingUser(null);
+        setIsLoadingPortal(false);
         setMySessionToken('');
         currentUserRef.current = null;
+        pendingUserRef.current = null;
         mySessionTokenRef.current = '';
         try {
           sessionStorage.removeItem('spp_tab_session');
           sessionStorage.removeItem('spp_my_session_token');
-          if (active?.role === 'admin') {
-            localStorage.removeItem('spp_admin_session');
-            localStorage.removeItem('spp_admin_token');
-          } else if (active?.role === 'parent') {
-            localStorage.removeItem('spp_parent_session');
-            localStorage.removeItem('spp_parent_token');
-          }
+          localStorage.removeItem('spp_admin_session');
+          localStorage.removeItem('spp_admin_token');
+          localStorage.removeItem('spp_parent_session');
+          localStorage.removeItem('spp_parent_token');
           localStorage.removeItem('spp_user_session');
           localStorage.removeItem('spp_my_session_token');
         } catch (e) {}
@@ -12832,28 +12835,50 @@ function ParentDashboardView({
         const cssReadyPromise = ensureDashboardCss();
         const newSessionToken = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
         try {
-          // Simpan sesi independen untuk tab saat ini
+          // Simpan sesi HANYA di sessionStorage per-tab agar tab baru selalu kena sesi login ulang
           sessionStorage.setItem('spp_tab_session', JSON.stringify(userObj));
           sessionStorage.setItem('spp_intended_role', userObj.role);
           sessionStorage.setItem('spp_my_session_token', newSessionToken);
-
-          // Simpan terpisah per-role di localStorage agar login admin tidak menimpa user
-          if (userObj.role === 'admin') {
-            localStorage.setItem('spp_admin_session', JSON.stringify(userObj));
-            localStorage.setItem('spp_admin_token', newSessionToken);
-          } else {
-            localStorage.setItem('spp_parent_session', JSON.stringify(userObj));
-            localStorage.setItem('spp_parent_token', newSessionToken);
-          }
+          // Bersihkan sisa sesi global lama jika ada agar tidak auto-login di tab baru
+          localStorage.removeItem('spp_admin_session');
+          localStorage.removeItem('spp_admin_token');
+          localStorage.removeItem('spp_parent_session');
+          localStorage.removeItem('spp_parent_token');
+          localStorage.removeItem('spp_user_session');
+          localStorage.removeItem('spp_my_session_token');
         } catch (e) {}
         setMySessionToken(newSessionToken);
         mySessionTokenRef.current = newSessionToken;
+        pendingUserRef.current = userObj;
 
         const deviceType = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'Smartphone (HP)' : 'Komputer (PC/Laptop)';
         const loginTime = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        const userKey = userObj.role === 'parent' ? ('student_' + userObj.student.id) : 'admin_account';
+        const broadcastPayload = {
+          userKey,
+          sessionToken: newSessionToken,
+          device: deviceType,
+          time: loginTime
+        };
 
+        // 1. Broadcast instan antar tab browser yang sama (BroadcastChannel + localStorage ping)
+        try {
+          if (typeof BroadcastChannel !== 'undefined') {
+            if (bcChannelRef.current) {
+              bcChannelRef.current.postMessage(broadcastPayload);
+            } else {
+              const bc = new BroadcastChannel('spp_single_session_bc');
+              bc.postMessage(broadcastPayload);
+              setTimeout(() => { try { bc.close(); } catch (err) {} }, 500);
+            }
+          }
+          localStorage.setItem('spp_single_session_ping', JSON.stringify({ ...broadcastPayload, nonce: Math.random() }));
+        } catch (e) {}
+
+        // 2. Sinkronisasi token sesi ke Supabase DB & Realtime Broadcast lintas perangkat
         const supabase = getSupabaseClient();
         if (supabase) {
+          sessionSyncPendingRef.current = true;
           try {
             if (userObj.role === 'parent' && userObj.student) {
               const sessionPayload = { session_token: newSessionToken };
@@ -12861,26 +12886,34 @@ function ParentDashboardView({
                 sessionPayload.arrears_note = '';
               }
               await supabase.from('students').update(sessionPayload).eq('id', userObj.student.id);
+              setStudents(prev => prev.map(s => s.id === userObj.student.id ? { ...s, sessionToken: newSessionToken } : s));
+            } else if (userObj.role === 'admin') {
+              let stgId = settings?.id || initialHandoff?.settings?.id;
+              if (!stgId) {
+                const { data: stgRows } = await supabase.from('settings').select('id').limit(1);
+                if (stgRows && stgRows[0]?.id) stgId = stgRows[0].id;
+              }
+              if (stgId) {
+                await supabase.from('settings').update({ session_token: newSessionToken }).eq('id', stgId);
+                setSettings(prev => ({ ...prev, id: stgId, sessionToken: newSessionToken }));
+              }
             }
 
-            const userKey = userObj.role === 'parent' ? ('student_' + userObj.student.id) : 'admin_account';
-            const authChannel = supabase.channel('spp_single_session_channel');
-            authChannel.subscribe((status) => {
-              if (status === 'SUBSCRIBED') {
-                authChannel.send({
-                  type: 'broadcast',
-                  event: 'single_session_login',
-                  payload: {
-                    userKey,
-                    sessionToken: newSessionToken,
-                    device: deviceType,
-                    time: loginTime
-                  }
-                });
-              }
-            });
+            const rtMsg = {
+              type: 'broadcast',
+              event: 'single_session_login',
+              payload: broadcastPayload
+            };
+            const ch = authChannelRef.current || supabase.channel('spp_single_session_channel');
+            if (ch.state === 'joined') {
+              ch.send(rtMsg);
+            } else {
+              pendingBroadcastRef.current = rtMsg;
+            }
           } catch (err) {
             console.warn("Gagal sinkronisasi sesi ke database:", err);
+          } finally {
+            sessionSyncPendingRef.current = false;
           }
         }
 
@@ -12937,15 +12970,26 @@ function ParentDashboardView({
                 setStudents(mappedStudents);
                 try { localStorage.setItem('spp_cached_students', JSON.stringify(mappedStudents)); } catch(e) {}
 
-                // Cek validitas sesi siswa aktif di perangkat ini
+                // Cek validitas sesi siswa aktif di perangkat/tab ini
                 const activeToken = mySessionTokenRef.current;
-                if (activeUser && activeUser.role === 'parent' && activeUser.student && activeToken) {
+                if (!sessionSyncPendingRef.current && activeUser && activeUser.role === 'parent' && activeUser.student && activeToken) {
                   const freshSt = mappedStudents.find(s => s.id === activeUser.student.id);
                   if (freshSt && freshSt.sessionToken && freshSt.sessionToken !== activeToken) {
-                    handleForceLogout(freshSt.name, 'Perangkat lain');
+                    handleForceLogout(freshSt.name, 'Perangkat / Tab lain');
                     return;
                   }
                 }
+              }
+
+              if (stgRes.status === 'fulfilled' && stgRes.value && stgRes.value.data && stgRes.value.data.length > 0) {
+                const mappedSettings = mapSettingsFromDb(stgRes.value.data[0]);
+                const activeToken = mySessionTokenRef.current;
+                if (!sessionSyncPendingRef.current && activeUser && activeUser.role === 'admin' && activeToken && mappedSettings.sessionToken && mappedSettings.sessionToken !== activeToken) {
+                  handleForceLogout(activeUser.name || mappedSettings.adminName || 'Admin TU', 'Perangkat / Tab lain');
+                  return;
+                }
+                setSettings(mappedSettings);
+                try { localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings)); } catch(e) {}
               }
 
               if (trRes.status === 'fulfilled' && trRes.value && trRes.value.data) {
@@ -12971,12 +13015,6 @@ function ParentDashboardView({
                 setNotes(mappedNt);
                 try { localStorage.setItem('spp_cached_notes', JSON.stringify(mappedNt)); } catch(e) {}
               }
-
-              if (stgRes.status === 'fulfilled' && stgRes.value && stgRes.value.data && stgRes.value.data.length > 0) {
-                const mappedSettings = mapSettingsFromDb(stgRes.value.data[0]);
-                setSettings(mappedSettings);
-                try { localStorage.setItem('spp_cached_settings', JSON.stringify(mappedSettings)); } catch(e) {}
-              }
             }
           }
         } catch (e) {
@@ -12988,31 +13026,68 @@ function ParentDashboardView({
         }
       }, [handleForceLogout]);
 
-      // Realtime listener broadcast saat ada login baru dari device lain
+      // Listener sesi tunggal: hanya menendang sesi lama jika akun YANG SAMA login lagi di tab atau perangkat lain
       useEffect(() => {
-        const supabase = getSupabaseClient();
-        if (!supabase) return;
-
-        const authChannel = supabase.channel('spp_single_session_channel');
-        authChannel.on('broadcast', { event: 'single_session_login' }, (msg) => {
-          const payload = msg.payload || {};
-          const activeUser = currentUserRef.current;
+        const handleIncomingSessionBroadcast = (payload) => {
+          if (!payload || !payload.sessionToken || !payload.userKey) return;
+          const activeUser = currentUserRef.current || pendingUserRef.current;
           const activeToken = mySessionTokenRef.current;
           if (!activeUser || !activeToken) return;
 
           const myKey = activeUser.role === 'parent' ? ('student_' + activeUser.student?.id) : 'admin_account';
-          // Pastikan admin hanya menendang sesama admin di device lain, dan user hanya menendang akun siswa yang sama
-          if (payload.userKey === myKey && payload.sessionToken && payload.sessionToken !== activeToken) {
+          if (payload.userKey === myKey && payload.sessionToken !== activeToken) {
             handleForceLogout(
               activeUser.role === 'parent' ? activeUser.student?.name : (activeUser.name || 'Admin'),
               payload.device || 'Perangkat lain',
               payload.time || 'Baru saja'
             );
           }
-        }).subscribe();
+        };
+
+        let bc = null;
+        try {
+          if (typeof BroadcastChannel !== 'undefined') {
+            bc = new BroadcastChannel('spp_single_session_bc');
+            bcChannelRef.current = bc;
+            bc.onmessage = (event) => handleIncomingSessionBroadcast(event.data);
+          }
+        } catch (e) {}
+
+        const handleStoragePing = (e) => {
+          if (e.key === 'spp_single_session_ping' && e.newValue) {
+            try {
+              handleIncomingSessionBroadcast(JSON.parse(e.newValue));
+            } catch (err) {}
+          }
+        };
+        window.addEventListener('storage', handleStoragePing);
+
+        const supabase = getSupabaseClient();
+        let authChannel = null;
+        if (supabase) {
+          authChannel = supabase.channel('spp_single_session_channel');
+          authChannelRef.current = authChannel;
+          authChannel.on('broadcast', { event: 'single_session_login' }, (msg) => {
+            handleIncomingSessionBroadcast(msg.payload || {});
+          }).subscribe((status) => {
+            if (status === 'SUBSCRIBED' && pendingBroadcastRef.current) {
+              const queued = pendingBroadcastRef.current;
+              pendingBroadcastRef.current = null;
+              authChannel.send(queued);
+            }
+          });
+        }
 
         return () => {
-          supabase.removeChannel(authChannel);
+          window.removeEventListener('storage', handleStoragePing);
+          if (bc) {
+            if (bcChannelRef.current === bc) bcChannelRef.current = null;
+            try { bc.close(); } catch (e) {}
+          }
+          if (supabase && authChannel) {
+            if (authChannelRef.current === authChannel) authChannelRef.current = null;
+            supabase.removeChannel(authChannel);
+          }
         };
       }, [handleForceLogout]);
 
@@ -13021,7 +13096,20 @@ function ParentDashboardView({
         const interval = setInterval(() => {
           fetchData(false);
         }, 30000);
-        return () => clearInterval(interval);
+        const handleVisibilityCheck = () => {
+          if (document.visibilityState === 'visible' && currentUserRef.current && !sessionSyncPendingRef.current) {
+            const now = Date.now();
+            if (now - lastVisibilityFetchRef.current > 1500) {
+              lastVisibilityFetchRef.current = now;
+              fetchData(false);
+            }
+          }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityCheck);
+        return () => {
+          clearInterval(interval);
+          document.removeEventListener('visibilitychange', handleVisibilityCheck);
+        };
       }, [fetchData]);
 
       // Saat pengguna berhasil login, sinkronkan seluruh transaksi dan pengumuman secara instan
@@ -13277,6 +13365,20 @@ function ParentDashboardView({
           return c;
         }));
 
+        if (isFromAdmin) {
+          try {
+            const list = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
+            if (!list.includes(id)) {
+              list.push(id);
+              localStorage.setItem('spp_admin_read_complaints', JSON.stringify(list));
+            }
+            const msgCounts = JSON.parse(localStorage.getItem('spp_admin_read_complaint_msgs') || '{}');
+            const targetC = complaints.find(c => c.id === id);
+            msgCounts[id] = Math.max((updatedMessages && updatedMessages.length) || 0, ((targetC && Array.isArray(targetC.messages)) ? targetC.messages.length + 1 : 1));
+            localStorage.setItem('spp_admin_read_complaint_msgs', JSON.stringify(msgCounts));
+          } catch (e) {}
+        }
+
         showToast("Pesan Terkirim", `Pesan balasan dari ${senderRole} berhasil terkirim.`, "success");
 
         const supabase = getSupabaseClient();
@@ -13314,14 +13416,23 @@ function ParentDashboardView({
       const handleMarkReadNotification = async (type, id) => {
         const supabase = getSupabaseClient();
         if (type === 'complaint') {
+          const target = complaints.find(c => c.id === id);
+          const msgLen = target && Array.isArray(target.messages) ? target.messages.length : 0;
           try {
             const list = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
             if (!list.includes(id)) {
               list.push(id);
               localStorage.setItem('spp_admin_read_complaints', JSON.stringify(list));
             }
+            const msgCounts = JSON.parse(localStorage.getItem('spp_admin_read_complaint_msgs') || '{}');
+            msgCounts[id] = Math.max(msgCounts[id] || 0, msgLen);
+            localStorage.setItem('spp_admin_read_complaint_msgs', JSON.stringify(msgCounts));
           } catch(e) {}
-          setComplaints(prev => prev.map(c => c.id === id ? { ...c, isRead: true } : c));
+          setComplaints(prev => {
+            const next = prev.map(c => c.id === id ? { ...c, isRead: true } : c);
+            try { localStorage.setItem('spp_cached_complaints', JSON.stringify(next)); } catch(e) {}
+            return next;
+          });
           if (supabase && typeof id !== 'number') {
             try { await supabase.from('complaints').update({ is_read: true }).eq('id', id); } catch (err) {}
           }
@@ -13333,25 +13444,150 @@ function ParentDashboardView({
               localStorage.setItem('spp_admin_read_trx', JSON.stringify(list));
             }
           } catch(e) {}
-          setTransactions(prev => prev.map(t => t.id === id ? { ...t, isRead: true } : t));
+          setTransactions(prev => {
+            const next = prev.map(t => t.id === id ? { ...t, isRead: true } : t);
+            try { localStorage.setItem('spp_cached_transactions', JSON.stringify(next)); } catch(e) {}
+            return next;
+          });
           if (supabase && typeof id !== 'number') {
             try { await supabase.from('transactions').update({ is_read: true }).eq('id', id); } catch (err) {}
+          }
+        } else if (type === 'note') {
+          const target = notes.find(n => n.id === id);
+          const commentLen = target && Array.isArray(target.comments) ? target.comments.length : 0;
+          try {
+            const readMap = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+            readMap[id] = Math.max(readMap[id] || 0, commentLen);
+            localStorage.setItem('spp_admin_read_note_replies', JSON.stringify(readMap));
+            window.dispatchEvent(new Event('spp_note_read_updated'));
+          } catch (e) {}
+          setNotesReadSync(s => s + 1);
+          setNotes(prev => {
+            const next = prev.map(n => n.id === id ? { ...n, isRead: true } : n);
+            try { localStorage.setItem('spp_cached_notes', JSON.stringify(next)); } catch(e) {}
+            return next;
+          });
+          if (supabase && typeof id !== 'number') {
+            try { await supabase.from('student_notes').update({ is_read: true }).eq('id', id); } catch (err) {}
           }
         }
       };
 
+      const markAllNotesRepliesRead = useCallback(async () => {
+        const currentNotes = notes || [];
+        if (currentNotes.length === 0) return;
+        const uuidIds = [];
+        try {
+          const readMap = JSON.parse(localStorage.getItem('spp_admin_read_note_replies') || '{}');
+          currentNotes.forEach(n => {
+            const len = Array.isArray(n.comments) ? n.comments.length : 0;
+            if ((readMap[n.id] || 0) < len || !n.isRead) {
+              readMap[n.id] = len;
+              if (typeof n.id === 'string' && n.id.includes('-')) {
+                uuidIds.push(n.id);
+              }
+            }
+          });
+          localStorage.setItem('spp_admin_read_note_replies', JSON.stringify(readMap));
+          window.dispatchEvent(new Event('spp_note_read_updated'));
+        } catch (e) {}
+        setNotesReadSync(s => s + 1);
+        setNotes(prev => {
+          const next = prev.map(n => n.isRead ? n : { ...n, isRead: true });
+          try { localStorage.setItem('spp_cached_notes', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
+        const supabase = getSupabaseClient();
+        if (supabase && uuidIds.length > 0) {
+          try { await supabase.from('student_notes').update({ is_read: true }).in('id', uuidIds); } catch (err) {}
+        }
+      }, [notes]);
+
+      const handleMarkAllAdminRead = useCallback(async () => {
+        const supabase = getSupabaseClient();
+        const complaintUuids = [];
+        const trxUuids = [];
+
+        try {
+          const readCompList = JSON.parse(localStorage.getItem('spp_admin_read_complaints') || '[]');
+          const msgCounts = JSON.parse(localStorage.getItem('spp_admin_read_complaint_msgs') || '{}');
+          (complaints || []).forEach(c => {
+            if (!readCompList.includes(c.id)) readCompList.push(c.id);
+            const len = Array.isArray(c.messages) ? c.messages.length : 0;
+            msgCounts[c.id] = Math.max(msgCounts[c.id] || 0, len);
+            if (!c.isRead && typeof c.id === 'string' && c.id.includes('-')) {
+              complaintUuids.push(c.id);
+            }
+          });
+          localStorage.setItem('spp_admin_read_complaints', JSON.stringify(readCompList));
+          localStorage.setItem('spp_admin_read_complaint_msgs', JSON.stringify(msgCounts));
+        } catch (e) {}
+
+        try {
+          const readTrxList = JSON.parse(localStorage.getItem('spp_admin_read_trx') || '[]');
+          (transactions || []).forEach(t => {
+            if (!readTrxList.includes(t.id)) readTrxList.push(t.id);
+            if (!t.isRead && typeof t.id === 'string' && t.id.includes('-')) {
+              trxUuids.push(t.id);
+            }
+          });
+          localStorage.setItem('spp_admin_read_trx', JSON.stringify(readTrxList));
+        } catch (e) {}
+
+        setComplaints(prev => {
+          const next = prev.map(c => c.isRead ? c : { ...c, isRead: true });
+          try { localStorage.setItem('spp_cached_complaints', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
+        setTransactions(prev => {
+          const next = prev.map(t => t.isRead ? t : { ...t, isRead: true });
+          try { localStorage.setItem('spp_cached_transactions', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
+
+        await markAllNotesRepliesRead();
+
+        if (supabase) {
+          try {
+            if (complaintUuids.length > 0) {
+              await supabase.from('complaints').update({ is_read: true }).in('id', complaintUuids);
+            }
+            if (trxUuids.length > 0) {
+              await supabase.from('transactions').update({ is_read: true }).in('id', trxUuids);
+            }
+          } catch (err) {}
+        }
+      }, [complaints, transactions, markAllNotesRepliesRead]);
+
+      const selectAdminView = useCallback((viewId) => {
+        setCurrentView(viewId);
+        if (viewId === 'catatan') {
+          markAllNotesRepliesRead();
+        }
+      }, [markAllNotesRepliesRead]);
+
+      useEffect(() => {
+        if (currentUser?.role === 'admin' && currentView === 'catatan' && unreadNotesRepliesList.length > 0) {
+          markAllNotesRepliesRead();
+        }
+      }, [currentUser?.role, currentView, unreadNotesRepliesList.length, markAllNotesRepliesRead]);
+
       const handleAddCommentNote = async (noteId, commentObj) => {
         const supabase = getSupabaseClient();
-        setNotes(prev => prev.map(n => {
-          if (n.id === noteId) {
-            const updatedComments = [...(n.comments || []), commentObj];
-            if (supabase && typeof noteId !== 'number') {
-              supabase.from('student_notes').update({ comments: JSON.stringify(updatedComments) }).eq('id', noteId).then();
+        setNotes(prev => {
+          const next = prev.map(n => {
+            if (n.id === noteId) {
+              const updatedComments = [...(n.comments || []), commentObj];
+              if (supabase && typeof noteId !== 'number') {
+                supabase.from('student_notes').update({ comments: JSON.stringify(updatedComments), is_read: false }).eq('id', noteId).then();
+              }
+              return { ...n, comments: updatedComments, isRead: false };
             }
-            return { ...n, comments: updatedComments };
-          }
-          return n;
-        }));
+            return n;
+          });
+          try { localStorage.setItem('spp_cached_notes', JSON.stringify(next)); } catch(e) {}
+          return next;
+        });
         showToast("Komentar Terkirim", "Komentar berhasil ditambahkan pada catatan evaluasi.", "success");
       };
 
@@ -13450,7 +13686,6 @@ function ParentDashboardView({
             };
             try {
               sessionStorage.setItem('spp_tab_session', JSON.stringify(updatedUser));
-              localStorage.setItem('spp_parent_session', JSON.stringify(updatedUser));
             } catch (e) {}
             return updatedUser;
           }
@@ -13763,11 +13998,8 @@ function ParentDashboardView({
                       {totalAdminUnread > 0 && (
                         <button
                           type="button"
-                          onClick={() => {
-                            complaints.forEach(c => handleMarkReadNotification('complaint', c.id));
-                            transactions.forEach(t => handleMarkReadNotification('transaction', t.id));
-                          }}
-                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                          onClick={handleMarkAllAdminRead}
+                          className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                         >
                           Tandai Dibaca
                         </button>
@@ -13786,7 +14018,7 @@ function ParentDashboardView({
                     {totalAdminUnread === 0 ? (
                       <div className="text-center py-6 text-slate-400 font-medium">
                         <Icon name="bell-off" size={26} className="mx-auto mb-1.5 text-slate-300" />
-                        Semua pengaduan dan transaksi telah ditinjau.
+                        Semua pengaduan, transaksi, dan balasan catatan telah ditinjau.
                       </div>
                     ) : (
                       <>
@@ -13796,7 +14028,7 @@ function ParentDashboardView({
                             onClick={() => {
                               handleMarkReadNotification('complaint', c.id);
                               setShowAdminMobileBell(false);
-                              setCurrentView('pengaduan');
+                              selectAdminView('pengaduan');
                             }}
                             className="p-3 rounded-2xl border border-amber-300 bg-amber-50/90 cursor-pointer hover:scale-[0.99] transition-all text-amber-950 font-bold shadow-2xs"
                           >
@@ -13817,7 +14049,7 @@ function ParentDashboardView({
                             onClick={() => {
                               handleMarkReadNotification('transaction', t.id);
                               setShowAdminMobileBell(false);
-                              setCurrentView('transaksi');
+                              selectAdminView('transaksi');
                             }}
                             className="p-3 rounded-2xl border border-blue-200 bg-blue-50/90 cursor-pointer hover:scale-[0.99] transition-all text-blue-950 font-bold shadow-2xs"
                           >
@@ -13835,8 +14067,9 @@ function ParentDashboardView({
                           <div 
                             key={'note_reply_' + n.id}
                             onClick={() => {
+                              handleMarkReadNotification('note', n.id);
                               setShowAdminMobileBell(false);
-                              setCurrentView('catatan');
+                              selectAdminView('catatan');
                             }}
                             className="p-3 rounded-2xl border border-teal-200 bg-teal-50/90 cursor-pointer hover:scale-[0.99] transition-all text-teal-950 font-bold shadow-2xs"
                           >
@@ -13993,10 +14226,11 @@ function ParentDashboardView({
                           icon: 'users', 
                           defaultView: 'siswa', 
                           views: ['siswa', 'catatan'], 
-                          badge: null,
+                          badge: (unreadNotesRepliesList.length > 0 ? unreadNotesRepliesList.length : null),
+                          badgeType: 'danger',
                           subItems: [
                             { id: 'siswa', label: 'Data Murid', icon: 'user-check' },
-                            { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text' }
+                            { id: 'catatan', label: 'Catatan Siswa TU', icon: 'file-text', badge: (unreadNotesRepliesList.length > 0 ? unreadNotesRepliesList.length : null), badgeType: 'danger' }
                           ]
                         },
                         { 
@@ -14028,12 +14262,12 @@ function ParentDashboardView({
                                   } else {
                                     setAdminExpandedGroup(group.id);
                                     if (!isGroupActive) {
-                                      setCurrentView(group.defaultView);
+                                      selectAdminView(group.defaultView);
                                     }
                                   }
                                 } else {
                                   setAdminExpandedGroup(group.id);
-                                  setCurrentView(group.defaultView);
+                                  selectAdminView(group.defaultView);
                                   setIsAdminMobileMenuOpen(false);
                                 }
                               }}
@@ -14072,7 +14306,7 @@ function ParentDashboardView({
                                     key={sub.id}
                                     type="button"
                                     onClick={() => {
-                                      setCurrentView(sub.id);
+                                      selectAdminView(sub.id);
                                       setAdminExpandedGroup(group.id);
                                       setIsAdminMobileMenuOpen(false);
                                     }}
@@ -14138,10 +14372,10 @@ function ParentDashboardView({
 
             <div className="w-full flex-1 bg-[#ebf1f8] flex flex-col md:flex-row min-h-screen mobile-full-height">
               {/* ROYAL BLUE SIDEBAR - Hidden on mobile */}
-              <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative z-20 overflow-x-hidden hide-on-mobile-nav">
+              <aside className="w-full md:w-72 lg:w-80 royal-blue-sidebar shrink-0 flex flex-col justify-between p-0 relative md:sticky md:top-0 md:h-screen md:self-start md:overflow-y-auto no-scrollbar z-20 overflow-x-hidden hide-on-mobile-nav">
                 
                 {/* Subtle Ambient Highlights in Admin Sidebar */}
-                <div className="absolute -bottom-10 -left-10 w-64 h-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none select-none z-0"></div>
+                <div className="absolute bottom-0 -left-10 w-64 h-64 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none select-none z-0"></div>
                 <div className="absolute top-20 right-0 w-48 h-48 rounded-full bg-indigo-500/10 blur-[60px] pointer-events-none select-none z-0"></div>
 
                 <div className="relative z-10">
@@ -14216,12 +14450,12 @@ function ParentDashboardView({
                                 } else {
                                   setAdminExpandedGroup(group.id);
                                   if (!isGroupActive) {
-                                    setCurrentView(group.defaultView);
+                                    selectAdminView(group.defaultView);
                                   }
                                 }
                               } else {
                                 setAdminExpandedGroup(group.id);
-                                setCurrentView(group.defaultView);
+                                selectAdminView(group.defaultView);
                               }
                             }}
                             className={`w-full py-3.5 px-4 flex items-center justify-between transition-all duration-200 text-xs sm:text-[13.5px] whitespace-nowrap rounded-2xl ${
@@ -14267,7 +14501,7 @@ function ParentDashboardView({
                                 <button
                                   key={sub.id}
                                   onClick={() => {
-                                    setCurrentView(sub.id);
+                                    selectAdminView(sub.id);
                                     setAdminExpandedGroup(group.id);
                                   }}
                                   className={`w-full px-4 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between transition-all ${
@@ -14417,7 +14651,7 @@ function ParentDashboardView({
               {['transaksi', 'tunggakan', 'laporan'].includes(currentView) && (
                 <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
                   <button
-                    onClick={() => setCurrentView('transaksi')}
+                    onClick={() => selectAdminView('transaksi')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
                       currentView === 'transaksi' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
                     }`}
@@ -14426,7 +14660,7 @@ function ParentDashboardView({
                     <span>Catat Bayar</span>
                   </button>
                   <button
-                    onClick={() => setCurrentView('tunggakan')}
+                    onClick={() => selectAdminView('tunggakan')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
                       currentView === 'tunggakan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
                     }`}
@@ -14435,7 +14669,7 @@ function ParentDashboardView({
                     <span>Tunggakan</span>
                   </button>
                   <button
-                    onClick={() => setCurrentView('laporan')}
+                    onClick={() => selectAdminView('laporan')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
                       currentView === 'laporan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
                     }`}
@@ -14449,7 +14683,7 @@ function ParentDashboardView({
               {['siswa', 'catatan'].includes(currentView) && (
                 <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
                   <button
-                    onClick={() => setCurrentView('siswa')}
+                    onClick={() => selectAdminView('siswa')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
                       currentView === 'siswa' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
                     }`}
@@ -14458,13 +14692,18 @@ function ParentDashboardView({
                     <span>Data Murid ({students.length})</span>
                   </button>
                   <button
-                    onClick={() => setCurrentView('catatan')}
+                    onClick={() => selectAdminView('catatan')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
                       currentView === 'catatan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
                     }`}
                   >
                     <Icon name="file-edit" size={13} />
                     <span>Catatan TU</span>
+                    {unreadNotesRepliesList.length > 0 && (
+                      <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-500 text-white">
+                        {unreadNotesRepliesList.length}
+                      </span>
+                    )}
                   </button>
                 </div>
               )}
@@ -14472,7 +14711,7 @@ function ParentDashboardView({
               {['pengumuman', 'pengaduan'].includes(currentView) && (
                 <div className="flex md:hidden items-center gap-2 px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 overflow-x-auto no-scrollbar shrink-0 relative z-10">
                   <button
-                    onClick={() => setCurrentView('pengumuman')}
+                    onClick={() => selectAdminView('pengumuman')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
                       currentView === 'pengumuman' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
                     }`}
@@ -14481,7 +14720,7 @@ function ParentDashboardView({
                     <span>Pengumuman</span>
                   </button>
                   <button
-                    onClick={() => setCurrentView('pengaduan')}
+                    onClick={() => selectAdminView('pengaduan')}
                     className={`px-3.5 py-1.5 rounded-full text-xs font-black transition-all shrink-0 flex items-center gap-1.5 ${
                       currentView === 'pengaduan' ? 'bg-blue-600 text-white shadow-sm' : 'bg-white text-slate-600 border border-slate-200'
                     }`}
@@ -14506,9 +14745,13 @@ function ParentDashboardView({
                 complaints={complaints}
                 notes={notes}
                 settings={settings}
-                navigateTo={(v) => setCurrentView(v)}
+                navigateTo={selectAdminView}
+                totalAdminUnread={totalAdminUnread}
+                unreadNotesReplies={unreadNotesRepliesList}
                 onShowKuitansi={(trx) => setSelectedKuitansi(trx)}
                 onMarkReadNotification={handleMarkReadNotification}
+                onMarkAllRead={handleMarkAllAdminRead}
+                onOpenNotifications={() => setShowAdminMobileBell(true)}
                 onRefresh={fetchData}
                 isRefreshing={isRefreshing}
               />
@@ -14568,7 +14811,7 @@ function ParentDashboardView({
                 students={students}
                 transactions={transactions}
                 settings={settings}
-                navigateTo={(v) => setCurrentView(v)}
+                navigateTo={selectAdminView}
               />
             )}
 
@@ -14577,6 +14820,7 @@ function ParentDashboardView({
                 students={students}
                 notes={notes}
                 onAddNote={handleAddNote}
+                onMarkNoteRead={(note) => handleMarkReadNotification('note', note.id)}
                 onDeleteNote={(id) => {
                   showConfirmPopup({
                     title: "Hapus Catatan Kesiswaan?",

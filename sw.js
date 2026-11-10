@@ -3,19 +3,16 @@
  * Provides high-efficiency caching, instant load times, and offline capabilities.
  */
 
-const CACHE_NAME = 'spp-cache-v4';
+const CACHE_NAME = 'spp-cache-5f1aa348';
 const STATIC_ASSETS = [
   './',
   'index.html',
-  'login.min.css',
-  'dashboard.min.css',
+  'dashboard.min.css?v=0580f4aa',
   'logo.webp',
-  'logo.png',
   'favicon.svg',
-  'init.js',
-  'env.js',
-  'app.js',
-  'libs/lucide.min.js',
+  'env.js?v=8ee00723',
+  'login.min.js?v=0ceffee6',
+  'app.js?v=77528cc1',
   'libs/react.production.min.js',
   'libs/react-dom.production.min.js',
   'libs/supabase.min.js'
@@ -47,7 +44,6 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // Jangan tangani selain GET requests
   if (req.method !== 'GET') return;
 
   // Source maps & Supabase REST/Realtime API - selalu bypass service worker cache
@@ -55,7 +51,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML Navigations / Root - Network First agar pembaruan halaman langsung aktif (fallback cache saat offline)
+  // HTML Navigations / Root - Network First agar pembaruan halaman langsung aktif
   const isHtmlRequest =
     req.mode === 'navigate' ||
     url.pathname === '/' ||
@@ -79,7 +75,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Google Fonts caching (fonts.googleapis.com, fonts.gstatic.com) - Cache First
+  // Google Fonts caching - Cache First
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
@@ -99,7 +95,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Local Static Assets (vendor libs, images, css) - Stale While Revalidate
+  // Local Static Assets - Stale While Revalidate
   event.respondWith(
     caches.match(req).then((cachedResponse) => {
       const fetchPromise = fetch(req).then((networkResponse) => {
@@ -110,13 +106,9 @@ self.addEventListener('fetch', (event) => {
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // Fallback offline
-        return cachedResponse;
-      });
+      }).catch(() => cachedResponse);
 
       return cachedResponse || fetchPromise;
     })
   );
 });
-

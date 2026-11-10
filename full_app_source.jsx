@@ -884,6 +884,7 @@
 
     const ensureDashboardCss = () => {
       if (typeof document === 'undefined') return Promise.resolve();
+      const cssHref = window.__SPP_DASHBOARD_CSS_HREF || 'dashboard.min.css';
       const existing = document.getElementById('spp-dashboard-css');
       if (existing) {
         if (existing.dataset.loaded === '1' || existing.sheet) return Promise.resolve();
@@ -891,14 +892,14 @@
           const done = () => { existing.dataset.loaded = '1'; resolve(); };
           existing.addEventListener('load', done, { once: true });
           existing.addEventListener('error', done, { once: true });
-          setTimeout(done, 800);
+          setTimeout(done, 1500);
         });
       }
       return new Promise((resolve) => {
         const link = document.createElement('link');
         link.id = 'spp-dashboard-css';
         link.rel = 'stylesheet';
-        link.href = 'dashboard.min.css';
+        link.href = cssHref;
         const done = () => {
           link.dataset.loaded = '1';
           resolve();
@@ -906,18 +907,19 @@
         link.addEventListener('load', done, { once: true });
         link.addEventListener('error', done, { once: true });
         document.head.appendChild(link);
-        setTimeout(done, 800);
+        setTimeout(done, 1500);
       });
     };
 
     const prefetchDashboardCss = () => {
       if (typeof document === 'undefined') return;
+      const cssHref = window.__SPP_DASHBOARD_CSS_HREF || 'dashboard.min.css';
       if (document.getElementById('spp-dashboard-css') || document.getElementById('spp-dashboard-css-prefetch')) return;
       const link = document.createElement('link');
       link.id = 'spp-dashboard-css-prefetch';
       link.rel = 'prefetch';
       link.as = 'style';
-      link.href = 'dashboard.min.css';
+      link.href = cssHref;
       document.head.appendChild(link);
     };
 
@@ -928,8 +930,13 @@
 
     const Icon = React.memo(function Icon({ name, size = 18, className = "", style }) {
       const iconDef = useMemo(() => {
-        if (typeof window === 'undefined' || !window.lucide || !window.lucide.icons) return null;
-        return window.lucide.icons[toPascalCaseIconName(name)] || window.lucide.icons[name] || null;
+        if (typeof window === 'undefined') {
+          const ssrMap = (typeof globalThis !== 'undefined' && globalThis.__SPP_ICONS) ? globalThis.__SPP_ICONS : null;
+          return ssrMap ? (ssrMap[toPascalCaseIconName(name)] || ssrMap[name] || null) : null;
+        }
+        const iconsMap = (window.lucide && window.lucide.icons) ? window.lucide.icons : window.__SPP_ICONS;
+        if (!iconsMap) return null;
+        return iconsMap[toPascalCaseIconName(name)] || iconsMap[name] || null;
       }, [name]);
 
       if (!iconDef) {
@@ -1431,8 +1438,9 @@
     // 1. KOMPONEN LOGIN SPLIT CARD DUAL ROLE
     // ==========================================
     
-    function LoginView({ onLogin, settings, students }) {
+    function LoginView({ onLogin, settings, students, onPrepareAuth, isSsrSnapshot = false, initialUsername = '', initialPassword = '' }) {
       const [role, setRole] = useState(() => {
+        if (typeof window === 'undefined') return 'parent';
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const r = urlParams.get('role') || (window.location.hash.includes('admin') ? 'admin' : (window.location.hash.includes('wali') || window.location.hash.includes('parent') ? 'parent' : null));
@@ -1442,81 +1450,105 @@
         } catch (e) {}
         return 'parent';
       }); // 'parent' or 'admin'
-      const [username, setUsername] = useState('');
-      const [password, setPassword] = useState('');
+      const [username, setUsername] = useState(() => initialUsername || '');
+      const [password, setPassword] = useState(() => initialPassword || '');
       const [showPassword, setShowPassword] = useState(false);
       const [rememberMe, setRememberMe] = useState(true);
       const [errorMsg, setErrorMsg] = useState('');
+      const [isSubmitting, setIsSubmitting] = useState(false);
 
-      const handleLoginSubmit = (e) => {
+      const handleLoginSubmit = async (e) => {
         e.preventDefault();
+        if (isSubmitting) return;
         setErrorMsg('');
-        const cleanInput = username.trim().toLowerCase();
+        setIsSubmitting(true);
 
-        if (role === 'admin') {
-          const expectedAdminUser = (settings.adminUsername || '').trim().toLowerCase();
-          const expectedAdminPass = (settings.adminPassword || '').trim();
-          
-          if (
-            expectedAdminUser &&
-            cleanInput === expectedAdminUser &&
-            password.trim() === expectedAdminPass
-          ) {
-            onLogin({ role: 'admin', name: settings.adminName || 'Sarah Aura Alamanda' });
-          } else {
-            setErrorMsg('Username atau Password Admin TU tidak cocok. Silakan pastikan akun Admin Anda benar.');
-          }
-        } else {
-          // Login Wali Murid: Cari berdasarkan NIS ATAU Nama Siswa (case-insensitive)
-          const student = students.find(s => 
-            (s.nis && s.nis.toString().trim() === username.trim()) ||
-            (s.name && s.name.trim().toLowerCase() === cleanInput)
-          );
-          
-          if (!student) {
-            setErrorMsg('Data Wali Siswa / NIS tidak ditemukan dalam sistem. Silakan masukkan NIS atau Nama Siswa ananda.');
-            return;
-          }
+        try {
+          let activeSettings = settings;
+          let activeStudents = students;
 
-          // CEK STATUS SISWA (LULUS / KELUAR / NON-AKTIF):
-          const isStudentActive = student.statusAktif !== false && (!student.status || student.status.toLowerCase() === 'aktif');
-          if (!isStudentActive) {
-            setErrorMsg('Akun siswa ini berstatus NON-AKTIF / TELAH KELUAR / LULUS (Status Akun: OFF). Akses login ke portal telah ditutup oleh pihak sekolah. Silakan hubungi bagian Tata Usaha (TU).');
-            return;
-          }
-
-          const enteredPwd = password.trim();
-
-          // Cek apakah password akun saat ini adalah status Default Sistem:
-          // Default: belum ada password kustom, ATAU password sama dengan Sb[NIS], ATAU sama dengan [NIS]
-          const isDefault = !student.password || 
-                            student.password.toString().trim() === student.nis.toString().trim() || 
-                            student.password.toString().trim() === `Sb${student.nis.toString().trim()}`;
-
-          let isValid = false;
-          if (isDefault) {
-            const validDefaults = [
-              `Sb${student.nis.toString().trim()}`,
-              student.nis.toString().trim()
-            ];
-            if (student.password && student.password.toString().trim().length > 0) {
-              validDefaults.push(student.password.toString().trim());
+          if (typeof onPrepareAuth === 'function') {
+            try {
+              const prepared = await onPrepareAuth('submit');
+              if (prepared) {
+                if (prepared.settings) activeSettings = prepared.settings;
+                if (prepared.students) activeStudents = prepared.students;
+              }
+            } catch (err) {
+              setErrorMsg('Gagal terhubung ke server portal. Periksa koneksi internet Anda lalu coba kembali.');
+              return;
             }
-            isValid = validDefaults.includes(enteredPwd);
-          } else {
-            // Jika akun telah diset menggunakan password kustom terbaru
-            isValid = (enteredPwd === student.password.toString().trim());
           }
 
-          if (isValid) {
-            onLogin({ role: 'parent', student: student });
-          } else {
-            if (isDefault) {
-              setErrorMsg(`Password akun telah diatur ke Default Sistem. Silakan masuk menggunakan password default: Sb${student.nis} (atau NIS Anda).`);
+          const cleanInput = username.trim().toLowerCase();
+
+          if (role === 'admin') {
+            const expectedAdminUser = (activeSettings.adminUsername || '').trim().toLowerCase();
+            const expectedAdminPass = (activeSettings.adminPassword || '').trim();
+            
+            if (
+              expectedAdminUser &&
+              cleanInput === expectedAdminUser &&
+              password.trim() === expectedAdminPass
+            ) {
+              await Promise.resolve(onLogin({ role: 'admin', name: activeSettings.adminName || 'Sarah Aura Alamanda' }));
             } else {
-              setErrorMsg('Password akun tidak cocok dengan password yang aktif saat ini. Silakan coba lagi.');
+              setErrorMsg('Username atau Password Admin TU tidak cocok. Silakan pastikan akun Admin Anda benar.');
+            }
+          } else {
+            // Login Wali Murid: Cari berdasarkan NIS ATAU Nama Siswa (case-insensitive)
+            const student = (activeStudents || []).find(s => 
+              (s.nis && s.nis.toString().trim() === username.trim()) ||
+              (s.name && s.name.trim().toLowerCase() === cleanInput)
+            );
+            
+            if (!student) {
+              setErrorMsg('Data Wali Siswa / NIS tidak ditemukan dalam sistem. Silakan masukkan NIS atau Nama Siswa ananda.');
+              return;
+            }
+
+            // CEK STATUS SISWA (LULUS / KELUAR / NON-AKTIF):
+            const isStudentActive = student.statusAktif !== false && (!student.status || student.status.toLowerCase() === 'aktif');
+            if (!isStudentActive) {
+              setErrorMsg('Akun siswa ini berstatus NON-AKTIF / TELAH KELUAR / LULUS (Status Akun: OFF). Akses login ke portal telah ditutup oleh pihak sekolah. Silakan hubungi bagian Tata Usaha (TU).');
+              return;
+            }
+
+            const enteredPwd = password.trim();
+
+            // Cek apakah password akun saat ini adalah status Default Sistem:
+            // Default: belum ada password kustom, ATAU password sama dengan Sb[NIS], ATAU sama dengan [NIS]
+            const isDefault = !student.password || 
+                              student.password.toString().trim() === student.nis.toString().trim() || 
+                              student.password.toString().trim() === `Sb${student.nis.toString().trim()}`;
+
+            let isValid = false;
+            if (isDefault) {
+              const validDefaults = [
+                `Sb${student.nis.toString().trim()}`,
+                student.nis.toString().trim()
+              ];
+              if (student.password && student.password.toString().trim().length > 0) {
+                validDefaults.push(student.password.toString().trim());
+              }
+              isValid = validDefaults.includes(enteredPwd);
+            } else {
+              // Jika akun telah diset menggunakan password kustom terbaru
+              isValid = (enteredPwd === student.password.toString().trim());
+            }
+
+            if (isValid) {
+              await Promise.resolve(onLogin({ role: 'parent', student: student }));
+            } else {
+              if (isDefault) {
+                setErrorMsg(`Password akun telah diatur ke Default Sistem. Silakan masuk menggunakan password default: Sb${student.nis} (atau NIS Anda).`);
+              } else {
+                setErrorMsg('Password akun tidak cocok dengan password yang aktif saat ini. Silakan coba lagi.');
+              }
             }
           }
+        } finally {
+          setIsSubmitting(false);
         }
       };
 
@@ -1603,7 +1635,9 @@
             <div className="luxury-school-watermark flex items-center justify-center">
               <img 
                 src="logo.webp" 
-                alt="Watermark" 
+                alt="" 
+                width="320"
+                height="320"
                 fetchPriority="high"
                 decoding="async"
                 className="w-full h-full object-contain filter contrast-125 select-none pointer-events-none opacity-15" 
@@ -1614,7 +1648,7 @@
           {/* Top Brand & Status Pill (Visible on Desktop / Tablet) */}
           <div className="relative z-10 mb-4 hidden lg:flex items-center gap-3 px-6 py-2.5 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 text-white shadow-2xl shadow-blue-950/40">
             <div className="w-7 h-7 rounded-full bg-white/20 border border-white/30 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
-              <img src="logo.webp" alt="PAUD Setia Bhakti" className="w-full h-full object-contain" />
+              <img src="logo.webp" alt="PAUD Setia Bhakti" width="28" height="28" className="w-full h-full object-contain" />
             </div>
             <span className="text-xs font-black tracking-wide text-white">{settings.schoolName || 'PAUD SETIA BHAKTI'}</span>
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -1633,7 +1667,7 @@
               <div className="absolute bottom-8 left-8 w-44 h-44 rounded-full bg-sky-400/15 blur-2xl pointer-events-none"></div>
 
               {/* Layered Organic Wave Divider (Right edge on Desktop) */}
-              <div className="hidden lg:block absolute top-0 bottom-0 -right-1 w-24 overflow-hidden pointer-events-none z-10">
+              <div className="hidden lg:block absolute top-0 bottom-0 -right-1 w-24 overflow-hidden pointer-events-none z-10" aria-hidden="true">
                 <svg className="h-full w-full" preserveAspectRatio="none" viewBox="0 0 120 500" fill="none">
                   <path d="M120,0 L60,0 C20,30 20,80 60,110 C20,140 20,190 60,220 C20,250 20,300 60,330 C20,360 20,410 60,440 C30,470 30,490 60,500 L120,500 Z" fill="rgba(255, 255, 255, 0.22)" />
                   <path d="M120,0 L78,0 C45,35 45,85 78,115 C45,145 45,195 78,225 C45,255 45,305 78,335 C45,365 45,415 78,445 C55,475 55,490 78,500 L120,500 Z" fill="rgba(255, 255, 255, 0.45)" />
@@ -1642,7 +1676,7 @@
               </div>
 
               {/* Mobile Wave Divider (Bottom edge of top banner on mobile) */}
-              <div className="block lg:hidden absolute -bottom-1 left-0 right-0 h-8 overflow-hidden pointer-events-none z-10">
+              <div className="block lg:hidden absolute -bottom-1 left-0 right-0 h-8 overflow-hidden pointer-events-none z-10" aria-hidden="true">
                 <svg className="w-full h-full" preserveAspectRatio="none" viewBox="0 0 500 60" fill="none">
                   <path d="M0,60 L0,30 C60,10 120,10 180,30 C240,50 300,50 360,30 C420,10 480,10 500,20 L500,60 Z" fill="#ffffff" />
                 </svg>
@@ -1655,11 +1689,11 @@
                 <div className="flex items-center justify-between gap-2.5 mb-4 sm:mb-5">
                   <div className="inline-flex items-center gap-2 h-8 sm:h-9 px-3.5 rounded-full bg-white/10 backdrop-blur-md text-[11px] font-bold text-white border border-white/15 shadow-sm min-w-0">
                     <Icon name="clock" size={13} className="text-cyan-300 shrink-0" />
-                    <span className="truncate">{formattedDate} • {formattedClock}</span>
+                    <span className="truncate">{isSsrSnapshot ? 'Portal Resmi Sekolah • 24 Jam' : `${formattedDate} • ${formattedClock}`}</span>
                   </div>
                   <div className="inline-flex items-center justify-center shrink-0 min-w-[125px] gap-1.5 h-8 sm:h-9 px-3 rounded-full bg-white/15 backdrop-blur-md text-xs font-black text-cyan-200 border border-white/20 shadow-xs">
-                    <span>{greeting.emoji}</span>
-                    <span>{greeting.text}!</span>
+                    <span>{isSsrSnapshot ? '✨' : greeting.emoji}</span>
+                    <span>{isSsrSnapshot ? 'Selamat Datang!' : `${greeting.text}!`}</span>
                   </div>
                 </div>
 
@@ -1672,7 +1706,9 @@
                   >
                     <img 
                       src="logo.webp" 
-                      alt="PAUD Setia Bhakti" 
+                      alt="Logo PAUD Setia Bhakti" 
+                      width="56"
+                      height="56"
                       className="w-full h-full max-h-full max-w-full object-contain filter drop-shadow select-none pointer-events-none" 
                     />
                   </div>
@@ -1752,6 +1788,7 @@
                         onClick={() => setActiveFeatureIdx(null)}
                         className="text-cyan-300 hover:text-white shrink-0 p-0.5"
                         title="Tutup info"
+                        aria-label="Tutup informasi fitur"
                       >
                         <Icon name="x" size={12} />
                       </button>
@@ -1809,6 +1846,8 @@
                   <button
                     type="button"
                     onClick={() => { 
+                      prefetchDashboardCss();
+                      if (typeof onPrepareAuth === 'function') onPrepareAuth('prefetch');
                       if (role !== 'parent') {
                         setRole('parent'); 
                         setErrorMsg(''); 
@@ -1830,6 +1869,8 @@
                   <button
                     type="button"
                     onClick={() => { 
+                      prefetchDashboardCss();
+                      if (typeof onPrepareAuth === 'function') onPrepareAuth('prefetch');
                       if (role !== 'admin') {
                         setRole('admin'); 
                         setErrorMsg(''); 
@@ -1891,7 +1932,14 @@
                 )}
 
                 {/* Login Form */}
-                <form onSubmit={handleLoginSubmit} onFocus={prefetchDashboardCss} className="space-y-3.5 sm:space-y-4">
+                <form
+                  onSubmit={handleLoginSubmit}
+                  onFocus={() => {
+                    prefetchDashboardCss();
+                    if (typeof onPrepareAuth === 'function') onPrepareAuth('prefetch');
+                  }}
+                  className="space-y-3.5 sm:space-y-4"
+                >
                   {/* Field 1: Username / NIS */}
                   <div className="space-y-1">
                     <label htmlFor="login-username" className="block text-[11px] sm:text-xs font-black text-slate-700 uppercase tracking-wide">
@@ -1943,8 +1991,9 @@
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 text-slate-400 hover:text-blue-600 transition-colors p-1.5"
+                        className="absolute right-3.5 text-slate-500 hover:text-blue-600 transition-colors p-1.5"
                         title={showPassword ? "Sembunyikan password" : "Lihat password"}
+                        aria-label={showPassword ? "Sembunyikan kata sandi" : "Lihat kata sandi"}
                       >
                         <Icon name={showPassword ? "eye-off" : "eye"} size={18} />
                       </button>
@@ -1976,7 +2025,7 @@
                         <span>Lupa Password? Bantuan TU</span>
                       </a>
                     ) : (
-                      <span className="text-slate-400 text-xs font-semibold">Administrator TU</span>
+                      <span className="text-slate-500 text-xs font-semibold">Administrator TU</span>
                     )}
                   </div>
 
@@ -1985,13 +2034,16 @@
                     {/* Primary Submit Button: Stately 54px-56px height with bold typography */}
                     <button
                       type="submit"
+                      disabled={isSubmitting}
                       className={`w-full min-h-[52px] h-13 sm:h-14 rounded-2xl text-white font-black text-sm sm:text-base shadow-xl active:scale-[0.98] transition-all duration-300 flex items-center justify-center gap-2.5 group ${
+                        isSubmitting ? 'opacity-80 cursor-wait ' : ''
+                      }${
                         role === 'parent'
                           ? 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 shadow-blue-600/35 hover:shadow-blue-600/50'
                           : 'bg-gradient-to-r from-indigo-600 via-indigo-700 to-purple-800 hover:from-indigo-700 hover:to-purple-900 shadow-indigo-600/35 hover:shadow-indigo-600/50'
                       }`}
                     >
-                      <span>Masuk Sekarang</span>
+                      <span>{isSubmitting ? 'Memverifikasi Akun...' : 'Masuk Sekarang'}</span>
                       <Icon name="arrow-right" size={20} className="transition-transform duration-200 group-hover:translate-x-1" />
                     </button>
 
@@ -1999,6 +2051,8 @@
                     <button
                       type="button"
                       onClick={() => {
+                        prefetchDashboardCss();
+                        if (typeof onPrepareAuth === 'function') onPrepareAuth('prefetch');
                         const nextRole = role === 'parent' ? 'admin' : 'parent';
                         setRole(nextRole);
                         try { sessionStorage.setItem('spp_intended_role', nextRole); } catch(e){}
@@ -12489,7 +12543,8 @@ function ParentDashboardView({
       );
     }
 
-    function App() {
+    function App({ initialHandoff = null }) {
+      const handoffConsumedRef = useRef(false);
       // Isolasi sesi per-tab (sessionStorage) dan per-role (localStorage) agar refresh admin tidak menimpa user
       const [currentUser, setCurrentUser] = useState(() => {
         try {
@@ -12586,12 +12641,16 @@ function ParentDashboardView({
       const [envConfig, setEnvConfig] = useState({});
       
       const [settings, setSettings] = useState(() => {
+        if (initialHandoff && initialHandoff.settings) return initialHandoff.settings;
         try {
           const c = localStorage.getItem('spp_extended_settings') || localStorage.getItem('spp_cached_settings');
           return c ? JSON.parse(c) : DEFAULT_SETTINGS;
         } catch(e) { return DEFAULT_SETTINGS; }
       });
       const [students, setStudents] = useState(() => {
+        if (initialHandoff && Array.isArray(initialHandoff.students) && initialHandoff.students.length > 0) {
+          return initialHandoff.students;
+        }
         try {
           const c = localStorage.getItem('spp_cached_students');
           return c ? JSON.parse(c) : [];
@@ -12642,8 +12701,8 @@ function ParentDashboardView({
       const [activeMidtransBill, setActiveMidtransBill] = useState(null);
       const [toast, setToast] = useState(null);
       const [crudPopup, setCrudPopup] = useState(null);
-      const [pendingUser, setPendingUser] = useState(null);
-      const [isLoadingPortal, setIsLoadingPortal] = useState(false);
+      const [pendingUser, setPendingUser] = useState(() => (initialHandoff && initialHandoff.userObj ? initialHandoff.userObj : null));
+      const [isLoadingPortal, setIsLoadingPortal] = useState(() => Boolean(initialHandoff && initialHandoff.userObj));
 
       // Notifikasi Admin & Hitungan Unread (Dideklarasikan di level teratas komponen App sesuai Rules of Hooks)
       const [notesReadSync, setNotesReadSync] = useState(0);
@@ -12751,7 +12810,7 @@ function ParentDashboardView({
         } catch (e) {}
       }, []);
 
-      const handleUserLogin = async (userObj) => {
+      const handleUserLogin = async (userObj, opts = {}) => {
         const cssReadyPromise = ensureDashboardCss();
         const newSessionToken = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
         try {
@@ -12808,8 +12867,10 @@ function ParentDashboardView({
         }
 
         await cssReadyPromise;
-        setPendingUser(userObj);
-        setIsLoadingPortal(true);
+        if (!opts || !opts.alreadyLoading) {
+          setPendingUser(userObj);
+          setIsLoadingPortal(true);
+        }
       };
 
       const fetchData = useCallback(async (isManual = false) => {
@@ -12946,6 +13007,14 @@ function ParentDashboardView({
       }, [fetchData]);
 
       // Saat pengguna berhasil login, sinkronkan seluruh transaksi dan pengumuman secara instan
+      useEffect(() => {
+        try { document.documentElement.classList.remove('spp-has-session'); } catch (e) {}
+        if (initialHandoff && initialHandoff.userObj && !handoffConsumedRef.current) {
+          handoffConsumedRef.current = true;
+          handleUserLogin(initialHandoff.userObj, { alreadyLoading: true });
+        }
+      }, []);
+
       useEffect(() => {
         if (currentUser || isLoadingPortal) {
           ensureDashboardCss();
@@ -14537,6 +14606,13 @@ function ParentDashboardView({
     );
     }
 
-    const rootElement = document.getElementById('root');
-    const root = ReactDOM.createRoot(rootElement);
-    root.render(<App />);
+    window.__SPP_MountFullApp = function(existingRoot, handoff) {
+      try { document.documentElement.classList.remove('spp-has-session'); } catch (e) {}
+      const targetRoot = existingRoot || ReactDOM.createRoot(document.getElementById('root'));
+      targetRoot.render(<App initialHandoff={handoff || window.__SPP_LOGIN_HANDOFF || null} />);
+      return targetRoot;
+    };
+
+    if (!window.__SPP_DEFER_APP_MOUNT) {
+      window.__SPP_MountFullApp();
+    }

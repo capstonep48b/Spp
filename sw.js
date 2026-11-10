@@ -3,19 +3,16 @@
  * Provides high-efficiency caching, instant load times, and offline capabilities.
  */
 
-const CACHE_NAME = 'spp-cache-5f1aa348';
+const CACHE_NAME = 'spp-cache-2ad8394a';
 const STATIC_ASSETS = [
   './',
   'index.html',
-  'dashboard.min.css?v=0580f4aa',
   'logo.webp',
   'favicon.svg',
   'env.js?v=8ee00723',
-  'login.min.js?v=0ceffee6',
-  'app.js?v=77528cc1',
+  'login.min.js?v=4dafdab6',
   'libs/react.production.min.js',
-  'libs/react-dom.production.min.js',
-  'libs/supabase.min.js'
+  'libs/react-dom.production.min.js'
 ];
 
 self.addEventListener('install', (event) => {

@@ -456,26 +456,34 @@ function buildBootAppCode(appJsUrl, dashCssUrl) {
     if (!rootEl) return;
 
     const mountGuestBoot = () => {
-      const activeEl = document.activeElement;
-      const activeId = activeEl && (activeEl.id === 'login-username' || activeEl.id === 'login-password') ? activeEl.id : null;
-      const selStart = activeEl && typeof activeEl.selectionStart === 'number' ? activeEl.selectionStart : null;
       const preUser = document.getElementById('login-username')?.value || '';
       const prePass = document.getElementById('login-password')?.value || '';
+      const canHydrate = Boolean(
+        typeof ReactDOM.hydrateRoot === 'function' &&
+        rootEl.firstElementChild &&
+        rootEl.firstElementChild.tagName === 'MAIN'
+      );
 
-      const root = ReactDOM.createRoot(rootEl);
+      let root = null;
 
       function BootApp() {
-        const [bootState, setBootState] = React.useState(() => {
-          let s = DEFAULT_SETTINGS;
-          let st = [];
+        const [bootState, setBootState] = React.useState(() => ({
+          settings: DEFAULT_SETTINGS,
+          students: []
+        }));
+
+        React.useEffect(() => {
           try {
             const cs = localStorage.getItem('spp_extended_settings') || localStorage.getItem('spp_cached_settings');
-            if (cs) s = JSON.parse(cs);
             const cst = localStorage.getItem('spp_cached_students');
-            if (cst) st = JSON.parse(cst);
+            if (cs || cst) {
+              setBootState({
+                settings: cs ? JSON.parse(cs) : DEFAULT_SETTINGS,
+                students: cst ? JSON.parse(cst) : []
+              });
+            }
           } catch (e) {}
-          return { settings: s, students: st };
-        });
+        }, []);
 
         const handlePrepareAuth = React.useCallback(async (mode) => {
           ensureDashboardCss();
@@ -513,23 +521,18 @@ function buildBootAppCode(appJsUrl, dashCssUrl) {
             settings={bootState.settings}
             students={bootState.students}
             onPrepareAuth={handlePrepareAuth}
+            ssrHydrating={canHydrate}
             initialUsername={preUser}
             initialPassword={prePass}
           />
         );
       }
 
-      root.render(<BootApp />);
-      if (activeId) {
-        requestAnimationFrame(() => {
-          const el = document.getElementById(activeId);
-          if (el) {
-            el.focus();
-            if (selStart !== null && typeof el.setSelectionRange === 'function') {
-              try { el.setSelectionRange(selStart, selStart); } catch (e) {}
-            }
-          }
-        });
+      if (canHydrate) {
+        root = ReactDOM.hydrateRoot(rootEl, <BootApp />);
+      } else {
+        root = ReactDOM.createRoot(rootEl);
+        root.render(<BootApp />);
       }
     };
 
@@ -868,20 +871,17 @@ ${buildBootAppCode(appJsVersionedUrl, dashCssVersionedUrl)}
   fs.writeFileSync('index.html', updatedHtml, 'utf8');
   console.log(`   SUCCESS: index.html updated (${Buffer.byteLength(updatedHtml)} B, gzip ${zlib.gzipSync(updatedHtml).length} B).`);
 
-  // 7. Update sw.js Cache Version & Versioned Assets List
+  // 7. Update sw.js Cache Version & Lightweight Shell Assets (Dashboard bundles cached lazily on use)
   const swBuildHash = sha256Short(appHash + dashCssHash + loginJsHash + envHash);
   const swAssets = [
     './',
     'index.html',
-    dashCssVersionedUrl,
     'logo.webp',
     'favicon.svg',
     `env.js?v=${envHash}`,
     `login.min.js?v=${loginJsHash}`,
-    appJsVersionedUrl,
     'libs/react.production.min.js',
-    'libs/react-dom.production.min.js',
-    'libs/supabase.min.js'
+    'libs/react-dom.production.min.js'
   ];
   let swCode = fs.readFileSync('sw.js', 'utf8');
   swCode = swCode

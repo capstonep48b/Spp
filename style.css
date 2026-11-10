@@ -634,6 +634,24 @@ body {
   box-shadow: 0 40px 100px -25px rgba(2, 6, 23, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.35);
 }
 
+@media (max-width: 1023px) {
+  .login-glass-card {
+    min-height: 1096px;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .login-glass-card {
+    min-height: 735px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .login-glass-card {
+    min-height: 731px;
+  }
+}
+
 /* =======================================================
    ACADEMIC LEDGER & PASTEL NOTEBOOK DESIGN SYSTEM
    Screenshot 1 Inspiration: Warm, Friendly Educational Aesthetic

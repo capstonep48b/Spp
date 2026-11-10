@@ -18,12 +18,29 @@
   <link rel="icon" type="image/webp" href="logo.webp" />
   <link rel="apple-touch-icon" href="logo.webp" />
   
-  <!-- Minified External Custom Styles (High Performance) -->
-  <link rel="stylesheet" href="style.min.css" />
+  <!-- Static Compiled Login Stylesheet (Zero Unused Dashboard CSS & Zero Runtime Tailwind JIT) -->
+  <link rel="stylesheet" href="login.min.css" />
+  <script>
+    (function() {
+      try {
+        if (
+          sessionStorage.getItem('spp_tab_session') ||
+          localStorage.getItem('spp_admin_session') ||
+          localStorage.getItem('spp_parent_session') ||
+          localStorage.getItem('spp_user_session')
+        ) {
+          var l = document.createElement('link');
+          l.id = 'spp-dashboard-css';
+          l.rel = 'stylesheet';
+          l.href = 'dashboard.min.css';
+          document.head.appendChild(l);
+        }
+      } catch (e) {}
+    })();
+  </script>
 
-  <!-- Deferred Vendor Scripts (Eliminating Render-Blocking) -->
+  <!-- Deferred Vendor Scripts (Eliminating Render-Blocking & Long Main-Thread Tasks) -->
   <script defer src="init.js"></script>
-  <script defer src="libs/tailwind.js"></script>
   <script defer src="libs/lucide.min.js"></script>
   <script defer src="libs/react.production.min.js"></script>
   <script defer src="libs/react-dom.production.min.js"></script>

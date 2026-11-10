@@ -3,19 +3,18 @@
  * Provides high-efficiency caching, instant load times, and offline capabilities.
  */
 
-const CACHE_NAME = 'spp-cache-v3';
+const CACHE_NAME = 'spp-cache-v4';
 const STATIC_ASSETS = [
   './',
   'index.html',
-  'style.min.css',
-  'style.css',
+  'login.min.css',
+  'dashboard.min.css',
   'logo.webp',
   'logo.png',
   'favicon.svg',
   'init.js',
   'env.js',
   'app.js',
-  'libs/tailwind.js',
   'libs/lucide.min.js',
   'libs/react.production.min.js',
   'libs/react-dom.production.min.js',
@@ -51,8 +50,32 @@ self.addEventListener('fetch', (event) => {
   // Jangan tangani selain GET requests
   if (req.method !== 'GET') return;
 
-  // Supabase REST/Realtime API - selalu network first / bypass service worker cache
-  if (url.hostname.includes('supabase.co') || url.pathname.includes('/rest/v1/')) {
+  // Source maps & Supabase REST/Realtime API - selalu bypass service worker cache
+  if (url.pathname.endsWith('.map') || url.hostname.includes('supabase.co') || url.pathname.includes('/rest/v1/')) {
+    return;
+  }
+
+  // HTML Navigations / Root - Network First agar pembaruan halaman langsung aktif (fallback cache saat offline)
+  const isHtmlRequest =
+    req.mode === 'navigate' ||
+    url.pathname === '/' ||
+    url.pathname.endsWith('/') ||
+    url.pathname.endsWith('/index.html');
+
+  if (isHtmlRequest) {
+    event.respondWith(
+      fetch(req).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(req, responseToCache);
+          });
+        }
+        return networkResponse;
+      }).catch(() => {
+        return caches.match(req).then((cached) => cached || caches.match('index.html'));
+      })
+    );
     return;
   }
 

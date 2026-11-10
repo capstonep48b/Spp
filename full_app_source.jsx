@@ -882,62 +882,93 @@
       return allMonths.filter(m => isMonthOnOrAfterStudentStart(m, student, settings));
     };
 
-    const ICON_SVG_CACHE = new Map();
-    const Icon = React.memo(function Icon({ name, size = 18, className = "" }) {
-      const spanRef = useRef(null);
-
-      useEffect(() => {
-        if (!spanRef.current) return;
-        let isMounted = true;
-
-        const renderIcon = () => {
-          if (!isMounted || !spanRef.current) return;
-
-          if (!window.lucide || !window.lucide.icons) {
-            setTimeout(renderIcon, 50);
-            return;
-          }
-
-          const cacheKey = `${name}_${size}_${className}`;
-          if (ICON_SVG_CACHE.has(cacheKey)) {
-            spanRef.current.innerHTML = ICON_SVG_CACHE.get(cacheKey);
-            return;
-          }
-
-          const pascalName = name
-            ? name.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')
-            : '';
-
-          const iconDef = window.lucide.icons[pascalName] || window.lucide.icons[name];
-
-          if (iconDef && typeof window.lucide.createElement === 'function') {
-            const svg = window.lucide.createElement(iconDef);
-            svg.setAttribute('width', size);
-            svg.setAttribute('height', size);
-            if (className) {
-              svg.setAttribute('class', className);
-            }
-            const html = svg.outerHTML;
-            ICON_SVG_CACHE.set(cacheKey, html);
-            if (spanRef.current) {
-              spanRef.current.innerHTML = html;
-            }
-          }
+    const ensureDashboardCss = () => {
+      if (typeof document === 'undefined') return Promise.resolve();
+      const existing = document.getElementById('spp-dashboard-css');
+      if (existing) {
+        if (existing.dataset.loaded === '1' || existing.sheet) return Promise.resolve();
+        return new Promise((resolve) => {
+          const done = () => { existing.dataset.loaded = '1'; resolve(); };
+          existing.addEventListener('load', done, { once: true });
+          existing.addEventListener('error', done, { once: true });
+          setTimeout(done, 800);
+        });
+      }
+      return new Promise((resolve) => {
+        const link = document.createElement('link');
+        link.id = 'spp-dashboard-css';
+        link.rel = 'stylesheet';
+        link.href = 'dashboard.min.css';
+        const done = () => {
+          link.dataset.loaded = '1';
+          resolve();
         };
+        link.addEventListener('load', done, { once: true });
+        link.addEventListener('error', done, { once: true });
+        document.head.appendChild(link);
+        setTimeout(done, 800);
+      });
+    };
 
-        renderIcon();
+    const prefetchDashboardCss = () => {
+      if (typeof document === 'undefined') return;
+      if (document.getElementById('spp-dashboard-css') || document.getElementById('spp-dashboard-css-prefetch')) return;
+      const link = document.createElement('link');
+      link.id = 'spp-dashboard-css-prefetch';
+      link.rel = 'prefetch';
+      link.as = 'style';
+      link.href = 'dashboard.min.css';
+      document.head.appendChild(link);
+    };
 
-        return () => {
-          isMounted = false;
-        };
-      }, [name, size, className]);
+    const ICON_ELEMENT_CACHE = new Map();
+    const toPascalCaseIconName = (str) => (
+      str ? str.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('') : ''
+    );
+
+    const Icon = React.memo(function Icon({ name, size = 18, className = "", style }) {
+      const iconDef = useMemo(() => {
+        if (typeof window === 'undefined' || !window.lucide || !window.lucide.icons) return null;
+        return window.lucide.icons[toPascalCaseIconName(name)] || window.lucide.icons[name] || null;
+      }, [name]);
+
+      if (!iconDef) {
+        return (
+          <span
+            className={`inline-block shrink-0 ${className}`.trim()}
+            style={{ width: size, height: size, verticalAlign: 'middle', ...style }}
+            aria-hidden="true"
+          />
+        );
+      }
+
+      let children = ICON_ELEMENT_CACHE.get(name);
+      if (!children) {
+        children = iconDef.map(([tag, attrs], idx) => React.createElement(tag, { key: idx, ...attrs }));
+        ICON_ELEMENT_CACHE.set(name, children);
+      }
+
+      const mergedClassName = className && className.includes('mx-auto')
+        ? `shrink-0 ${className}`
+        : `inline-block shrink-0 ${className}`;
 
       return (
-        <span 
-          ref={spanRef} 
-          className={`inline-flex items-center justify-center shrink-0 ${className}`} 
-          style={{ width: size, height: size, verticalAlign: 'middle' }}
-        />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className={mergedClassName.trim()}
+          style={{ verticalAlign: 'middle', ...style }}
+        >
+          {children}
+        </svg>
       );
     });
 
@@ -1089,7 +1120,7 @@
       }
 
       return (
-        <div className="loading-screen-royal-nuance select-none">
+        <main aria-label="Memuat Portal SPP" className="loading-screen-royal-nuance select-none">
           {/* Faint School Watermark in the background */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden" aria-hidden="true">
             <div className="w-[min(85vw,640px)] h-[min(85vw,640px)] opacity-[0.045] flex items-center justify-center pointer-events-none select-none">
@@ -1213,7 +1244,7 @@
               </span>
             </div>
           </div>
-        </div>
+        </main>
       );
     }
 
@@ -1566,7 +1597,7 @@
       const waLink = `https://wa.me/${waPhone}?text=${encodeURIComponent('Halo Admin ' + (settings.schoolName || 'PAUD SETIA BHAKTI') + ', saya wali murid ingin meminta bantuan login/reset password.')}`;
 
       return (
-        <div className="min-h-screen login-ambient-canvas flex flex-col items-center justify-center p-3 sm:p-5 md:p-8 lg:p-10 relative overflow-hidden">
+        <main aria-label="Portal Login SPP" className="min-h-screen login-ambient-canvas flex flex-col items-center justify-center p-3 sm:p-5 md:p-8 lg:p-10 relative overflow-hidden">
           {/* Subtle Watermark in Login Canvas (LCP Optimized with WebP & High Priority) */}
           <div className="luxury-watermark-bg" aria-hidden="true">
             <div className="luxury-school-watermark flex items-center justify-center">
@@ -1860,7 +1891,7 @@
                 )}
 
                 {/* Login Form */}
-                <form onSubmit={handleLoginSubmit} className="space-y-3.5 sm:space-y-4">
+                <form onSubmit={handleLoginSubmit} onFocus={prefetchDashboardCss} className="space-y-3.5 sm:space-y-4">
                   {/* Field 1: Username / NIS */}
                   <div className="space-y-1">
                     <label htmlFor="login-username" className="block text-[11px] sm:text-xs font-black text-slate-700 uppercase tracking-wide">
@@ -1987,7 +2018,7 @@
             </div>
 
           </div>
-        </div>
+        </main>
       );
     }
 
@@ -9037,8 +9068,7 @@ function ParentDashboardView({
             <head>
               <meta charset="UTF-8">
               <title>Laporan SPP - ${settings?.schoolName || 'PAUD'}</title>
-              <link rel="stylesheet" href="style.css">
-              <script src="libs/tailwind.js"><\/script>
+              <link rel="stylesheet" href="dashboard.min.css">
               <style>
                 body { padding: 24px; background: #ffffff; color: #0f172a; font-family: sans-serif; }
                 @media print { body { padding: 0; } }
@@ -12674,6 +12704,7 @@ function ParentDashboardView({
       };
 
       const handleForceLogout = useCallback((userName, device = 'Perangkat lain', time = 'Baru saja') => {
+        ensureDashboardCss();
         const active = currentUserRef.current;
         setCurrentUser(null);
         setMySessionToken('');
@@ -12721,6 +12752,7 @@ function ParentDashboardView({
       }, []);
 
       const handleUserLogin = async (userObj) => {
+        const cssReadyPromise = ensureDashboardCss();
         const newSessionToken = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
         try {
           // Simpan sesi independen untuk tab saat ini
@@ -12775,6 +12807,7 @@ function ParentDashboardView({
           }
         }
 
+        await cssReadyPromise;
         setPendingUser(userObj);
         setIsLoadingPortal(true);
       };
@@ -12914,10 +12947,13 @@ function ParentDashboardView({
 
       // Saat pengguna berhasil login, sinkronkan seluruh transaksi dan pengumuman secara instan
       useEffect(() => {
+        if (currentUser || isLoadingPortal) {
+          ensureDashboardCss();
+        }
         if (currentUser) {
           fetchData(false);
         }
-      }, [currentUser, fetchData]);
+      }, [currentUser, isLoadingPortal, fetchData]);
 
       const handleUpdateSettings = async (newSettings) => {
         setSettings(newSettings);

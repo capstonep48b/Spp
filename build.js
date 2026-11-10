@@ -1,24 +1,135 @@
 const babel = require('@babel/core');
 const terser = require('terser');
 const CleanCSS = require('clean-css');
+const postcss = require('postcss');
+const tailwindcss = require('tailwindcss');
 const fs = require('fs');
+const zlib = require('zlib');
+
+function extractLoginComponentSources(source) {
+  const ast = babel.parseSync(source, {
+    presets: [['@babel/preset-react', { runtime: 'classic' }]],
+    filename: 'full_app_source.jsx'
+  });
+  const targets = new Set(['Icon', 'LoginView']);
+  const chunks = [];
+  function walk(node) {
+    if (!node || typeof node !== 'object') return;
+    if ((node.type === 'FunctionDeclaration' || node.type === 'VariableDeclarator') && node.id && targets.has(node.id.name)) {
+      chunks.push(source.slice(node.start, node.end));
+      return;
+    }
+    for (const k of Object.keys(node)) {
+      if (k === 'loc' || k === 'start' || k === 'end') continue;
+      const v = node[k];
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object' && v.type) walk(v);
+    }
+  }
+  walk(ast.program);
+  return chunks.join('\n');
+}
+
+function getSelectorClasses(selector) {
+  const s = selector.replace(/\\:/g, '__COLON__');
+  const matches = [];
+  const re = /\.([a-zA-Z_-][a-zA-Z0-9_-]*(?:__COLON__[a-zA-Z0-9_-]+)*)/g;
+  let m;
+  while ((m = re.exec(s)) !== null) {
+    matches.push(m[1].replace(/__COLON__/g, ':'));
+  }
+  return matches;
+}
+
+function filterCustomCssForSource(rawCss, targetSource, { includePrint = true } = {}) {
+  const root = postcss.parse(rawCss);
+  const usedKeyframeNames = new Set();
+
+  const shouldKeepRule = (rule) => {
+    const keptSels = rule.selectors.filter((sel) => {
+      const cls = getSelectorClasses(sel);
+      if (cls.length === 0) return true;
+      return cls.every((c) => targetSource.includes(c));
+    });
+    if (keptSels.length === 0) return false;
+    rule.selector = keptSels.join(', ');
+    rule.walkDecls(/^animation(-name)?$/, (decl) => {
+      // Collect identifiers from animation properties
+      const cleaned = decl.value.replace(/cubic-bezier\([^)]*\)/g, ' ');
+      cleaned.split(/[\s,]+/).forEach((tok) => {
+        if (/^[a-zA-Z_-][a-zA-Z0-9_-]*$/.test(tok)) {
+          usedKeyframeNames.add(tok);
+        }
+      });
+    });
+    return true;
+  };
+
+  root.each((node) => {
+    if (node.type === 'comment') {
+      node.remove();
+    } else if (node.type === 'rule') {
+      if (!shouldKeepRule(node)) node.remove();
+    } else if (node.type === 'atrule' && node.name === 'media') {
+      if (!includePrint && node.params.includes('print')) {
+        node.remove();
+        return;
+      }
+      node.each((child) => {
+        if (child.type === 'rule' && !shouldKeepRule(child)) child.remove();
+      });
+      if (!node.nodes || node.nodes.length === 0) node.remove();
+    }
+  });
+
+  // Remove unreferenced @keyframes
+  root.each((node) => {
+    if (node.type === 'atrule' && node.name === 'keyframes') {
+      if (!usedKeyframeNames.has(node.params.trim())) {
+        node.remove();
+      }
+    }
+  });
+
+  return root.toString();
+}
+
+async function compileSplitCss(tailwindContentRaw, customCss) {
+  const result = await postcss([
+    tailwindcss({
+      content: [{ raw: tailwindContentRaw, extension: 'jsx' }],
+      theme: { extend: {} },
+      corePlugins: { preflight: true }
+    })
+  ]).process(`@tailwind base;\n@tailwind components;\n@tailwind utilities;\n${customCss}`, {
+    from: undefined
+  });
+  const minified = new CleanCSS({ level: 2 }).minify(result.css);
+  if (minified.errors && minified.errors.length > 0) {
+    throw new Error(`CleanCSS errors: ${minified.errors.join('; ')}`);
+  }
+  return minified.styles;
+}
 
 async function runBuild() {
   console.log('--- [START PRODUCTION BUILD] ---');
 
-  // 1. Compile JSX with Babel
-  console.log('1. Compiling full_app_source.jsx with Babel...');
+  // 1. Compile JSX with Babel + Source Map
+  console.log('1. Compiling full_app_source.jsx with Babel (with source map)...');
   const source = fs.readFileSync('full_app_source.jsx', 'utf8');
   const babelRes = babel.transformSync(source, {
     presets: [
       ['@babel/preset-react', { runtime: 'classic' }]
     ],
+    filename: 'full_app_source.jsx',
+    sourceFileName: 'full_app_source.jsx',
+    sourceMaps: true,
     compact: true,
     comments: false
   });
 
-  // 2. Production Minification of JavaScript with Terser (Saves ~236 KB payload, >30 KiB gzip)
-  console.log('2. Minifying JavaScript with Terser...');
+  // 2. Production Minification of JavaScript with Terser + External Source Map
+  console.log('2. Minifying JavaScript with Terser & generating app.js.map...');
   const terserRes = await terser.minify(babelRes.code, {
     compress: {
       drop_console: false,
@@ -31,18 +142,35 @@ async function runBuild() {
     },
     format: {
       comments: false
+    },
+    sourceMap: {
+      content: babelRes.map,
+      filename: 'app.js',
+      url: 'app.js.map',
+      includeSources: false
     }
   });
 
   fs.writeFileSync('app.js', terserRes.code, 'utf8');
-  console.log(`   SUCCESS: app.js minified to ${Buffer.byteLength(terserRes.code)} bytes.`);
+  fs.writeFileSync('app.js.map', terserRes.map, 'utf8');
+  console.log(`   SUCCESS: app.js minified to ${Buffer.byteLength(terserRes.code)} bytes (gzip ${zlib.gzipSync(terserRes.code).length} B), app.js.map ${Buffer.byteLength(terserRes.map)} bytes.`);
 
-  // 3. Production Minification of CSS with CleanCSS (Saves ~15.8 KB payload, >3.7 KiB gzip)
-  console.log('3. Minifying style.css to style.min.css...');
+  // 3. Compile Static Tailwind CSS & Split Bundles (Eliminating libs/tailwind.js & Unused CSS)
+  console.log('3. Compiling static Tailwind CSS + custom CSS bundles (login.min.css & dashboard.min.css)...');
+  const html = fs.readFileSync('index.html', 'utf8');
   const rawCss = fs.readFileSync('style.css', 'utf8');
-  const cleanCssRes = new CleanCSS({ level: 1 }).minify(rawCss);
-  fs.writeFileSync('style.min.css', cleanCssRes.styles, 'utf8');
-  console.log(`   SUCCESS: style.min.css generated (${Buffer.byteLength(cleanCssRes.styles)} bytes).`);
+
+  const loginComponentSrc = extractLoginComponentSources(source) + '\n' + html;
+  const loginCustomCss = filterCustomCssForSource(rawCss, loginComponentSrc, { includePrint: false });
+  const loginMinCss = await compileSplitCss(loginComponentSrc, loginCustomCss);
+  fs.writeFileSync('login.min.css', loginMinCss, 'utf8');
+  console.log(`   SUCCESS: login.min.css generated (${Buffer.byteLength(loginMinCss)} bytes, gzip ${zlib.gzipSync(loginMinCss).length} B).`);
+
+  const fullAppSrc = source + '\n' + html;
+  const dashboardCustomCss = filterCustomCssForSource(rawCss, fullAppSrc, { includePrint: true });
+  const dashboardMinCss = await compileSplitCss(fullAppSrc, dashboardCustomCss);
+  fs.writeFileSync('dashboard.min.css', dashboardMinCss, 'utf8');
+  console.log(`   SUCCESS: dashboard.min.css generated (${Buffer.byteLength(dashboardMinCss)} bytes, gzip ${zlib.gzipSync(dashboardMinCss).length} B).`);
 
   // 4. Generate secure class-based env.js (Strictly sanitized, no hardcoded admin credentials or school data)
   console.log('4. Generating sanitized secure env.js...');

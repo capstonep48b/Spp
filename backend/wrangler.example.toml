@@ -1,0 +1,26 @@
+name = "aplikasi-spp-midtrans-api"
+main = "cloudflare-worker.mjs"
+compatibility_date = "2026-01-01"
+
+[vars]
+CORS_ALLOWED_ORIGINS = "https://e-sppsetiabhakti.my.id,http://localhost:3000"
+SUPABASE_URL = "https://mgywbrmneeorynisujkf.supabase.co"
+SUPABASE_KEY = "sb_publishable_BT_1lHhvJerwY0k4fWzIbg_51-VQ7V5"
+SUPABASE_REST_PATH = "/rest/v1"
+
+MIDTRANS_IS_PRODUCTION = "false"
+MIDTRANS_CLIENT_KEY = "Mid-client-MdhYv4NdjfvG20k6"
+
+MIDTRANS_SANDBOX_SNAP_URL = "https://app.sandbox.midtrans.com/snap/snap.js"
+MIDTRANS_SANDBOX_API_URL = "https://app.sandbox.midtrans.com/snap/v1/transactions"
+MIDTRANS_SANDBOX_CORE_API_URL = "https://api.sandbox.midtrans.com/v2"
+MIDTRANS_PRODUCTION_SNAP_URL = "https://app.midtrans.com/snap/snap.js"
+MIDTRANS_PRODUCTION_API_URL = "https://app.midtrans.com/snap/v1/transactions"
+MIDTRANS_PRODUCTION_CORE_API_URL = "https://api.midtrans.com/v2"
+
+API_HEALTH_ENDPOINT = "/api/health"
+MIDTRANS_CONFIG_ENDPOINT = "/api/midtrans/config"
+MIDTRANS_CREATE_TX_ENDPOINT = "/api/midtrans/create-transaction"
+MIDTRANS_STATUS_ENDPOINT = "/api/midtrans/status"
+MIDTRANS_WEBHOOK_ENDPOINT = "/api/midtrans/webhook"
+APP_BASE_URL = "https://e-sppsetiabhakti.my.id"

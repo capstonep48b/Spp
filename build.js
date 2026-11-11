@@ -8,6 +8,23 @@ const fs = require('fs');
 const vm = require('vm');
 const zlib = require('zlib');
 
+const SRC_MODULES = [
+  'src/utils/storage.js',
+  'src/utils/formatters.js',
+  'src/utils/mappers.js',
+  'src/utils/billing.js',
+  'src/services/api.js',
+  'src/components/common.jsx',
+  'src/components/auth.jsx',
+  'src/components/modals.jsx',
+  'src/components/parent.jsx',
+  'src/components/admin/DashboardView.jsx',
+  'src/components/admin/SiswaListView.jsx',
+  'src/components/admin/FinanceViews.jsx',
+  'src/components/admin/CommunicationViews.jsx',
+  'src/App.jsx'
+];
+
 function sha256Short(content) {
   return crypto.createHash('sha256').update(content).digest('hex').slice(0, 8);
 }
@@ -44,7 +61,9 @@ function extractUsedIcons(targetSource, allIcons) {
 function extractDeclarations(source, targetNames, astCache = null) {
   const ast = astCache || babel.parseSync(source, {
     presets: [['@babel/preset-react', { runtime: 'classic' }]],
-    filename: 'full_app_source.jsx'
+    babelrc: false,
+    configFile: false,
+    filename: 'app_bundle.jsx'
   });
   const chunks = [];
   for (const stmt of ast.program.body) {
@@ -132,7 +151,7 @@ async function compileSplitCss(tailwindContentRaw, customCss) {
   ]).process(`@tailwind base;\n@tailwind components;\n@tailwind utilities;\n${customCss}`, {
     from: undefined
   });
-  const minified = new CleanCSS({ level: 2 }).minify(result.css);
+  const minified = new CleanCSS({ level: 2, specialComments: 0 }).minify(result.css);
   if (minified.errors && minified.errors.length > 0) {
     throw new Error(`CleanCSS errors: ${minified.errors.join('; ')}`);
   }
@@ -251,7 +270,7 @@ function vnodeToHtml(vnode, ssrFragmentSymbol) {
 }
 
 function renderLoginSsrHtml(source, ast, loginIcons, ssrSettings) {
-  const ssrTargets = new Set(['ICON_ELEMENT_CACHE', 'toPascalCaseIconName', 'Icon', 'LoginView']);
+  const ssrTargets = new Set(['ICON_ELEMENT_CACHE', 'toPascalCaseIconName', 'Icon', 'LoginStatusClockPills', 'LoginView']);
   const ssrSource = `
 const { useState, useEffect, useMemo, useCallback, useRef } = React;
 ${extractDeclarations(source, ssrTargets, ast)}
@@ -267,6 +286,8 @@ globalThis.__SPP_RENDER_SSR_LOGIN = function(ssrSettings) {
 
   const compiled = babel.transformSync(ssrSource, {
     presets: [['@babel/preset-react', { runtime: 'classic' }]],
+    babelrc: false,
+    configFile: false,
     filename: 'ssr_login.jsx',
     comments: false
   });
@@ -284,9 +305,9 @@ globalThis.__SPP_RENDER_SSR_LOGIN = function(ssrSettings) {
       return { $$typeof: Symbol.for('react.memo'), type: comp };
     },
     useState(init) {
-      return [typeof init === 'function' ? init() : init, () => {}];
+      return [typeof init === 'function' ? init() : init, () => { }];
     },
-    useEffect() {},
+    useEffect() { },
     useMemo(fn) {
       return fn();
     },
@@ -561,28 +582,30 @@ function buildBootAppCode(appJsUrl, dashCssUrl) {
 async function runBuild() {
   console.log('--- [START PRODUCTION BUILD] ---');
 
-  const source = fs.readFileSync('full_app_source.jsx', 'utf8');
+  const moduleSources = SRC_MODULES.map((modPath) => fs.readFileSync(modPath, 'utf8'));
+  const source = 'const { useState, useEffect, useMemo, useCallback, useRef } = React;\n' + moduleSources.join('\n\n');
   const htmlTemplate = fs.readFileSync('index.html', 'utf8');
-  const rawCss = fs.readFileSync('style.css', 'utf8');
+  const rawCss = fs.readFileSync('src/styles/main.css', 'utf8');
   const ast = babel.parseSync(source, {
     presets: [['@babel/preset-react', { runtime: 'classic' }]],
-    filename: 'full_app_source.jsx'
+    babelrc: false,
+    configFile: false,
+    filename: 'app_bundle.jsx'
   });
 
-  // 1. Load & Prune Lucide Icons (Zero external 457 KB lucide.min.js request!)
-  console.log('1. Extracting pruned Lucide icons from libs/lucide.min.js...');
+  console.log(`1. Extracting pruned Lucide icons (${SRC_MODULES.length} modules)...`);
   const allLucideIcons = loadAllLucideIcons();
   const appIcons = extractUsedIcons(source, allLucideIcons);
   console.log(`   Pruned full-app icons: ${Object.keys(appIcons).length} / ${Object.keys(allLucideIcons).length} (${Buffer.byteLength(JSON.stringify(appIcons))} B JSON).`);
 
-  // 2. Compile Full Dashboard/App JSX with Embedded Pruned Icons + Source Map
-  console.log('2. Compiling full_app_source.jsx -> app.js + app.js.map...');
-  // Prepend on line 1 without adding newline so line numbers in app.js.map match full_app_source.jsx 1:1
+  console.log('2. Compiling modular src/ -> app.js + app.js.map...');
   const fullAppSourceWithIcons = `(typeof globalThis!=='undefined'?globalThis:window).__SPP_ICONS=${JSON.stringify(appIcons)};` + source;
   const babelRes = babel.transformSync(fullAppSourceWithIcons, {
     presets: [['@babel/preset-react', { runtime: 'classic' }]],
-    filename: 'full_app_source.jsx',
-    sourceFileName: 'full_app_source.jsx',
+    babelrc: false,
+    configFile: false,
+    filename: 'app_bundle.jsx',
+    sourceFileName: 'app_bundle.jsx',
     sourceMaps: true,
     compact: true,
     comments: false
@@ -592,11 +615,13 @@ async function runBuild() {
     compress: {
       drop_console: false,
       drop_debugger: true,
-      passes: 2
+      ecma: 2020,
+      passes: 3,
+      pure_getters: true
     },
     mangle: {
       toplevel: false,
-      reserved: ['React', 'ReactDOM', 'Icon', 'AplikasiSPP', 'EnvironmentConfig', 'AppEnv', 'BootApp']
+      reserved: ['React', 'ReactDOM', 'Icon', 'AplikasiSPP', 'EnvironmentConfig', 'AppEnv', 'BootApp', 'AppApi']
     },
     format: {
       comments: false
@@ -614,18 +639,16 @@ async function runBuild() {
   const appHash = sha256Short(terserRes.code);
   console.log(`   SUCCESS: app.js ${Buffer.byteLength(terserRes.code)} B (gzip ${zlib.gzipSync(terserRes.code).length} B, v=${appHash}), map ${Buffer.byteLength(terserRes.map)} B.`);
 
-  // 3. Compile Split CSS Bundles (login.min.css + dashboard.min.css)
-  console.log('3. Compiling static Tailwind CSS bundles (login.min.css & dashboard.min.css)...');
+  console.log('3. Compiling static Tailwind CSS bundles (inline login CSS & dashboard.min.css)...');
   const cleanHtmlForScan = htmlTemplate
     .replace(/<style id="spp-login-css">[\s\S]*?<\/style>/, '<style id="spp-login-css"></style>')
     .replace(/<script id="spp-session-boot">[\s\S]*?<\/script>/, '<script id="spp-session-boot"></script>')
-    .replace(/<div id="root">[\s\S]*?<\/div>\s*<!--SPP_ROOT_END-->/, '<div id="root"></div><!--SPP_ROOT_END-->');
-  const loginCssDeclNames = new Set(['ICON_ELEMENT_CACHE', 'toPascalCaseIconName', 'Icon', 'LoginView']);
+    .replace(/<div id="root"(?:\s+data-ssr-root="1")?>[\s\S]*?<\/div>(?=\s*<script(?:\s+data-spp-sw="1")?>)/, '<div id="root" data-ssr-root="1"></div>');
+  const loginCssDeclNames = new Set(['ICON_ELEMENT_CACHE', 'toPascalCaseIconName', 'Icon', 'LoginStatusClockPills', 'LoginView']);
   const loginComponentSrc = extractDeclarations(source, loginCssDeclNames, ast) + '\n' + cleanHtmlForScan;
   const loginCustomCss = filterCustomCssForSource(rawCss, loginComponentSrc, { includePrint: false });
   const loginMinCss = await compileSplitCss(loginComponentSrc, loginCustomCss);
-  fs.writeFileSync('login.min.css', loginMinCss, 'utf8');
-  console.log(`   SUCCESS: login.min.css ${Buffer.byteLength(loginMinCss)} B (gzip ${zlib.gzipSync(loginMinCss).length} B).`);
+  console.log(`   SUCCESS: inline login CSS ${Buffer.byteLength(loginMinCss)} B (gzip ${zlib.gzipSync(loginMinCss).length} B).`);
 
   const fullAppCssSrc = source + '\n' + cleanHtmlForScan;
   const dashboardCustomCss = filterCustomCssForSource(rawCss, fullAppCssSrc, { includePrint: true });
@@ -634,152 +657,33 @@ async function runBuild() {
   const dashCssHash = sha256Short(dashboardMinCss);
   console.log(`   SUCCESS: dashboard.min.css ${Buffer.byteLength(dashboardMinCss)} B (gzip ${zlib.gzipSync(dashboardMinCss).length} B, v=${dashCssHash}).`);
 
-  // 4. Generate Sanitized Secure env.js
   console.log('4. Generating sanitized secure env.js...');
-  let envData = {};
-  let secretVault = {};
+  const { parseEnvText, resolveBackendConfig, renderEnvJsCode } = require('./backend/midtrans-core');
+  let mergedEnv = {};
   try {
-    const envFile = fs.readFileSync('.env', 'utf8');
-    envFile.split(/\r?\n/).forEach((rawLine) => {
-      const line = rawLine.trim();
-      if (!line || line.startsWith('#')) return;
-
-      const eqIdx = line.indexOf('=');
-      if (eqIdx === -1) return;
-
-      const key = line.slice(0, eqIdx).trim();
-      const val = line.slice(eqIdx + 1).trim();
-
-      if (/(?:SERVER_KEY|SECRET|SERVICE_ROLE|PRIVATE_KEY|^PORT$)/i.test(key)) return;
-
-      if (/SUPABASE_KEY|SUPABASE_ANON_KEY/i.test(key)) {
-        secretVault.k = Buffer.from(val).toString('base64');
-        return;
-      }
-
-      if (/^(SUPABASE_URL|MIDTRANS_CLIENT_KEY)$/i.test(key)) {
-        envData[key] = val;
-      }
-    });
-  } catch (e) {}
-
-  const envClassCode = `/**
- * ====================================================================
- * Dedicated Environment Configuration Class (Security Encapsulated)
- * Melindungi kredensial klien, menyembunyikan kunci rahasia server,
- * dan mencegah manipulasi objek runtime (Object.freeze & Tamper-Proof).
- * Seluruh data identitas sekolah, periode, dan admin dimuat dari Supabase.
- * ====================================================================
- */
-class EnvironmentConfig {
-  #config = {};
-  #vault = {};
-  #initialized = false;
-
-  constructor(rawConfig = {}, vault = {}) {
-    if (this.#initialized) {
-      throw new Error("EnvironmentConfig sudah diinisialisasi sebagai singleton.");
+    if (fs.existsSync('.env')) {
+      Object.assign(mergedEnv, parseEnvText(fs.readFileSync('.env', 'utf8')));
     }
-
-    const sanitized = {};
-    for (const [key, val] of Object.entries(rawConfig)) {
-      if (!key || typeof key !== 'string') continue;
-      const cleanKey = key.trim();
-      if (/^(SUPABASE_URL|MIDTRANS_CLIENT_KEY|SCHOOL_NAME)$/i.test(cleanKey)) {
-        sanitized[cleanKey] = String(val || '').trim();
-      }
+    if (fs.existsSync('.env.local')) {
+      Object.assign(mergedEnv, parseEnvText(fs.readFileSync('.env.local', 'utf8')));
     }
-
-    this.#config = Object.freeze(sanitized);
-    this.#vault = Object.freeze({ ...vault });
-    this.#initialized = true;
-    Object.freeze(this);
+  } catch (e) { }
+  for (const [k, v] of Object.entries(process.env)) {
+    if (v !== undefined) mergedEnv[k] = v;
   }
 
-  #decode(token) {
-    if (!token || typeof token !== 'string') return '';
-    try {
-      if (typeof atob === 'function') return atob(token);
-      if (typeof Buffer !== 'undefined') return Buffer.from(token, 'base64').toString('utf8');
-    } catch (e) {}
-    return '';
-  }
-
-  get(key, defaultValue = '') {
-    return Object.prototype.hasOwnProperty.call(this.#config, key) ? this.#config[key] : defaultValue;
-  }
-
-  has(key) {
-    return Boolean(this.#config[key]);
-  }
-
-  get supabaseUrl() {
-    return this.get('SUPABASE_URL');
-  }
-
-  get supabaseKey() {
-    const fromVault = this.#decode(this.#vault.k);
-    if (fromVault) return fromVault;
-    if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('spp_supabase_key') || localStorage.getItem('supabase_key') || '';
-    }
-    return '';
-  }
-
-  get midtransClientKey() {
-    return this.get('MIDTRANS_CLIENT_KEY');
-  }
-
-  get schoolName() {
-    return this.get('SCHOOL_NAME', 'PAUD SETIA BHAKTI');
-  }
-
-  toObject() {
-    return { ...this.#config };
-  }
-}
-
-(function() {
-  const _rawValues = ${JSON.stringify(envData, null, 2)};
-  const _vault = ${JSON.stringify(secretVault, null, 2)};
-  const _envInstance = new EnvironmentConfig(_rawValues, _vault);
-
-  if (typeof window !== 'undefined') {
-    Object.defineProperty(window, 'EnvironmentConfig', {
-      value: EnvironmentConfig,
-      writable: false,
-      configurable: false,
-      enumerable: false
-    });
-
-    Object.defineProperty(window, 'AppEnv', {
-      value: _envInstance,
-      writable: false,
-      configurable: false,
-      enumerable: true
-    });
-
-    Object.defineProperty(window, 'ENV', {
-      get: () => _envInstance.toObject(),
-      set: () => { console.warn("Peringatan Keamanan: window.ENV bersifat read-only dan terlindungi!"); },
-      configurable: false,
-      enumerable: true
-    });
-  }
-
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { EnvironmentConfig, AppEnv: _envInstance };
-  }
-})();
-`;
+  const resolvedEnvConfig = resolveBackendConfig(mergedEnv);
+  const envClassCode = renderEnvJsCode(resolvedEnvConfig);
 
   fs.writeFileSync('env.js', envClassCode, 'utf8');
   const envHash = sha256Short(envClassCode);
-  console.log(`   SUCCESS: env.js generated (v=${envHash}).`);
+  console.log(`   SUCCESS: env.js generated (mode=${resolvedEnvConfig.mode}, v=${envHash}).`);
 
-  // 5. Build Lightweight login.min.js + login.min.js.map (Only LoginView + Auth Helpers + 19 Icons)
   console.log('5. Compiling lightweight login.min.js + login.min.js.map...');
   const loginTargetNames = new Set([
+    'LS_JSON_CACHE',
+    'readJsonLsCached',
+    'writeJsonLsCached',
     'mapStudentFromDb',
     'ALL_MONTHS',
     'formatDateIndo',
@@ -790,6 +694,7 @@ class EnvironmentConfig {
     'ICON_ELEMENT_CACHE',
     'toPascalCaseIconName',
     'Icon',
+    'LoginStatusClockPills',
     'LoginView'
   ]);
   const loginExtractedSrc = extractDeclarations(source, loginTargetNames, ast);
@@ -806,6 +711,8 @@ ${buildBootAppCode(appJsVersionedUrl, dashCssVersionedUrl)}
 
   const loginBabel = babel.transformSync(loginBundleRaw, {
     presets: [['@babel/preset-react', { runtime: 'classic' }]],
+    babelrc: false,
+    configFile: false,
     filename: 'login_bundle.jsx',
     sourceFileName: 'login_bundle.jsx',
     sourceMaps: true,
@@ -817,7 +724,9 @@ ${buildBootAppCode(appJsVersionedUrl, dashCssVersionedUrl)}
     compress: {
       drop_console: false,
       drop_debugger: true,
-      passes: 2
+      ecma: 2020,
+      passes: 3,
+      pure_getters: true
     },
     mangle: {
       toplevel: true,
@@ -839,7 +748,6 @@ ${buildBootAppCode(appJsVersionedUrl, dashCssVersionedUrl)}
   const loginJsHash = sha256Short(loginTerser.code);
   console.log(`   SUCCESS: login.min.js ${Buffer.byteLength(loginTerser.code)} B (gzip ${zlib.gzipSync(loginTerser.code).length} B, ${Object.keys(loginIcons).length} icons, v=${loginJsHash}).`);
 
-  // 6. Render SSR HTML Snapshot of LoginView into index.html
   console.log('6. Rendering SSR LoginView snapshot & updating index.html + sw.js...');
   const defaultSettingsSandbox = { window: { AppEnv: {}, ENV: {} } };
   vm.runInNewContext(extractDeclarations(source, new Set(['DEFAULT_SETTINGS']), ast) + '\nglobalThis.__DS = DEFAULT_SETTINGS;', defaultSettingsSandbox);
@@ -859,12 +767,11 @@ ${buildBootAppCode(appJsVersionedUrl, dashCssVersionedUrl)}
     .replace(/<script id="spp-session-boot">[\s\S]*?<\/script>/, `<script id="spp-session-boot">${inlineSessionBoot}</script>`)
     .replace(/src="env\.js(?:\?v=[^"]*)?"/, `src="env.js?v=${envHash}"`)
     .replace(/src="login\.min\.js(?:\?v=[^"]*)?"/, `src="login.min.js?v=${loginJsHash}"`)
-    .replace(/<div id="root">[\s\S]*?<\/div>\s*<!--SPP_ROOT_END-->/, `<div id="root">${ssrHtml}</div><!--SPP_ROOT_END-->`);
+    .replace(/<div id="root"(?:\s+data-ssr-root="1")?>[\s\S]*?<\/div>(?=\s*<script(?:\s+data-spp-sw="1")?>)/, `<div id="root" data-ssr-root="1">${ssrHtml}</div>`);
 
   fs.writeFileSync('index.html', updatedHtml, 'utf8');
   console.log(`   SUCCESS: index.html updated (${Buffer.byteLength(updatedHtml)} B, gzip ${zlib.gzipSync(updatedHtml).length} B).`);
 
-  // 7. Update sw.js Cache Version & Lightweight Shell Assets (Dashboard bundles cached lazily on use)
   const swBuildHash = sha256Short(appHash + dashCssHash + loginJsHash + envHash);
   const swAssets = [
     './',

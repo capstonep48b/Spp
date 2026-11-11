@@ -1,16 +1,11 @@
-/**
- * Service Worker - Aplikasi SPP PAUD Setia Bhakti
- * Provides high-efficiency caching, instant load times, and offline capabilities.
- */
-
-const CACHE_NAME = 'spp-cache-b5c55870';
+const CACHE_NAME = 'spp-cache-a2e05f2b';
 const STATIC_ASSETS = [
   './',
   'index.html',
   'logo.webp',
   'favicon.svg',
-  'env.js?v=8ee00723',
-  'login.min.js?v=b8f101af',
+  'env.js?v=55c846c1',
+  'login.min.js?v=4c3e84e4',
   'libs/react.production.min.js',
   'libs/react-dom.production.min.js'
 ];
@@ -43,12 +38,16 @@ self.addEventListener('fetch', (event) => {
 
   if (req.method !== 'GET') return;
 
-  // Source maps & Supabase REST/Realtime API - selalu bypass service worker cache
-  if (url.pathname.endsWith('.map') || url.hostname.includes('supabase.co') || url.pathname.includes('/rest/v1/')) {
+  if (
+    url.pathname.endsWith('.map') ||
+    url.pathname.startsWith('/api/') ||
+    url.hostname.includes('supabase.co') ||
+    url.hostname.includes('midtrans.com') ||
+    url.pathname.includes('/rest/v1/')
+  ) {
     return;
   }
 
-  // HTML Navigations / Root - Network First agar pembaruan halaman langsung aktif
   const isHtmlRequest =
     req.mode === 'navigate' ||
     url.pathname === '/' ||
@@ -72,7 +71,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Google Fonts caching - Cache First
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
@@ -92,7 +90,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Local Static Assets - Stale While Revalidate
   event.respondWith(
     caches.match(req).then((cachedResponse) => {
       const fetchPromise = fetch(req).then((networkResponse) => {

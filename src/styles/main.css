@@ -1,6 +1,3 @@
-/* Custom Design System - Royal Blue & Cloud Aesthetics for SPP App */
-/* Note: Google Fonts Plus Jakarta Sans preconnected and loaded directly in index.html for high performance */
-
 :root {
   --blue-primary: #2563eb;
   --blue-hover: #1d4ed8;
@@ -17,26 +14,14 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   background-color: #f1f5f9;
   color: #1e293b;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
-/* =======================================================
-   GLOWING SMURF AURORA & TECH AMBIENT CANVAS
-   Electric smurf blue & luminous cyan glowing background (Clean, No Dots)
-   ======================================================= */
 .bg-aesthetic-pattern {
   background-color: #eef6ff !important;
-  background-image: 
-    radial-gradient(circle at 90% 12%, rgba(6, 182, 212, 0.32) 0%, rgba(14, 165, 233, 0.14) 35%, transparent 70%),
-    radial-gradient(circle at 10% 48%, rgba(37, 99, 235, 0.26) 0%, rgba(59, 130, 246, 0.12) 38%, transparent 72%),
-    radial-gradient(circle at 85% 88%, rgba(14, 165, 233, 0.28) 0%, rgba(37, 99, 235, 0.12) 42%, transparent 75%),
-    radial-gradient(circle at 50% 28%, rgba(56, 189, 248, 0.18) 0%, transparent 60%);
-  background-size: 100% 100%;
-  background-attachment: fixed;
   position: relative;
 }
 
-/* Custom Refined Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -55,7 +40,6 @@ body {
   background: #3b82f6;
 }
 
-/* Toast Slide-In from Right Animation */
 @keyframes slideInRight {
   0% {
     opacity: 0;
@@ -71,7 +55,6 @@ body {
   animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Page Loading Bar Animation */
 @keyframes loadingProgress {
   0% { width: 0%; }
   50% { width: 75%; }
@@ -82,13 +65,12 @@ body {
   animation: loadingProgress 1.4s ease-in-out forwards;
 }
 
-/* Print Styling - Clean, Comprehensive, Reliable */
 @media print {
   @page {
     size: auto;
     margin: 10mm 12mm 10mm 12mm;
   }
-  
+
   html, body {
     background: #ffffff !important;
     color: #0f172a !important;
@@ -102,12 +84,10 @@ body {
     print-color-adjust: exact !important;
   }
 
-  /* Sembunyikan elemen navigasi dan tombol saat print */
   aside, nav, header, footer, button, .print\:hidden, [class*="print:hidden"], [class*="print\\:hidden"] {
     display: none !important;
   }
 
-  /* Reset semua wrapper parent flex & grid */
   #root, #root > div, main {
     display: block !important;
     width: 100% !important;
@@ -140,7 +120,6 @@ body {
     visibility: visible !important;
   }
 
-  /* Print Kuitansi Modal Area */
   .printable-kuitansi {
     display: block !important;
     position: static !important;
@@ -155,7 +134,7 @@ body {
     color: #0f172a !important;
     visibility: visible !important;
   }
-  /* Modal Overlay Print Reset */
+
   .fixed.inset-0 {
     position: static !important;
     background: transparent !important;
@@ -164,12 +143,6 @@ body {
   }
 }
 
-
-/* =======================================================
-   MODERN GLASSMORPHISM & TICKET RECEIPT AESTHETICS (IMAGE 2 & 3)
-   ======================================================= */
-
-/* Receipt Ticket Styles */
 .ticket-wrapper {
   position: relative;
   background: #ffffff;
@@ -188,7 +161,7 @@ body {
 .ticket-notch {
   width: 24px;
   height: 24px;
-  background-color: #0f172a; /* matches modal backdrop */
+  background-color: #0f172a;
   border-radius: 9999px;
   position: absolute;
   top: 50%;
@@ -212,7 +185,6 @@ body {
   margin: 0 12px;
 }
 
-/* Scalloped / Serrated Bottom Edge */
 .ticket-bottom-sawtooth {
   width: 100%;
   height: 12px;
@@ -222,13 +194,10 @@ body {
   transform: rotate(180deg);
 }
 
-/* Ultra Modern Glassmorphism System */
 .glass-panel-modern {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 12px 28px -10px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(226, 232, 240, 0.8);
 }
 
 @keyframes pulseHalo {
@@ -246,49 +215,6 @@ body {
   animation: pulseHalo 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
 }
 
-/* =======================================================
-   ELECTRIC SMURF BLUE SIDEBAR & GLOWING ACCENTS
-   Vibrant azure, electric royal blue & luminous cyan rim
-   ======================================================= */
-
-.royal-blue-sidebar {
-  background: 
-    radial-gradient(circle at 12% 10%, rgba(6, 182, 212, 0.55) 0%, transparent 48%),
-    radial-gradient(circle at 88% 90%, rgba(56, 189, 248, 0.4) 0%, transparent 48%),
-    radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.35) 0%, transparent 60%),
-    linear-gradient(180deg, #0b2d72 0%, #1142a5 35%, #1853c8 68%, #0d327d 100%) !important;
-  color: #ffffff;
-  position: relative;
-  overflow: hidden;
-  box-shadow: 8px 0 45px rgba(14, 165, 233, 0.25), 0 0 25px rgba(6, 182, 212, 0.15) !important;
-  border-right: 1.5px solid rgba(56, 189, 248, 0.4) !important;
-}
-
-/* Decorative subtle aura overlay on sidebar - PURE SMOOTH AURA, ZERO DOTS */
-.royal-blue-sidebar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    radial-gradient(circle at 20% 15%, rgba(6, 182, 212, 0.35) 0%, transparent 50%),
-    radial-gradient(circle at 80% 85%, rgba(56, 189, 248, 0.28) 0%, transparent 50%),
-    linear-gradient(180deg, transparent 0%, rgba(56, 189, 248, 0.08) 50%, transparent 100%);
-  background-size: 100% 100%, 100% 100%, 100% 200%;
-  animation: smurfSidebarFlow 14s ease-in-out infinite alternate;
-  pointer-events: none;
-  z-index: 0;
-}
-
-@keyframes smurfSidebarFlow {
-  0% {
-    background-position: 0 0, 0 0, 0 0%;
-  }
-  100% {
-    background-position: 0 0, 0 0, 0 100%;
-  }
-}
-
-/* Ensure non-absolute flow children are above the pattern without breaking absolute orbs */
 .royal-blue-sidebar > :not(.absolute) {
   position: relative;
   z-index: 2;
@@ -298,7 +224,6 @@ body {
   z-index: 0 !important;
 }
 
-/* Distinctive Notification & Sidebar Badges (> 0 vs 0) */
 .badge-danger-active {
   background: linear-gradient(135deg, #f43f5e 0%, #dc2626 100%) !important;
   color: #ffffff !important;
@@ -346,7 +271,6 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
-/* Luxury Dark Midnight Loading Screen Aesthetic */
 .loading-screen-royal-nuance {
   position: fixed !important;
   inset: 0 !important;
@@ -372,16 +296,11 @@ body {
 }
 
 .loading-glass-card {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: rgba(15, 23, 42, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: 0 30px 80px -15px rgba(0, 0, 0, 0.7), 0 0 50px -10px rgba(6, 182, 212, 0.22);
 }
 
-/* =======================================================
-   LUXURY WATERMARK & BACKGROUND AESTHETICS
-   ======================================================= */
 .luxury-watermark-bg {
   position: fixed;
   inset: 0;
@@ -397,14 +316,12 @@ body {
   transform: translate(-50%, -50%);
   width: min(85vw, 680px);
   height: min(85vw, 680px);
-  opacity: 0.038;
+  opacity: 0.04;
   pointer-events: none;
   user-select: none;
-  mix-blend-mode: multiply;
   transition: opacity 0.5s ease;
 }
 
-/* Luxury Loading Screen Special Animations */
 @keyframes orbitRingSpin {
   0% {
     transform: rotate(0deg);
@@ -454,23 +371,14 @@ body {
   animation: laserShimmer 1.6s infinite cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* =======================================================
-   LUXURY TAB TRANSITIONS & MODERN VIEW ANIMATIONS
-   ======================================================= */
 @keyframes modernPageSlide {
   0% {
     opacity: 0;
-    transform: translateY(14px) scale(0.99);
-    filter: blur(4px);
-  }
-  50% {
-    opacity: 0.9;
-    filter: blur(1px);
+    transform: translate3d(0, 10px, 0);
   }
   100% {
     opacity: 1;
-    transform: none;
-    filter: none;
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -482,7 +390,6 @@ body {
   animation: modernPageSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Universal Modal Dialog Reset & Guaranteed Viewport Centering */
 .modal-portal-wrapper {
   position: fixed !important;
   inset: 0 !important;
@@ -510,7 +417,6 @@ body {
   flex-direction: column !important;
 }
 
-/* Pulse Glow Effect for Badges and Rings */
 @keyframes pulseGlow {
   0%, 100% {
     box-shadow: 0 0 15px rgba(37, 99, 235, 0.3), 0 0 35px rgba(56, 189, 248, 0.15);
@@ -524,7 +430,6 @@ body {
   animation: pulseGlow 2.5s infinite ease-in-out;
 }
 
-/* Waving Greeting Mascot & Character Animations */
 @keyframes waveHand {
   0% { transform: rotate(0deg); }
   10% { transform: rotate(16deg); }
@@ -577,17 +482,14 @@ body {
   animation: mascotShadowPulse 3.2s infinite ease-in-out;
 }
 
-/* Luxury Greeting Card Styling */
 .greeting-welcome-banner {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 249, 255, 0.92) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 249, 255, 0.96) 100%);
   border: 1px solid rgba(219, 234, 254, 0.8);
   box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.08), 0 8px 10px -6px rgba(37, 99, 235, 0.04);
-  backdrop-filter: blur(12px);
   position: relative;
   overflow: hidden;
 }
 
-/* Hide scrollbars cleanly across browsers */
 .no-scrollbar::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
@@ -600,29 +502,23 @@ body {
 }
 
 @media (max-width: 767px) {
-  /* Hide desktop sidebar on mobile when hamburger menu is active */
   .hide-on-mobile-nav {
     display: none !important;
   }
 
-  /* Reset padding at bottom of main content since bottom nav is replaced by hamburger drawer */
   .mobile-nav-spacer {
     padding-bottom: 24px !important;
   }
 
-  /* Ensure the main app card doesn't have min-height or border-radius issues on mobile */
   .mobile-full-height {
     min-height: 100vh !important;
     border-radius: 0 !important;
   }
 }
 
-/* =======================================================
-   ULTRA-PREMIUM LOGIN AESTHETICS (Atmospheric Canvas & Glass)
-   ======================================================= */
 .login-ambient-canvas {
   background-color: #02091c;
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 15%, rgba(14, 165, 233, 0.45) 0%, transparent 48%),
     radial-gradient(circle at 85% 85%, rgba(37, 99, 235, 0.45) 0%, transparent 52%),
     radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.3) 0%, transparent 60%),
@@ -656,16 +552,11 @@ body {
   }
 }
 
-/* =======================================================
-   ACADEMIC LEDGER & PASTEL NOTEBOOK DESIGN SYSTEM
-   Screenshot 1 Inspiration: Warm, Friendly Educational Aesthetic
-   Clean, structured ledger cards and pastel header chips
-   ======================================================= */
 .pastel-ledger-card {
   background: #fffefb;
   border: 1.5px solid #fed7aa;
   border-radius: 28px;
-  box-shadow: 0 10px 30px -10px rgba(251, 146, 60, 0.08), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 6px 18px -6px rgba(251, 146, 60, 0.08);
   position: relative;
   overflow: visible;
 }
@@ -686,11 +577,10 @@ body {
   background: #ffffff;
   border: 1.5px solid #e2e8f0;
   border-radius: 28px;
-  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 6px 18px -6px rgba(15, 23, 42, 0.05);
   overflow: hidden;
 }
 
-/* Distinct pastel table header chips */
 .pastel-th-sky {
   background-color: #bae6fd !important;
   color: #0369a1 !important;
@@ -728,7 +618,6 @@ body {
   color: #334155 !important;
 }
 
-/* Kuitansi button matching Screenshot 1 */
 .btn-print-kuitansi {
   background-color: #e0f2fe;
   color: #0369a1;
@@ -742,7 +631,7 @@ body {
   gap: 6px;
   font-size: 11px;
   box-shadow: 0 2px 4px rgba(3, 105, 161, 0.08);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
   cursor: pointer;
 }
 .btn-print-kuitansi:hover {
@@ -756,7 +645,6 @@ body {
   transform: scale(0.97);
 }
 
-/* Status pills matching Screenshot 1 */
 .status-pill-lunas {
   background-color: #bbf7d0;
   color: #15803d;
@@ -781,15 +669,38 @@ body {
   align-items: center;
   gap: 4px;
 }
+.status-pill-kadaluarsa {
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  font-weight: 800;
+  padding: 3px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.status-pill-batal {
+  background-color: #ffe4e6;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  font-weight: 800;
+  padding: 3px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
-/* =======================================================
-   SMURF FROSTED CARDS & CRUD POPUP SYSTEM
-   ======================================================= */
 .royal-blue-sidebar {
   background: linear-gradient(180deg, #072a6b 0%, #0d3b8f 25%, #1554c2 65%, #0b317a 100%) !important;
+  color: #ffffff;
   border-right: 1.5px solid rgba(56, 189, 248, 0.4) !important;
-  box-shadow: 6px 0 28px -4px rgba(2, 44, 115, 0.4), 0 0 15px rgba(6, 182, 212, 0.2) !important;
+  box-shadow: 4px 0 16px -4px rgba(2, 44, 115, 0.25) !important;
   position: relative;
+  overflow: hidden;
 }
 
 @media (min-width: 768px) {
@@ -800,22 +711,8 @@ body {
     align-self: flex-start;
     overflow-y: auto;
     overflow-x: hidden;
+    contain: layout style paint;
   }
-}
-
-.royal-blue-sidebar::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    radial-gradient(circle at 10% 15%, rgba(56, 189, 248, 0.25) 0%, transparent 45%),
-    radial-gradient(circle at 90% 85%, rgba(6, 182, 212, 0.2) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(37, 99, 235, 0.15) 0%, transparent 60%);
-  pointer-events: none;
-  z-index: 0;
 }
 
 .smurf-mobile-drawer {
@@ -825,11 +722,9 @@ body {
 }
 
 .smurf-panel-glow {
-  background: rgba(255, 255, 255, 0.94) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.97) !important;
   border: 1.5px solid rgba(56, 189, 248, 0.45) !important;
-  box-shadow: 0 16px 45px -8px rgba(14, 165, 233, 0.18), 0 0 20px rgba(56, 189, 248, 0.12), 0 0 0 1px rgba(255, 255, 255, 0.9) inset !important;
+  box-shadow: 0 10px 28px -6px rgba(14, 165, 233, 0.14) !important;
   border-radius: 28px;
 }
 
@@ -838,13 +733,13 @@ body {
   color: #0369a1 !important;
   font-weight: 900 !important;
   border: 1.5px solid #38bdf8 !important;
-  box-shadow: 0 8px 24px -2px rgba(6, 182, 212, 0.45), 0 0 14px rgba(56, 189, 248, 0.4) !important;
+  box-shadow: 0 6px 16px -2px rgba(6, 182, 212, 0.35) !important;
   transform: scale(1.02);
 }
 
 .smurf-nav-item {
   color: rgba(255, 255, 255, 0.88);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s ease, transform 0.2s ease;
 }
 .smurf-nav-item:hover {
   background: rgba(255, 255, 255, 0.14) !important;
@@ -853,89 +748,11 @@ body {
   transform: translateX(3px);
 }
 
-/* Inside the App (Dashboard & Parent): Dynamic moving ambient orbs (Optimized GPU blur) */
-.smurf-ambient-orb {
-  position: fixed;
-  border-radius: 9999px;
-  pointer-events: none;
-  z-index: 0;
-  filter: blur(65px);
-  opacity: 0.72;
-  transform: translateZ(0);
-  will-change: transform;
-}
-
-.smurf-orb-1 {
-  width: 520px;
-  height: 520px;
-  top: -80px;
-  right: -60px;
-  background: radial-gradient(circle, rgba(6, 182, 212, 0.38) 0%, rgba(14, 165, 233, 0.18) 50%, transparent 75%);
-  animation: smurfOrbDrift1 20s ease-in-out infinite alternate;
-}
-
-.smurf-orb-2 {
-  width: 560px;
-  height: 560px;
-  bottom: 0%;
-  left: 15%;
-  background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, rgba(59, 130, 246, 0.14) 55%, transparent 80%);
-  animation: smurfOrbDrift2 24s ease-in-out infinite alternate;
-}
-
-.smurf-orb-3 {
-  width: 440px;
-  height: 440px;
-  top: 40%;
-  right: 18%;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(6, 182, 212, 0.12) 60%, transparent 80%);
-  animation: smurfOrbDrift3 18s ease-in-out infinite alternate;
-}
-
-@keyframes smurfOrbDrift1 {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(-100px, 90px) scale(1.16);
-  }
-  100% {
-    transform: translate(-160px, 30px) scale(0.95);
-  }
-}
-
-@keyframes smurfOrbDrift2 {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(110px, -80px) scale(1.14);
-  }
-  100% {
-    transform: translate(40px, -130px) scale(0.92);
-  }
-}
-
-@keyframes smurfOrbDrift3 {
-  0% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(-80px, -60px) scale(1.2);
-  }
-  100% {
-    transform: translate(60px, 70px) scale(0.9);
-  }
-}
-
-/* CRUD Pop-Up Modal System */
 .crud-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: 99999;
-  background: rgba(2, 6, 23, 0.68);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(2, 6, 23, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -966,9 +783,6 @@ body {
   to { opacity: 1; transform: scale(1); }
 }
 
-/* =======================================================
-   INTERACTIVE ROTATING 4 LOGIN FEATURE ICONS
-   ======================================================= */
 @keyframes loginOrbitRingSpin {
   0% {
     transform: rotate(0deg);
@@ -1045,10 +859,6 @@ body {
   border-color: rgba(103, 232, 249, 0.75) !important;
 }
 
-/* =======================================================
-   SUBTLE AESTHETIC PANEL BACKGROUND (ADMIN & WALI MURID)
-   Strictly behind all cards, text, and interactive elements
-   ======================================================= */
 .panel-subtle-bg-layer {
   position: absolute;
   inset: 0;
@@ -1059,21 +869,8 @@ body {
   z-index: 0;
   overflow: hidden;
   user-select: none;
-  background-image:
-    radial-gradient(rgba(14, 116, 144, 0.045) 1.25px, transparent 1.25px),
-    radial-gradient(rgba(37, 99, 235, 0.03) 1px, transparent 1px),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.28) 0%, rgba(224, 242, 254, 0.16) 45%, rgba(186, 230, 253, 0.22) 100%);
-  background-size: 28px 28px, 56px 56px, 100% 100%;
-  background-position: 0 0, 14px 14px, 0 0;
-}
-
-.panel-subtle-svg-mesh {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0.8;
-  pointer-events: none;
+  contain: layout style paint;
+  background: transparent;
 }
 
 .panel-subtle-watermark {
@@ -1126,16 +923,11 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: 0.045 !important;
-  filter: grayscale(35%) contrast(1.1);
-  transform: scale(0.92);
+  opacity: 0.04 !important;
   pointer-events: none;
   user-select: none;
 }
 
-/* =======================================================
-   SIDEBAR BOTTOM ORNAMENTAL CORAK / PATTERN
-   ======================================================= */
 .sidebar-corak-ornament {
   position: relative;
   width: 100%;
@@ -1148,5 +940,28 @@ body {
     radial-gradient(circle at 50% 90%, rgba(56, 189, 248, 0.16) 0%, transparent 70%),
     linear-gradient(180deg, transparent 0%, rgba(8, 47, 73, 0.28) 100%);
   border-top: 1px solid rgba(125, 211, 252, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-in-right,
+  .animate-loading-bar,
+  .animate-pulse-halo,
+  .loading-orbit-ring,
+  .loading-orbit-counter,
+  .animate-laser-sweep,
+  .animate-tab-switch,
+  .animate-modern-fade,
+  .animate-pulse-glow,
+  .animate-waving-hand,
+  .animate-mascot-sway,
+  .animate-mascot-shadow,
+  .login-icon-orbit-ring,
+  .login-icon-idle-orbit,
+  .crud-modal-backdrop,
+  .crud-modal-card {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 

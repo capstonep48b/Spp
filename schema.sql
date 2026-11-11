@@ -1,11 +1,3 @@
--- ========================================================
--- SCHEMA DATABASE SUPABASE - APLIKASI SPP PAUD SETIA BHAKTI
--- Dokumentasi Lengkap Struktur Tabel, Relasi, Indeks & Realtime
--- Versi: 2.1 (Terverifikasi Tanpa Bug, Lengkap dengan Realtime & RLS)
--- ========================================================
-
--- 1. TABEL SETTINGS
--- Pengaturan Sekolah, Kredensial Admin, Periode Ajaran & Konfigurasi Midtrans
 CREATE TABLE IF NOT EXISTS public.settings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     school_name VARCHAR(255) NOT NULL DEFAULT 'PAUD SETIA BHAKTI',
@@ -34,7 +26,6 @@ CREATE TABLE IF NOT EXISTS public.settings (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migrasi idempotent kolom tabel settings
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS school_name VARCHAR(255) DEFAULT 'PAUD SETIA BHAKTI';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS address TEXT DEFAULT 'Paud setia bhakti, GMQR+P5P, Purwadadi Tim., Kec. Purwadadi, Kabupaten Subang, Jawa Barat 46385';
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS phone VARCHAR(50) DEFAULT '089503222835';
@@ -58,7 +49,6 @@ ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS tarif_playgroup NUMERIC(12,
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS tarif_kelas_a NUMERIC(12,2) DEFAULT 0;
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS tarif_kelas_b NUMERIC(12,2) DEFAULT 0;
 
--- Inisialisasi Settings default jika tabel masih kosong
 INSERT INTO public.settings (
     school_name, address, phone, academic_year, active_period_name, semester,
     admin_name, admin_username, admin_password, due_date_day,
@@ -73,8 +63,6 @@ SELECT
     '[{"name":"KELAS A","tarif":100000},{"name":"KELAS B","tarif":1200000}]'::jsonb
 WHERE NOT EXISTS (SELECT 1 FROM public.settings);
 
--- 2. TABEL STUDENTS
--- Biodata Murid, NIS/NIPD/NISN, Kelas, Tarif, Mutasi Kelas & Riwayat Tunggakan
 CREATE TABLE IF NOT EXISTS public.students (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nis VARCHAR(50) NOT NULL UNIQUE,
@@ -95,7 +83,7 @@ CREATE TABLE IF NOT EXISTS public.students (
     telepon VARCHAR(50),
     password VARCHAR(255) DEFAULT NULL,
     photo_url TEXT DEFAULT '',
-    status VARCHAR(50) DEFAULT 'Aktif', -- Status Akun & Login: 'Aktif' (ON), 'Non-Aktif' (OFF), 'Lulus' (OFF), 'Keluar' (OFF)
+    status VARCHAR(50) DEFAULT 'Aktif',
     keringanan_note VARCHAR(255) DEFAULT '',
     arrears_amount NUMERIC(12,2) DEFAULT 0,
     arrears_note VARCHAR(255) DEFAULT 'Tunggakan Tahun Sebelumnya',
@@ -107,7 +95,6 @@ CREATE TABLE IF NOT EXISTS public.students (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migrasi idempotent kolom tabel students
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS nipd VARCHAR(50) DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS nisn VARCHAR(50) DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS jk VARCHAR(10) DEFAULT 'L';
@@ -130,11 +117,8 @@ ALTER TABLE public.students ADD COLUMN IF NOT EXISTS start_active_year INT DEFAU
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS session_token VARCHAR(255) DEFAULT '';
 ALTER TABLE public.students ADD COLUMN IF NOT EXISTS class_history JSONB DEFAULT '[]';
 
--- Migrasi password default untuk akun siswa lama yang belum diset
 UPDATE public.students SET password = 'Sb' || nis WHERE password IS NULL OR password = '';
 
--- 3. TABEL TRANSACTIONS
--- Riwayat Pembayaran SPP (Kasir Manual, Bank Transfer, & Midtrans Gateway)
 CREATE TABLE IF NOT EXISTS public.transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID REFERENCES public.students(id) ON DELETE SET NULL,
@@ -153,10 +137,10 @@ CREATE TABLE IF NOT EXISTS public.transactions (
     payment_time TIMESTAMPTZ DEFAULT NULL,
     academic_year VARCHAR(50) DEFAULT NULL,
     period_name VARCHAR(100) DEFAULT NULL,
+    expires_at TIMESTAMPTZ DEFAULT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migrasi idempotent kolom tabel transactions
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS student_id UUID REFERENCES public.students(id) ON DELETE SET NULL;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS order_id VARCHAR(100) DEFAULT NULL;
@@ -166,9 +150,8 @@ ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS payment_time TIMESTAMPT
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS academic_year VARCHAR(50) DEFAULT NULL;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS period_name VARCHAR(100) DEFAULT NULL;
 ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS keringanan_note VARCHAR(255) DEFAULT '';
+ALTER TABLE public.transactions ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ DEFAULT NULL;
 
--- 4. TABEL ANNOUNCEMENTS
--- Berita, Pengumuman & Agenda Kegiatan Sekolah dengan Foto Dokumentasi
 CREATE TABLE IF NOT EXISTS public.announcements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title VARCHAR(255) NOT NULL,
@@ -179,12 +162,9 @@ CREATE TABLE IF NOT EXISTS public.announcements (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migrasi idempotent kolom tabel announcements
 ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT '';
 ALTER TABLE public.announcements ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
 
--- 5. TABEL STUDENT NOTES
--- Catatan Evaluasi & Catatan Penting TU / Guru untuk Murid beserta Balasan Wali
 CREATE TABLE IF NOT EXISTS public.student_notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
@@ -198,12 +178,9 @@ CREATE TABLE IF NOT EXISTS public.student_notes (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migrasi idempotent kolom tabel student_notes
 ALTER TABLE public.student_notes ADD COLUMN IF NOT EXISTS comments TEXT DEFAULT '[]';
 ALTER TABLE public.student_notes ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
 
--- 6. TABEL COMPLAINTS
--- Layanan Pengaduan & Aspirasi Wali Murid Terhubung Chat Interaktif (Batas Aktif 1 Jam)
 CREATE TABLE IF NOT EXISTS public.complaints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id UUID REFERENCES public.students(id) ON DELETE CASCADE,
@@ -220,13 +197,11 @@ CREATE TABLE IF NOT EXISTS public.complaints (
     expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '1 hour')
 );
 
--- Migrasi idempotent kolom tabel complaints
 ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS admin_reply TEXT DEFAULT '';
 ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS messages TEXT DEFAULT '[]';
 ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS is_read BOOLEAN DEFAULT false;
 ALTER TABLE public.complaints ADD COLUMN IF NOT EXISTS expires_at TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '1 hour');
 
--- 7. PENGATURAN ROW LEVEL SECURITY (RLS)
 ALTER TABLE public.settings DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.students DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transactions DISABLE ROW LEVEL SECURITY;
@@ -255,7 +230,6 @@ CREATE POLICY "Allow All Announcements" ON public.announcements FOR ALL TO publi
 CREATE POLICY "Allow All Student Notes" ON public.student_notes FOR ALL TO public USING (true) WITH CHECK (true);
 CREATE POLICY "Allow All Complaints" ON public.complaints FOR ALL TO public USING (true) WITH CHECK (true);
 
--- 8. OPTIMASI INDEKS (INDEXING) UNTUK PERFORMA QUERY TINGGI
 CREATE INDEX IF NOT EXISTS idx_students_nis ON public.students(nis);
 CREATE INDEX IF NOT EXISTS idx_students_kelas ON public.students(kelas);
 CREATE INDEX IF NOT EXISTS idx_students_status ON public.students(status);
@@ -271,8 +245,6 @@ CREATE INDEX IF NOT EXISTS idx_complaints_student_id ON public.complaints(studen
 CREATE INDEX IF NOT EXISTS idx_complaints_status ON public.complaints(status);
 CREATE INDEX IF NOT EXISTS idx_complaints_created_at ON public.complaints(created_at DESC);
 
--- 9. SUPABASE REALTIME PUBLICATION SETUP
--- Memastikan tabel-tabel terdaftar di publikasi Supabase Realtime agar sinkronisasi live
 DO $$
 BEGIN
   IF NOT EXISTS (

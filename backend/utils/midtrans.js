@@ -231,18 +231,38 @@ function getInitialMethodLabelForChannel(preferredChannel) {
   return 'Midtrans Snap Online';
 }
 
-function formatMidtransPaymentDetails(payload = {}) {
+function formatMidtransPaymentDetails(payload = {}, coreApiUrl = '') {
   const vaFirst = Array.isArray(payload.va_numbers) && payload.va_numbers.length > 0 ? payload.va_numbers[0] : null;
   const vaBank = vaFirst?.bank ? String(vaFirst.bank).toUpperCase() : (payload.permata_va_number ? 'PERMATA' : '');
   const vaNumber = vaFirst?.va_number ? String(vaFirst.va_number) : (payload.permata_va_number ? String(payload.permata_va_number) : '');
+  const paymentType = String(payload.payment_type || '').trim();
+  const pTypeLower = paymentType.toLowerCase();
+  const transactionId = payload.transaction_id ? String(payload.transaction_id).trim() : '';
+  const acquirerRaw = payload.acquirer ? String(payload.acquirer).trim() : '';
+  const acquirerLower = acquirerRaw.toLowerCase();
+  const coreOrigin = String(coreApiUrl || '').replace(/\/v\d+\/?$/i, '').replace(/\/+$/, '') || 'https://api.sandbox.midtrans.com';
+  const actions = Array.isArray(payload.actions) ? payload.actions : [];
+  const qrAction = actions.find(a => a && a.url && (/generate-qr-code/i.test(String(a.name || '')) || /\/qr-code/i.test(String(a.url || ''))));
+  let qrCodeUrl = qrAction ? String(qrAction.url).trim() : '';
+  if (!qrCodeUrl && transactionId) {
+    if (pTypeLower === 'qris' || acquirerLower.includes('shopee')) {
+      qrCodeUrl = acquirerLower.includes('shopee')
+        ? `${coreOrigin}/v2/qris/shopeepay/sppq_${transactionId}/qr-code`
+        : `${coreOrigin}/v2/qris/${transactionId}/qr-code`;
+    } else if (pTypeLower === 'gopay') {
+      qrCodeUrl = `${coreOrigin}/v2/gopay/${transactionId}/qr-code`;
+    }
+  }
   return {
-    paymentType: String(payload.payment_type || '').trim(),
+    paymentType,
+    transactionId,
     vaBank,
     vaNumber,
     billerCode: payload.biller_code ? String(payload.biller_code) : '',
     billKey: payload.bill_key ? String(payload.bill_key) : '',
     paymentCode: payload.payment_code ? String(payload.payment_code) : '',
-    acquirer: payload.acquirer ? String(payload.acquirer).toUpperCase() : ''
+    acquirer: acquirerRaw ? acquirerRaw.toUpperCase() : '',
+    qrCodeUrl
   };
 }
 

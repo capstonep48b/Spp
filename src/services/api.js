@@ -397,7 +397,12 @@ const AppApi = {
           vaBank: data.paymentDetails?.vaBank || '',
           billKey: data.paymentDetails?.billKey || '',
           billerCode: data.paymentDetails?.billerCode || '',
-          paymentCode: data.paymentDetails?.paymentCode || ''
+          paymentCode: data.paymentDetails?.paymentCode || '',
+          qrCodeUrl: data.paymentDetails?.qrCodeUrl || '',
+          transactionId: data.paymentDetails?.transactionId || '',
+          acquirer: data.paymentDetails?.acquirer || '',
+          paymentType: data.paymentDetails?.paymentType || '',
+          snapRedirectUrl: data.redirectUrl || ''
         });
       }
       return {
@@ -434,7 +439,11 @@ const AppApi = {
           vaBank: pd.vaBank || '',
           billKey: pd.billKey || '',
           billerCode: pd.billerCode || '',
-          paymentCode: pd.paymentCode || ''
+          paymentCode: pd.paymentCode || '',
+          qrCodeUrl: pd.qrCodeUrl || '',
+          transactionId: pd.transactionId || '',
+          acquirer: pd.acquirer || '',
+          paymentType: data.paymentType || pd.paymentType || ''
         });
       }
       return {

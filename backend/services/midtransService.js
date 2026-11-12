@@ -444,7 +444,7 @@ async function createSnapTransaction(config, payload, corsHeaders, fetchFn = glo
                     }
                     cleanupDraftOrder(newestPending.order_id);
                   } else {
-                    const conflictDetails = formatMidtransPaymentDetails(midJson);
+                    const conflictDetails = formatMidtransPaymentDetails(midJson, config.midtransCoreApiUrl);
                     return buildPendingConflictResponse(
                       newestPending,
                       billMonthLabel,
@@ -613,7 +613,7 @@ async function createSnapTransaction(config, payload, corsHeaders, fetchFn = glo
                   ).catch(() => null);
                 }
               } else {
-                const draftPaymentDetails = formatMidtransPaymentDetails(midJson);
+                const draftPaymentDetails = formatMidtransPaymentDetails(midJson, config.midtransCoreApiUrl);
                 const draftRow = syncDraftRes.updatedTransaction || {
                   id: existingDraft.orderId,
                   student_id: existingDraft.studentId,
@@ -951,7 +951,7 @@ async function checkCoreTransactionStatus(config, orderId, corsHeaders, fetchFn 
     mappedStatus = 'Kadaluarsa';
   }
   const methodLabel = formatMidtransMethodLabel(midJson);
-  const paymentDetails = formatMidtransPaymentDetails(midJson);
+  const paymentDetails = formatMidtransPaymentDetails(midJson, config.midtransCoreApiUrl);
   const syncRes = await syncMidtransResultToSupabase(
     config,
     { ...midJson, order_id: midJson.order_id || orderId },

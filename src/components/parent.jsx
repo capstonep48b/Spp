@@ -127,6 +127,7 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
   const [pendingExpiryTick, setPendingExpiryTick] = useState(0);
   const [copiedPayCodeKey, setCopiedPayCodeKey] = useState(null);
   const syncedExpiredOrdersRef = useRef(new Set());
+  const hydratedPendingOrdersRef = useRef(new Set());
   useEffect(() => {
     if (parentNavIntent && parentNavIntent.tab) {
       setActiveTab(parentNavIntent.tab);
@@ -294,6 +295,14 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
   }, [expiredPendingTransactions, onSyncPendingOrder]);
   useEffect(() => {
     if (!onSyncPendingOrder || activePendingTransactions.length === 0) return undefined;
+    activePendingTransactions.forEach(trx => {
+      if (trx.orderId && !trx.vaNumber && !trx.billKey && !trx.paymentCode && !trx.qrCodeUrl && !hydratedPendingOrdersRef.current.has(trx.orderId)) {
+        hydratedPendingOrdersRef.current.add(trx.orderId);
+        onSyncPendingOrder(trx, {
+          manual: false
+        });
+      }
+    });
     const pollTimer = setInterval(() => {
       activePendingTransactions.forEach(trx => {
         if (trx.orderId) {
@@ -1551,67 +1560,107 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
                             ? 'Kode Bayar'
                             : '';
                       const payCodeVal = trx.vaNumber || trx.billKey || trx.paymentCode || '';
+                      const qrCodeUrl = trx.qrCodeUrl || '';
+                      const isQrisTrx = Boolean(qrCodeUrl) || String(trx.paymentType || '').toLowerCase() === 'qris' || /qris|gopay|shopeepay/i.test(String(trx.method || ''));
+                      const isSandboxEnv = !window.AppEnv?.midtransIsProduction || String(trx.snapUrl || window.AppEnv?.midtransSnapUrl || '').includes('sandbox');
                       const copyKey = (trx.orderId || trx.id || idx) + '_code';
-                      return <div key={trx.orderId || trx.id || idx} className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-50/80 via-white to-orange-50/40 border border-amber-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 shadow-2xs">
-                                  <div className="space-y-2 min-w-0 flex-1">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <h4 className="font-black text-slate-900 text-base sm:text-lg">{trx.month}</h4>
-                                      <span className="status-pill-menunggu">
-                                        <Icon name="clock" size={11} /> Menunggu Pembayaran
-                                      </span>
+                      const qrCopyKey = (trx.orderId || trx.id || idx) + '_qr';
+                      return <div key={trx.orderId || trx.id || idx} className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-50/80 via-white to-orange-50/40 border border-amber-200 flex flex-col gap-3.5 shadow-2xs">
+                                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                                    <div className="space-y-2 min-w-0 flex-1">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <h4 className="font-black text-slate-900 text-base sm:text-lg">{trx.month}</h4>
+                                        <span className="status-pill-menunggu">
+                                          <Icon name="clock" size={11} /> Menunggu Pembayaran
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 font-bold">
+                                        <span className="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 font-mono text-[11px] text-slate-700 break-all">
+                                          Order: {trx.orderId || '-'}
+                                        </span>
+                                        <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-extrabold">
+                                          {trx.method && trx.method !== '-' ? trx.method : 'Midtrans Snap Online'}
+                                        </span>
+                                        {payCodeVal && <span className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 text-[11px] font-mono font-black max-w-full">
+                                            <span className="break-all">{payCodeLabel}: {payCodeVal}</span>
+                                            <button type="button" onClick={() => {
+                                    try {
+                                      navigator.clipboard.writeText(payCodeVal);
+                                      setCopiedPayCodeKey(copyKey);
+                                      setTimeout(() => setCopiedPayCodeKey(null), 2000);
+                                    } catch (e) {}
+                                  }} className="px-1.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-sans text-[10px] font-bold flex items-center gap-1 transition-colors">
+                                              <Icon name={copiedPayCodeKey === copyKey ? 'check' : 'copy'} size={10} />
+                                              <span>{copiedPayCodeKey === copyKey ? 'Disalin' : 'Salin'}</span>
+                                            </button>
+                                          </span>}
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-2 text-xs font-extrabold text-amber-900 pt-0.5">
+                                        <Icon name="clock" size={13} className="text-amber-600 shrink-0" />
+                                        {expMs > 0 ? <span>
+                                            Sisa Waktu: <span className="font-mono font-black text-rose-700 bg-white px-2 py-0.5 rounded-md border border-amber-300"><LiveCountdownText expiresAtMs={expMs} /></span> {expClock ? `(Batas ${expClock})` : ''}
+                                          </span> : <span>Menunggu batas waktu pembayaran dari Midtrans</span>}
+                                      </div>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 font-bold">
-                                      <span className="px-2.5 py-0.5 rounded-lg bg-white border border-slate-200 font-mono text-[11px] text-slate-700 break-all">
-                                        Order: {trx.orderId || '-'}
-                                      </span>
-                                      <span className="px-2.5 py-0.5 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-[11px] font-extrabold">
-                                        {trx.method && trx.method !== '-' ? trx.method : 'Midtrans Snap Online'}
-                                      </span>
-                                      {payCodeVal && <span className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-900 text-[11px] font-mono font-black max-w-full">
-                                          <span className="break-all">{payCodeLabel}: {payCodeVal}</span>
+                                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                                      <div className="text-left sm:text-right bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl border sm:border-0 border-amber-200">
+                                        <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Tagihan</span>
+                                        <div className="font-black text-slate-900 text-lg sm:text-xl whitespace-nowrap">{formatRupiah(trx.amount)}</div>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <button type="button" onClick={() => onCheckPendingStatus && onCheckPendingStatus(trx)} className="py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs">
+                                          <Icon name="refresh-cw" size={13} />
+                                          <span>Cek Status</span>
+                                        </button>
+                                        {onRecreatePendingOrder && trx.orderId && <button type="button" onClick={() => onRecreatePendingOrder(trx)} className="py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs" title="Batalkan transaksi lama dan langsung buat VA / QRIS baru">
+                                            <Icon name="repeat" size={13} />
+                                            <span>{isQrisTrx ? 'Buat QR Baru' : 'Buat VA Baru'}</span>
+                                          </button>}
+                                        {onCancelPendingOrder && trx.orderId && <button type="button" onClick={() => onCancelPendingOrder(trx)} className="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs" title="Batalkan order ini dan ganti metode pembayaran">
+                                            <Icon name="x-circle" size={13} />
+                                            <span>Batalkan</span>
+                                          </button>}
+                                        <button type="button" onClick={() => onResumePendingMidtrans && onResumePendingMidtrans(trx)} className="py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black rounded-xl text-xs sm:text-sm shadow-md shadow-amber-500/25 transition-all flex items-center justify-center gap-1.5">
+                                          <Icon name="credit-card" size={15} />
+                                          <span>Lanjutkan Bayar</span>
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {qrCodeUrl && <div className="p-3.5 rounded-xl bg-white border border-indigo-200 flex flex-col sm:flex-row items-start sm:items-center gap-3.5 w-full">
+                                      <button type="button" onClick={() => setPreviewImage({
+                            url: qrCodeUrl,
+                            title: `Kode QRIS - ${trx.month}`
+                          })} className="w-20 h-20 rounded-xl border border-slate-200 bg-white p-1 shrink-0 overflow-hidden hover:border-indigo-400 transition-colors cursor-pointer" title="Klik untuk perbesar gambar QRIS">
+                                        <img src={qrCodeUrl} alt="Kode QRIS" className="w-full h-full object-contain" />
+                                      </button>
+                                      <div className="min-w-0 flex-1 w-full space-y-1.5">
+                                        <div className="text-[11px] font-black text-indigo-950 uppercase tracking-wider">URL Kode QRIS (Simulator / Scan)</div>
+                                        <div className="px-2.5 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-[11px] font-mono text-slate-700 break-all select-all">
+                                          {qrCodeUrl}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2 pt-0.5">
                                           <button type="button" onClick={() => {
-                                  try {
-                                    navigator.clipboard.writeText(payCodeVal);
-                                    setCopiedPayCodeKey(copyKey);
-                                    setTimeout(() => setCopiedPayCodeKey(null), 2000);
-                                  } catch (e) {}
-                                }} className="px-1.5 py-0.5 rounded bg-indigo-600 hover:bg-indigo-700 text-white font-sans text-[10px] font-bold flex items-center gap-1 transition-colors">
-                                            <Icon name={copiedPayCodeKey === copyKey ? 'check' : 'copy'} size={10} />
-                                            <span>{copiedPayCodeKey === copyKey ? 'Disalin' : 'Salin'}</span>
+                                try {
+                                  navigator.clipboard.writeText(qrCodeUrl);
+                                  setCopiedPayCodeKey(qrCopyKey);
+                                  setTimeout(() => setCopiedPayCodeKey(null), 2000);
+                                } catch (e) {}
+                              }} className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-black flex items-center gap-1.5 transition-colors shadow-2xs">
+                                            <Icon name={copiedPayCodeKey === qrCopyKey ? 'check' : 'copy'} size={12} />
+                                            <span>{copiedPayCodeKey === qrCopyKey ? 'URL Disalin ✓' : 'Salin URL QRIS'}</span>
                                           </button>
-                                        </span>}
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2 text-xs font-extrabold text-amber-900 pt-0.5">
-                                      <Icon name="clock" size={13} className="text-amber-600 shrink-0" />
-                                      {expMs > 0 ? <span>
-                                          Sisa Waktu: <span className="font-mono font-black text-rose-700 bg-white px-2 py-0.5 rounded-md border border-amber-300"><LiveCountdownText expiresAtMs={expMs} /></span> {expClock ? `(Batas ${expClock})` : ''}
-                                        </span> : <span>Menunggu batas waktu pembayaran dari Midtrans</span>}
-                                    </div>
-                                  </div>
-                                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
-                                    <div className="text-left sm:text-right bg-white sm:bg-transparent p-2.5 sm:p-0 rounded-xl border sm:border-0 border-amber-200">
-                                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Tagihan</span>
-                                      <div className="font-black text-slate-900 text-lg sm:text-xl">{formatRupiah(trx.amount)}</div>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <button type="button" onClick={() => onCheckPendingStatus && onCheckPendingStatus(trx)} className="py-2.5 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs">
-                                        <Icon name="refresh-cw" size={13} />
-                                        <span>Cek Status</span>
-                                      </button>
-                                      {onRecreatePendingOrder && trx.orderId && <button type="button" onClick={() => onRecreatePendingOrder(trx)} className="py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs" title="Batalkan VA/metode lama dan langsung buat VA/QRIS baru">
-                                          <Icon name="repeat" size={13} />
-                                          <span>Buat VA Baru</span>
-                                        </button>}
-                                      {onCancelPendingOrder && trx.orderId && <button type="button" onClick={() => onCancelPendingOrder(trx)} className="py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-black rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 shadow-2xs" title="Batalkan order ini dan ganti metode pembayaran">
-                                          <Icon name="x-circle" size={13} />
-                                          <span>Batalkan</span>
-                                        </button>}
-                                      <button type="button" onClick={() => onResumePendingMidtrans && onResumePendingMidtrans(trx)} className="py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black rounded-xl text-xs sm:text-sm shadow-md shadow-amber-500/25 transition-all flex items-center justify-center gap-1.5">
-                                        <Icon name="credit-card" size={15} />
-                                        <span>Lanjutkan Bayar</span>
-                                      </button>
-                                    </div>
-                                  </div>
+                                          {isSandboxEnv && <a href="https://simulator.sandbox.midtrans.com/v2/qris/index" target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-black flex items-center gap-1.5 transition-colors">
+                                              <Icon name="external-link" size={12} />
+                                              <span>Buka Simulator QRIS</span>
+                                            </a>}
+                                        </div>
+                                      </div>
+                                    </div>}
+                                  {!qrCodeUrl && isQrisTrx && <div className="px-3 py-2 rounded-xl bg-indigo-50/70 border border-indigo-200 text-[11px] font-semibold text-indigo-900 flex items-center gap-2 w-full">
+                                      <Icon name="qr-code" size={14} className="text-indigo-600 shrink-0" />
+                                      <span>URL QRIS belum dimuat di sesi ini. Klik <strong>Cek Status</strong> atau <strong>Lanjutkan Bayar</strong> untuk memunculkan QRIS.</span>
+                                    </div>}
                                 </div>;
                     })}
                           </div>

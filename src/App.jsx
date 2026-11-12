@@ -1402,6 +1402,11 @@ function App({
         billKey: pd.billKey || row.bill_key || mapped.billKey || trx.billKey || '',
         billerCode: pd.billerCode || row.biller_code || mapped.billerCode || trx.billerCode || '',
         paymentCode: pd.paymentCode || row.payment_code || mapped.paymentCode || trx.paymentCode || '',
+        qrCodeUrl: pd.qrCodeUrl || row.qr_code_url || mapped.qrCodeUrl || trx.qrCodeUrl || '',
+        transactionId: pd.transactionId || row.transaction_id || mapped.transactionId || trx.transactionId || '',
+        acquirer: pd.acquirer || row.acquirer || mapped.acquirer || trx.acquirer || '',
+        paymentType: data.paymentType || pd.paymentType || row.payment_type || mapped.paymentType || trx.paymentType || '',
+        snapRedirectUrl: mapped.snapRedirectUrl || trx.snapRedirectUrl || '',
         expiresAt: data.expiryTime || mapped.expiresAt || trx.expiresAt || '',
         expiresAtMs: Number(data.expiresAtMs || 0) || mapped.expiresAtMs || trx.expiresAtMs || 0
       };
@@ -1415,6 +1420,11 @@ function App({
           billKey: updatedTrx.billKey,
           billerCode: updatedTrx.billerCode,
           paymentCode: updatedTrx.paymentCode,
+          qrCodeUrl: updatedTrx.qrCodeUrl,
+          transactionId: updatedTrx.transactionId,
+          acquirer: updatedTrx.acquirer,
+          paymentType: updatedTrx.paymentType,
+          snapRedirectUrl: updatedTrx.snapRedirectUrl,
           expiresAt: updatedTrx.expiresAt,
           expiresAtMs: updatedTrx.expiresAtMs
         });
@@ -1708,6 +1718,11 @@ function App({
           billKey: pd.billKey || rawTrx?.bill_key || baseMapped.billKey || '',
           billerCode: pd.billerCode || rawTrx?.biller_code || baseMapped.billerCode || '',
           paymentCode: pd.paymentCode || rawTrx?.payment_code || baseMapped.paymentCode || '',
+          qrCodeUrl: pd.qrCodeUrl || rawTrx?.qr_code_url || baseMapped.qrCodeUrl || '',
+          transactionId: pd.transactionId || rawTrx?.transaction_id || baseMapped.transactionId || '',
+          acquirer: pd.acquirer || rawTrx?.acquirer || baseMapped.acquirer || '',
+          paymentType: pendingData?.paymentType || pd.paymentType || rawTrx?.payment_type || baseMapped.paymentType || '',
+          snapRedirectUrl: pendingData?.redirectUrl || baseMapped.snapRedirectUrl || '',
           expiresAt: pendingData?.expiryTime || rawTrx?.expires_at || baseMapped.expiresAt || '',
           expiresAtMs: expMs,
           createdAtMs: baseMapped.createdAtMs || Date.now()
@@ -1722,6 +1737,11 @@ function App({
             billKey: pendingTrx.billKey,
             billerCode: pendingTrx.billerCode,
             paymentCode: pendingTrx.paymentCode,
+            qrCodeUrl: pendingTrx.qrCodeUrl,
+            transactionId: pendingTrx.transactionId,
+            acquirer: pendingTrx.acquirer,
+            paymentType: pendingTrx.paymentType,
+            snapRedirectUrl: pendingTrx.snapRedirectUrl,
             expiresAt: pendingTrx.expiresAt,
             expiresAtMs: pendingTrx.expiresAtMs,
             createdAtMs: pendingTrx.createdAtMs
@@ -1769,6 +1789,11 @@ function App({
           billKey: pd.billKey || rawTrx?.bill_key || sr.bill_key || baseMapped.billKey || '',
           billerCode: pd.billerCode || rawTrx?.biller_code || sr.biller_code || baseMapped.billerCode || '',
           paymentCode: pd.paymentCode || rawTrx?.payment_code || sr.payment_code || baseMapped.paymentCode || '',
+          qrCodeUrl: pd.qrCodeUrl || rawTrx?.qr_code_url || baseMapped.qrCodeUrl || '',
+          transactionId: pd.transactionId || rawTrx?.transaction_id || sr.transaction_id || baseMapped.transactionId || '',
+          acquirer: pd.acquirer || rawTrx?.acquirer || sr.acquirer || baseMapped.acquirer || '',
+          paymentType: gatewayRes.paymentType || pd.paymentType || rawTrx?.payment_type || sr.payment_type || baseMapped.paymentType || '',
+          snapRedirectUrl: gatewayRes.rawCreate?.redirectUrl || baseMapped.snapRedirectUrl || '',
           expiresAt: gatewayRes.expiryTime || gatewayRes.rawCreate?.expiryTime || rawTrx?.expires_at || baseMapped.expiresAt || '',
           expiresAtMs: expMs
         };
@@ -1782,6 +1807,11 @@ function App({
             billKey: mappedTrx.billKey,
             billerCode: mappedTrx.billerCode,
             paymentCode: mappedTrx.paymentCode,
+            qrCodeUrl: mappedTrx.qrCodeUrl,
+            transactionId: mappedTrx.transactionId,
+            acquirer: mappedTrx.acquirer,
+            paymentType: mappedTrx.paymentType,
+            snapRedirectUrl: mappedTrx.snapRedirectUrl,
             expiresAt: mappedTrx.expiresAt,
             expiresAtMs: mappedTrx.expiresAtMs
           });

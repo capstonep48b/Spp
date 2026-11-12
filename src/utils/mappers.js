@@ -168,6 +168,11 @@ const saveTrxMetaCache = (orderId, meta = {}) => {
     if (meta.billKey) nextEntry.billKey = meta.billKey;
     if (meta.billerCode) nextEntry.billerCode = meta.billerCode;
     if (meta.paymentCode) nextEntry.paymentCode = meta.paymentCode;
+    if (meta.qrCodeUrl) nextEntry.qrCodeUrl = meta.qrCodeUrl;
+    if (meta.transactionId) nextEntry.transactionId = meta.transactionId;
+    if (meta.acquirer) nextEntry.acquirer = meta.acquirer;
+    if (meta.paymentType) nextEntry.paymentType = meta.paymentType;
+    if (meta.snapRedirectUrl) nextEntry.snapRedirectUrl = meta.snapRedirectUrl;
     nextEntry.updatedAt = Date.now();
     const entries = Object.entries({
       ...prevMap,
@@ -240,13 +245,17 @@ const mapTransactionFromDb = row => {
     orderId: row.order_id || '',
     snapToken: row.snap_token || meta?.snapToken || '',
     snapUrl: row.snap_url || meta?.snapUrl || '',
-    paymentType: row.payment_type || '',
+    paymentType: row.payment_type || meta?.paymentType || '',
     paymentTime: row.payment_time || '',
     vaNumber: row.va_number || meta?.vaNumber || '',
     vaBank: row.va_bank || meta?.vaBank || '',
     billKey: row.bill_key || meta?.billKey || '',
     billerCode: row.biller_code || meta?.billerCode || '',
     paymentCode: row.payment_code || meta?.paymentCode || '',
+    qrCodeUrl: row.qr_code_url || meta?.qrCodeUrl || '',
+    transactionId: row.transaction_id || meta?.transactionId || '',
+    acquirer: row.acquirer || meta?.acquirer || '',
+    snapRedirectUrl: row.snap_redirect_url || meta?.snapRedirectUrl || '',
     createdAtMs,
     expiresAt: row.expires_at || meta?.expiresAt || '',
     expiresAtMs,

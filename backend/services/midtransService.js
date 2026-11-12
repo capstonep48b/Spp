@@ -1,4 +1,4 @@
-const { isPlaceholderKey } = require('../config/env');
+const { isPlaceholderKey, sanitizeApiKey, describeMidtransServerKeyShape } = require('../config/env');
 const { encodeBase64Utf8 } = require('../utils/crypto');
 const {
   DEFAULT_SNAP_EXPIRY_MS,
@@ -105,12 +105,16 @@ async function withBillCreationLock(lockKey, taskFn) {
 }
 
 async function resolveActiveMidtransCredentials(config, dbSettings) {
-  let clientKey = config.midtransClientKey;
-  let serverKey = config.midtransServerKey;
+  let clientKey = sanitizeApiKey(config.midtransClientKey, 'MIDTRANS_CLIENT_KEY');
+  let serverKey = sanitizeApiKey(config.midtransServerKey, 'MIDTRANS_SERVER_KEY');
   let source = 'env';
 
-  const dbClient = dbSettings && typeof dbSettings.midtrans_client_key === 'string' ? dbSettings.midtrans_client_key.trim() : '';
-  const dbServer = dbSettings && typeof dbSettings.midtrans_server_key === 'string' ? dbSettings.midtrans_server_key.trim() : '';
+  const dbClient = dbSettings && typeof dbSettings.midtrans_client_key === 'string'
+    ? sanitizeApiKey(dbSettings.midtrans_client_key, 'MIDTRANS_CLIENT_KEY')
+    : '';
+  const dbServer = dbSettings && typeof dbSettings.midtrans_server_key === 'string'
+    ? sanitizeApiKey(dbSettings.midtrans_server_key, 'MIDTRANS_SERVER_KEY')
+    : '';
 
   if (isPlaceholderKey(clientKey) && dbClient && !isPlaceholderKey(dbClient) && /^(?:SB-)?Mid-client-/i.test(dbClient)) {
     clientKey = dbClient;
@@ -123,16 +127,38 @@ async function resolveActiveMidtransCredentials(config, dbSettings) {
 
   const clientKeyConfigured = !isPlaceholderKey(clientKey);
   const serverKeyConfigured = !isPlaceholderKey(serverKey);
+  const serverKeyFormat = describeMidtransServerKeyShape(serverKey, config.isProduction);
 
   return {
     clientKey,
     serverKey,
     clientKeyConfigured,
     serverKeyConfigured,
+    serverKeyFormat,
     ready: clientKeyConfigured && serverKeyConfigured,
     isDemoPlaceholder: !clientKeyConfigured || !serverKeyConfigured,
     source
   };
+}
+
+function buildMidtransUnauthorizedMessage(serverKey, isProduction, rawErrorDetails) {
+  const shape = describeMidtransServerKeyShape(serverKey, isProduction);
+  if (shape === 'client_key_wrong_field') {
+    return `${rawErrorDetails} (MIDTRANS_SERVER_KEY saat ini terisi Client Key. Wajib diisi Server Key Sandbox yang diawali SB-Mid-server-)`;
+  }
+  if (shape === 'missing_sandbox_prefix') {
+    return `${rawErrorDetails} (MIDTRANS_SERVER_KEY saat ini diawali Mid-server- tanpa awalan SB-. Untuk mode SANDBOX, gunakan Server Key Sandbox yang diawali SB-Mid-server-)`;
+  }
+  if (shape === 'sandbox_key_in_production_mode') {
+    return `${rawErrorDetails} (MIDTRANS_SERVER_KEY menggunakan key Sandbox SB-Mid-server-, sedangkan MIDTRANS_IS_PRODUCTION bernilai true)`;
+  }
+  if (shape === 'masked_placeholder') {
+    return `${rawErrorDetails} (MIDTRANS_SERVER_KEY terisi teks '...' dan belum diisi nilai key penuh di Cloudflare Variables & Secrets)`;
+  }
+  if (shape === 'sandbox_server_key' || shape === 'production_server_key') {
+    return `${rawErrorDetails} (MIDTRANS_SERVER_KEY ditolak Midtrans; pastikan key lengkap yang tersimpan di Cloudflare Secrets cocok dan sepasang dengan MIDTRANS_CLIENT_KEY)`;
+  }
+  return `${rawErrorDetails} (Format MIDTRANS_SERVER_KEY di Cloudflare Variables & Secrets tidak valid; pastikan menyalin Server Key Sandbox yang diawali SB-Mid-server-)`;
 }
 
 async function fetchCoreOrderStatusRaw(config, serverKey, orderId, fetchFn = globalThis.fetch) {
@@ -732,7 +758,7 @@ async function createSnapTransaction(config, payload, corsHeaders, fetchFn = glo
         ? midtransJson.error_messages.join('; ')
         : (midtransJson.status_message || midtransJson.message || midtransJson.error || `HTTP ${midtransRes.status}`);
       const errorDetails = midtransRes.status === 401
-        ? `${rawErrorDetails} (Pastikan MIDTRANS_SERVER_KEY valid dan sesuai mode ${config.mode.toUpperCase()} di env/Cloudflare Secrets)`
+        ? buildMidtransUnauthorizedMessage(creds.serverKey, config.isProduction, rawErrorDetails)
         : rawErrorDetails;
       return jsonResult(midtransRes.status >= 400 ? midtransRes.status : 502, {
         ok: false,
@@ -835,10 +861,13 @@ async function checkCoreTransactionStatus(config, orderId, corsHeaders, fetchFn 
   }
 
   if (!midRes.ok && String(midJson.status_code) !== '404') {
+    const rawMsg = midJson.status_message || `HTTP ${midRes.status}`;
     return jsonResult(midRes.status >= 400 ? midRes.status : 502, {
       ok: false,
       code: 'MIDTRANS_STATUS_ERROR',
-      message: midJson.status_message || `HTTP ${midRes.status}`,
+      message: midRes.status === 401
+        ? buildMidtransUnauthorizedMessage(creds.serverKey, config.isProduction, rawMsg)
+        : rawMsg,
       details: midJson
     }, corsHeaders);
   }

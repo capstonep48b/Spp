@@ -63,6 +63,7 @@ async function handleApiRequest(reqLike, rawEnv = {}, fetchFn = globalThis.fetch
       clientKey: creds.clientKey,
       clientKeyConfigured: creds.clientKeyConfigured,
       serverKeyConfigured: creds.serverKeyConfigured,
+      serverKeyFormat: creds.serverKeyFormat,
       ready: creds.ready,
       isDemoPlaceholder: creds.isDemoPlaceholder,
       credentialSource: creds.source,

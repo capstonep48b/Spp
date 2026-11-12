@@ -28,9 +28,34 @@ function stripQuotes(val) {
     (trimmed.startsWith('"') && trimmed.endsWith('"') && trimmed.length >= 2) ||
     (trimmed.startsWith("'") && trimmed.endsWith("'") && trimmed.length >= 2)
   ) {
-    return trimmed.slice(1, -1);
+    return trimmed.slice(1, -1).trim();
   }
   return trimmed;
+}
+
+function sanitizeApiKey(val, envVarName = '') {
+  let cleaned = stripQuotes(val);
+  if (envVarName) {
+    const prefixRe = new RegExp(`^${envVarName}\\s*=\\s*`, 'i');
+    if (prefixRe.test(cleaned)) {
+      cleaned = stripQuotes(cleaned.replace(prefixRe, ''));
+    }
+  }
+  return cleaned.replace(/[\r\n\t\s]+/g, '');
+}
+
+function describeMidtransServerKeyShape(key, isProduction = false) {
+  const cleaned = sanitizeApiKey(key, 'MIDTRANS_SERVER_KEY');
+  if (!cleaned || isPlaceholderKey(cleaned)) return 'missing_or_placeholder';
+  if (/^(?:SB-)?Mid-client-/i.test(cleaned)) return 'client_key_wrong_field';
+  if (cleaned.includes('...')) return 'masked_placeholder';
+  if (/^SB-Mid-server-/i.test(cleaned)) {
+    return isProduction ? 'sandbox_key_in_production_mode' : 'sandbox_server_key';
+  }
+  if (/^Mid-server-/i.test(cleaned)) {
+    return isProduction ? 'production_server_key' : 'missing_sandbox_prefix';
+  }
+  return 'unknown_format';
 }
 
 function parseEnvText(content) {
@@ -79,8 +104,8 @@ function resolveBackendConfig(rawEnv = {}) {
   const supabaseUrl = normalizeBaseUrl(env.SUPABASE_URL);
   const supabaseRestPath = normalizeEndpointPath(env.SUPABASE_REST_PATH, '/rest/v1');
   const supabaseRestUrl = supabaseUrl ? `${supabaseUrl}${supabaseRestPath}` : '';
-  const supabasePublicKey = String(env.SUPABASE_KEY || env.SUPABASE_ANON_KEY || '').trim();
-  const supabaseServerKey = String(env.SUPABASE_SERVICE_ROLE_KEY || supabasePublicKey).trim();
+  const supabasePublicKey = sanitizeApiKey(env.SUPABASE_KEY || env.SUPABASE_ANON_KEY || '', 'SUPABASE_KEY');
+  const supabaseServerKey = sanitizeApiKey(env.SUPABASE_SERVICE_ROLE_KEY || '', 'SUPABASE_SERVICE_ROLE_KEY') || supabasePublicKey;
 
   const backendApiUrl = normalizeBaseUrl(env.BACKEND_API_URL);
   const endpoints = {
@@ -92,10 +117,10 @@ function resolveBackendConfig(rawEnv = {}) {
     webhook: normalizeEndpointPath(env.MIDTRANS_WEBHOOK_ENDPOINT, '/api/midtrans/webhook')
   };
 
-  const midtransClientKey = String(env.MIDTRANS_CLIENT_KEY || '').trim();
-  const midtransServerKey = String(env.MIDTRANS_SERVER_KEY || '').trim();
-  const midtransSignatureKey = String(env.MIDTRANS_SIGNATURE_KEY || '').trim();
-  const midtransMerchantId = String(env.MIDTRANS_MERCHANT_ID || '').trim();
+  const midtransClientKey = sanitizeApiKey(env.MIDTRANS_CLIENT_KEY || '', 'MIDTRANS_CLIENT_KEY');
+  const midtransServerKey = sanitizeApiKey(env.MIDTRANS_SERVER_KEY || '', 'MIDTRANS_SERVER_KEY');
+  const midtransSignatureKey = sanitizeApiKey(env.MIDTRANS_SIGNATURE_KEY || '', 'MIDTRANS_SIGNATURE_KEY');
+  const midtransMerchantId = sanitizeApiKey(env.MIDTRANS_MERCHANT_ID || '', 'MIDTRANS_MERCHANT_ID');
 
   const corsAllowedOrigins = String(env.CORS_ALLOWED_ORIGINS || '*')
     .split(',')
@@ -315,6 +340,8 @@ module.exports = {
   normalizeEndpointPath,
   parseBooleanEnv,
   stripQuotes,
+  sanitizeApiKey,
+  describeMidtransServerKeyShape,
   parseEnvText,
   isPlaceholderKey,
   resolveBackendConfig,

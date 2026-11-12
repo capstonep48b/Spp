@@ -1,6 +1,6 @@
 const { encodeBase64Utf8 } = require('../utils/crypto');
 
-const PLACEHOLDER_KEY_RE = /^(?:$|your[_-]|sb-mid-(?:client|server)-demo|demo|placeholder|changeme|xxx+)/i;
+const PLACEHOLDER_KEY_RE = /^(?:$|your[_-]|sb-mid-(?:client|server)-demo|demo|placeholder|changeme|xxx+|sess_)/i;
 
 function normalizeBaseUrl(value, fallback = '') {
   const raw = String(value || fallback || '').trim();

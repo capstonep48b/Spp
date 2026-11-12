@@ -109,12 +109,15 @@ async function resolveActiveMidtransCredentials(config, dbSettings) {
   let serverKey = config.midtransServerKey;
   let source = 'env';
 
-  if (isPlaceholderKey(clientKey) && dbSettings && !isPlaceholderKey(dbSettings.midtrans_client_key)) {
-    clientKey = String(dbSettings.midtrans_client_key).trim();
+  const dbClient = dbSettings && typeof dbSettings.midtrans_client_key === 'string' ? dbSettings.midtrans_client_key.trim() : '';
+  const dbServer = dbSettings && typeof dbSettings.midtrans_server_key === 'string' ? dbSettings.midtrans_server_key.trim() : '';
+
+  if (isPlaceholderKey(clientKey) && dbClient && !isPlaceholderKey(dbClient) && /^(?:SB-)?Mid-client-/i.test(dbClient)) {
+    clientKey = dbClient;
     source = 'supabase_settings_fallback';
   }
-  if (isPlaceholderKey(serverKey) && dbSettings && !isPlaceholderKey(dbSettings.midtrans_server_key)) {
-    serverKey = String(dbSettings.midtrans_server_key).trim();
+  if (isPlaceholderKey(serverKey) && dbServer && !isPlaceholderKey(dbServer) && /^(?:SB-)?Mid-server-/i.test(dbServer)) {
+    serverKey = dbServer;
     source = 'supabase_settings_fallback';
   }
 
@@ -725,9 +728,12 @@ async function createSnapTransaction(config, payload, corsHeaders, fetchFn = glo
     }
 
     if (!midtransRes.ok || !midtransJson.token) {
-      const errorDetails = Array.isArray(midtransJson.error_messages)
+      const rawErrorDetails = Array.isArray(midtransJson.error_messages)
         ? midtransJson.error_messages.join('; ')
-        : (midtransJson.status_message || midtransJson.message || `HTTP ${midtransRes.status}`);
+        : (midtransJson.status_message || midtransJson.message || midtransJson.error || `HTTP ${midtransRes.status}`);
+      const errorDetails = midtransRes.status === 401
+        ? `${rawErrorDetails} (Pastikan MIDTRANS_SERVER_KEY valid dan sesuai mode ${config.mode.toUpperCase()} di env/Cloudflare Secrets)`
+        : rawErrorDetails;
       return jsonResult(midtransRes.status >= 400 ? midtransRes.status : 502, {
         ok: false,
         code: 'MIDTRANS_SNAP_ERROR',

@@ -72,8 +72,10 @@ function readRequestBody(req) {
 function isProtectedStaticFile(normalizedPath) {
   const base = path.basename(normalizedPath).toLowerCase();
   const lower = normalizedPath.toLowerCase();
-  if (base === '.env' || base.startsWith('.env.')) return true;
-  if (lower.includes('/backend/') || lower.includes('/functions/') || lower.startsWith('/.git')) return true;
+  if (base === '.env' || base.startsWith('.env.') || base === '.assetsignore' || base === '.gitignore') return true;
+  if (base === 'wrangler.json' || base === 'wrangler.jsonc' || base === 'wrangler.toml') return true;
+  if (base === 'package.json' || base === 'package-lock.json' || base === 'server.js' || base === 'build.js') return true;
+  if (lower.includes('/backend/') || lower.includes('/functions/') || lower.startsWith('/.git') || lower.startsWith('/node_modules/')) return true;
   if (lower.startsWith('/src/') || lower === '/schema.sql') return true;
   return false;
 }

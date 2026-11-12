@@ -1,11 +1,11 @@
-const CACHE_NAME = 'spp-cache-a2e05f2b';
+const CACHE_NAME = 'spp-cache-ce0187ad';
 const STATIC_ASSETS = [
   './',
   'index.html',
   'logo.webp',
   'favicon.svg',
   'env.js?v=55c846c1',
-  'login.min.js?v=4c3e84e4',
+  'login.min.js?v=9c10ac37',
   'libs/react.production.min.js',
   'libs/react-dom.production.min.js'
 ];

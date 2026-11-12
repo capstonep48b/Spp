@@ -197,9 +197,9 @@ const DashboardView = React.memo(function DashboardView({
   };
   return <div className="space-y-8 animate-in fade-in duration-300">
           
-          {showBellDropdown && <div className="fixed inset-0 z-[9999] pointer-events-auto">
+          {showBellDropdown && <ModalPortal><div className="fixed inset-0 z-[9999] pointer-events-auto">
               
-              <div className="fixed inset-0 bg-slate-900/30 z-[9999]" onClick={() => setShowBellDropdown(false)} />
+              <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px] z-[9999]" onClick={() => setShowBellDropdown(false)} />
               <div className="fixed inset-x-3 sm:inset-x-auto sm:right-8 top-[74px] sm:top-24 z-[10000] w-auto max-w-sm sm:max-w-none sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 max-h-[82vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2">
@@ -291,7 +291,7 @@ const DashboardView = React.memo(function DashboardView({
                     </div>)}
                 </div>
               </div>
-            </div>}
+            </div></ModalPortal>}
           
           
           <GreetingMascotBanner name={settings?.adminName || 'Admin TU'} role="Administrator" schoolName={settings?.schoolName} academicYear={settings?.academicYear} />
@@ -775,8 +775,10 @@ const DashboardView = React.memo(function DashboardView({
             </div>
           </div>
 
-          {showPivotModal && <div className="fixed inset-0 bg-slate-900/75 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+          {showPivotModal && <ModalPortal><div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto" onClick={e => {
+            if (e.target === e.currentTarget) setShowPivotModal(null);
+          }}>
+              <div className="bg-white rounded-3xl max-w-4xl w-full p-6 sm:p-8 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col my-auto relative">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div>
                     <h3 className="font-black text-slate-800 text-lg">
@@ -846,7 +848,7 @@ const DashboardView = React.memo(function DashboardView({
                     </div>}
                 </div>
               </div>
-            </div>}
+            </div></ModalPortal>}
 
         </div>;
 });

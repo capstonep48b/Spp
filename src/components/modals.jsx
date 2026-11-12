@@ -154,8 +154,8 @@ const KuitansiModal = React.memo(function KuitansiModal({
   onClose
 }) {
   if (!transaction) return null;
-  return <div className="fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-4 overflow-y-auto">
-          <div id="kuitansi-print-area" className="printable-kuitansi ticket-wrapper max-w-sm sm:max-w-md w-full bg-white rounded-[32px] overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 border border-slate-200">
+  return <ModalPortal><div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div id="kuitansi-print-area" className="printable-kuitansi ticket-wrapper max-w-sm sm:max-w-md w-full bg-white rounded-[32px] overflow-hidden shadow-2xl relative my-auto animate-in zoom-in-95 duration-200 border border-slate-200">
             
             <button onClick={onClose} className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-full transition-colors print:hidden z-20" title="Tutup">
               <Icon name="x" size={20} />
@@ -282,7 +282,7 @@ const KuitansiModal = React.memo(function KuitansiModal({
               </button>
             </div>
           </div>
-        </div>;
+        </div></ModalPortal>;
 });
 
 const MIDTRANS_PAYMENT_CATEGORIES = [{
@@ -657,8 +657,8 @@ const MidtransModal = React.memo(function MidtransModal({
       setErrorMsg(err.message || 'Terjadi kesalahan saat menghubungi backend pembayaran.');
     }
   };
-  return <div className="fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-[26px] sm:rounded-[30px] max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200 relative overflow-hidden">
+  return <ModalPortal><div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-[26px] sm:rounded-[30px] max-w-xl w-full max-h-[92vh] flex flex-col shadow-2xl border border-slate-200 my-auto animate-in zoom-in-95 duration-200 relative overflow-hidden">
 
             <div className="px-4 py-4 sm:px-6 sm:py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70 shrink-0">
               <div className="flex items-center gap-3 min-w-0">
@@ -780,5 +780,5 @@ const MidtransModal = React.memo(function MidtransModal({
               </button>
             </div>
           </div>
-        </div>;
+        </div></ModalPortal>;
 });

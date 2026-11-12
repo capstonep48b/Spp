@@ -1,3 +1,12 @@
+const ModalPortal = function ModalPortal({
+  children
+}) {
+  if (typeof document !== 'undefined' && typeof ReactDOM !== 'undefined' && ReactDOM && typeof ReactDOM.createPortal === 'function' && document.body) {
+    return ReactDOM.createPortal(children, document.body);
+  }
+  return children;
+};
+
 const ICON_ELEMENT_CACHE = new Map();
 
 const toPascalCaseIconName = str => str ? str.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('') : '';
@@ -198,8 +207,10 @@ const ImagePreviewModal = React.memo(function ImagePreviewModal({
   onClose
 }) {
   if (!imageUrl) return null;
-  return <div className="fixed inset-0 bg-slate-950/90 z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="relative max-w-4xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-white/20 flex flex-col">
+  return <ModalPortal><div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[10050] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in zoom-in-95 duration-200" onClick={e => {
+    if (e.target === e.currentTarget && onClose) onClose();
+  }}>
+          <div className="relative max-w-4xl w-full bg-white rounded-3xl overflow-hidden shadow-2xl border border-white/20 flex flex-col my-auto">
             <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
               <span className="font-extrabold text-sm truncate">{title || 'Preview Foto Pengumuman'}</span>
               <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-xl text-slate-300 hover:text-white transition-colors">
@@ -213,7 +224,7 @@ const ImagePreviewModal = React.memo(function ImagePreviewModal({
               Klik di luar atau tombol (X) di pojok kanan atas untuk menutup preview.
             </div>
           </div>
-        </div>;
+        </div></ModalPortal>;
 });
 
 const LoadingBarScreen = React.memo(function LoadingBarScreen({
@@ -392,7 +403,7 @@ const ToastNotification = React.memo(function ToastNotification({
     badgeBg = "bg-blue-50 text-blue-700 border-blue-200";
     borderAccent = "border-l-blue-500";
   }
-  return <div className="fixed top-5 right-5 z-[9999] max-w-md w-full animate-slide-in-right">
+  return <ModalPortal><div className="fixed top-5 right-5 z-[100010] max-w-md w-full animate-slide-in-right">
           <div className={`p-4 rounded-2xl bg-white border border-slate-200 ${borderAccent} border-l-4 shadow-xl flex items-start gap-3.5 relative overflow-hidden`}>
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${badgeBg} border`}>
               <Icon name={iconName} size={20} className={iconColor} />
@@ -410,7 +421,7 @@ const ToastNotification = React.memo(function ToastNotification({
             </button>
             <div className="absolute bottom-0 left-0 h-1 bg-gradient-to-r from-blue-500 via-sky-400 to-indigo-500 w-full"></div>
           </div>
-        </div>;
+        </div></ModalPortal>;
 });
 
 const CrudPopupModal = React.memo(function CrudPopupModal({
@@ -423,7 +434,7 @@ const CrudPopupModal = React.memo(function CrudPopupModal({
   const isError = popup.type === 'error';
   const isInfo = popup.type === 'info';
   const isSuccess = popup.type === 'success' || !isConfirm && !isDelete && !isError && !isInfo;
-  return <div className="crud-modal-backdrop" onClick={e => {
+  return <ModalPortal><div className="crud-modal-backdrop" onClick={e => {
     if (e.target === e.currentTarget && !isConfirm) onClose();
   }}>
           <div className="crud-modal-card" onClick={e => e.stopPropagation()}>
@@ -495,11 +506,11 @@ const CrudPopupModal = React.memo(function CrudPopupModal({
                 </button>
               </div>}
           </div>
-        </div>;
+        </div></ModalPortal>;
 });
 
 const RefreshLoadingOverlay = React.memo(function RefreshLoadingOverlay() {
-  return <div className="fixed inset-0 z-[99999] bg-slate-950/85 flex flex-col items-center justify-center p-4 animate-in fade-in duration-200 select-none overflow-hidden">
+  return <ModalPortal><div className="fixed inset-0 z-[99999] bg-slate-950/75 backdrop-blur-sm flex flex-col items-center justify-center p-4 animate-in fade-in duration-200 select-none overflow-hidden">
           <div className="loading-glass-card rounded-[32px] p-8 max-w-sm w-full shadow-2xl border border-white/20 flex flex-col items-center text-center relative overflow-hidden animate-in zoom-in-95 duration-200 text-white z-10">
             <div className="w-20 h-20 bg-white/10 rounded-full p-2 mb-4 border border-cyan-400/30 flex items-center justify-center relative shadow-inner">
               <div className="w-16 h-16 rounded-full border-4 border-cyan-400 border-t-transparent animate-spin absolute inset-0 m-auto"></div>
@@ -515,7 +526,7 @@ const RefreshLoadingOverlay = React.memo(function RefreshLoadingOverlay() {
               <div className="bg-gradient-to-r from-blue-600 via-cyan-400 to-sky-300 h-full w-full animate-loading-bar shadow-[0_0_10px_#22d3ee]"></div>
             </div>
           </div>
-        </div>;
+        </div></ModalPortal>;
 });
 
 const LiveCountdownText = React.memo(function LiveCountdownText({

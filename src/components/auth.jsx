@@ -588,8 +588,8 @@ const KickedOutModal = React.memo(function KickedOutModal({
   onClose
 }) {
   if (!info) return null;
-  return <div className="fixed inset-0 bg-slate-900/85 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-[32px] max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl border border-rose-100 text-center relative overflow-hidden">
+  return <ModalPortal><div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-[32px] max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl border border-rose-100 text-center relative overflow-hidden my-auto">
             <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 via-rose-500 to-rose-600"></div>
 
             <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner ring-8 ring-rose-50/50">
@@ -628,5 +628,5 @@ const KickedOutModal = React.memo(function KickedOutModal({
               Mengerti & Masuk Kembali
             </button>
           </div>
-        </div>;
+        </div></ModalPortal>;
 });

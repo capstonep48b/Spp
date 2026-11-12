@@ -1199,7 +1199,7 @@ const SiswaListView = React.memo(function SiswaListView({
         }
         return h.date || h.academicYear || '-';
       };
-      return <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+      return <ModalPortal><div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
               <div className="modal-portal-card bg-white rounded-3xl max-w-4xl w-full p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[92vh] sm:max-h-[90vh] flex flex-col border border-slate-200 m-auto relative">
                 
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -1390,13 +1390,13 @@ const SiswaListView = React.memo(function SiswaListView({
                   </button>
                 </div>
               </div>
-            </div>;
+            </div></ModalPortal>;
     })()}
 
-        {showModal && <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+        {showModal && <ModalPortal><div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
               <div className="modal-portal-card bg-white rounded-3xl max-w-3xl w-full m-auto shadow-2xl overflow-hidden flex flex-col max-h-[90vh] sm:max-h-[88vh] border border-slate-200 animate-in zoom-in-95 duration-200 relative">
                 
-                <div className="px-6 py-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between sticky top-0 z-10">
+                <div className="px-6 py-4 sm:py-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between sticky top-0 z-10 shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-black text-lg shadow-md">
                       <Icon name={editingStudent ? "user-check" : "user-plus"} size={20} />
@@ -1891,10 +1891,10 @@ const SiswaListView = React.memo(function SiswaListView({
                   </div>
                 </form>
               </div>
-            </div>}
+            </div></ModalPortal>}
 
           
-          {waModalStudent && <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+          {waModalStudent && <ModalPortal><div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
               <div className="modal-portal-card bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] sm:max-h-[88vh] flex flex-col border border-slate-200 m-auto relative">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-3">
@@ -1973,10 +1973,10 @@ const SiswaListView = React.memo(function SiswaListView({
                   </button>
                 </div>
               </div>
-            </div>}
+            </div></ModalPortal>}
 
           
-          {promotionStudent && <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+          {promotionStudent && <ModalPortal><div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
               <div className="modal-portal-card bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 space-y-5 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] sm:max-h-[88vh] flex flex-col border border-slate-200 m-auto relative">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-3">
@@ -2273,10 +2273,10 @@ const SiswaListView = React.memo(function SiswaListView({
                   </div>
                 </form>
               </div>
-            </div>}
+            </div></ModalPortal>}
 
           
-          {selectedBiodataStudent && <div className="modal-portal-wrapper fixed inset-0 bg-slate-950/85 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+          {selectedBiodataStudent && <ModalPortal><div className="modal-portal-wrapper fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
               <div className="modal-portal-card bg-white rounded-3xl max-w-2xl w-full p-5 sm:p-8 space-y-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] sm:max-h-[88vh] flex flex-col border border-slate-200 m-auto relative">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-3">
@@ -2437,6 +2437,6 @@ const SiswaListView = React.memo(function SiswaListView({
                   </button>
                 </div>
               </div>
-            </div>}
+            </div></ModalPortal>}
         </div>;
 });

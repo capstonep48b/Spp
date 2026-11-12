@@ -401,6 +401,8 @@ body {
   height: 100vh !important;
   height: 100dvh !important;
   z-index: 9999 !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -751,8 +753,10 @@ body {
 .crud-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 99999;
+  z-index: 100000;
   background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;

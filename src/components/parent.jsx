@@ -527,8 +527,10 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
   return <div className="min-h-screen bg-slate-100 flex flex-col w-full text-slate-800">
           {previewImage && <ImagePreviewModal imageUrl={previewImage.url} title={previewImage.title} onClose={() => setPreviewImage(null)} />}
 
-          {selectedAnnouncement && <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/75 p-4 animate-in fade-in">
-              <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200">
+          {selectedAnnouncement && <ModalPortal><div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/75 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in" onClick={e => {
+            if (e.target === e.currentTarget) setSelectedAnnouncement(null);
+          }}>
+              <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl relative my-auto animate-in zoom-in-95 duration-200">
                 <button onClick={() => setSelectedAnnouncement(null)} className="absolute top-4 right-4 p-2 bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-600 rounded-xl transition-colors z-10 shadow-sm">
                   <Icon name="x" size={24} />
                 </button>
@@ -546,7 +548,7 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
                   </div>
                 </div>
               </div>
-            </div>}
+            </div></ModalPortal>}
 
           
           {showParentClassHistory && (() => {
@@ -588,8 +590,8 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
         }
         return h.date || h.academicYear || '-';
       };
-      return <div className="fixed inset-0 z-[1100] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
-                <div className="fixed inset-0 bg-slate-950/85" onClick={() => setShowParentClassHistory(false)} />
+      return <ModalPortal><div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in">
+                <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm" onClick={() => setShowParentClassHistory(false)} />
                 <div className="bg-white rounded-3xl max-w-3xl w-full p-5 sm:p-7 space-y-4 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col border border-slate-200 m-auto relative z-10 text-slate-800">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
                     <div className="flex items-center gap-3">
@@ -676,13 +678,13 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
                     </button>
                   </div>
                 </div>
-              </div>;
+              </div></ModalPortal>;
     })()}
 
           
-          {showParentBell && <div className="fixed inset-0 z-[9999] pointer-events-auto">
+          {showParentBell && <ModalPortal><div className="fixed inset-0 z-[9999] pointer-events-auto">
               
-              <div className="fixed inset-0 bg-slate-900/25 z-[9999]" onClick={() => setShowParentBell(false)} />
+              <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px] z-[9999]" onClick={() => setShowParentBell(false)} />
               
               <div className="fixed inset-x-3 sm:inset-x-auto sm:right-8 top-[72px] sm:top-20 z-[10000] w-auto max-w-sm sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 max-h-[82vh] overflow-y-auto">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -735,7 +737,7 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
                       </div>)}
                 </div>
               </div>
-            </div>}
+            </div></ModalPortal>}
 
           
           <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#072a6b] via-[#0d3b8f] to-[#1554c2] px-4 sm:px-6 py-3.5 border-b border-cyan-400/30 shadow-xl shadow-blue-950/20 flex items-center justify-between min-h-[66px] text-white">
@@ -787,10 +789,11 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
           </div>
 
           
-          {isMobileMenuOpen && <div className="md:hidden fixed inset-0 z-50 overflow-hidden animate-in fade-in duration-200">
-              <div className="absolute inset-0 bg-slate-950/85 transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
+          {isMobileMenuOpen && <ModalPortal><div className="md:hidden fixed inset-0 z-[9999] overflow-hidden animate-in fade-in duration-200">
+              <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
 
-              <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] smurf-mobile-drawer text-white flex flex-col justify-between shadow-2xl z-10 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
+              <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] h-[100dvh] smurf-mobile-drawer text-white flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-right duration-300">
+                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-between relative z-10">
                 <div className="p-4 sm:p-5 relative z-10">
                   
                   <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
@@ -932,9 +935,10 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
                 <div className="mt-auto relative z-10">
                   <SidebarBottomOrnament roleLabel="Portal Wali Murid" />
                 </div>
+                </div>
 
                 
-                <div className="sticky bottom-0 bg-slate-950/95 border-t border-white/10 p-4 space-y-2 relative z-10">
+                <div className="shrink-0 bg-slate-950/95 border-t border-white/10 p-4 space-y-2 relative z-10">
                   <button type="button" onClick={() => {
             onRefresh(true);
             setIsMobileMenuOpen(false);
@@ -952,7 +956,7 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
                   </button>
                 </div>
               </div>
-            </div>}
+            </div></ModalPortal>}
 
           
           <div className="w-full flex-1 bg-aesthetic-pattern flex flex-col md:flex-row min-h-screen mobile-full-height relative">
@@ -1154,7 +1158,7 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
                   </div>
 
                   
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                  <div className="hidden md:flex items-center gap-2.5 sm:gap-3 shrink-0">
                     <button onClick={() => onRefresh(true)} title="Sinkronisasi Data" className="px-3.5 py-2 sm:px-4 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2">
                       <Icon name="refresh-cw" size={17} className={isRefreshing ? 'animate-spin text-blue-600' : ''} />
                       <span className="hidden sm:inline">Sinkronisasi</span>
@@ -1162,7 +1166,7 @@ const ParentDashboardView = React.memo(function ParentDashboardView({
 
                     <div className="relative">
                       
-                      <button type="button" onClick={() => setShowParentBell(!showParentBell)} className="hidden md:flex p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 relative transition-colors items-center justify-center" title="Notifikasi">
+                      <button type="button" onClick={() => setShowParentBell(!showParentBell)} className="flex p-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-slate-700 relative transition-colors items-center justify-center" title="Notifikasi">
                         <Icon name="bell" size={18} />
                         {totalParentUnread > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white rounded-full text-[10px] font-extrabold flex items-center justify-center">
                             {totalParentUnread}

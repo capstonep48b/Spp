@@ -698,19 +698,30 @@ function App({
     }
   }, [showToast]);
   const handleAddAnnouncement = useCallback(async annData => {
+    const cleanTitle = String(annData?.title || '').trim();
+    const cleanContent = String(annData?.content || '').trim();
+    if (!cleanTitle || !cleanContent) {
+      showToast("Data Belum Lengkap", !cleanTitle && !cleanContent ? "Judul pengumuman dan isi berita tidak boleh kosong." : !cleanTitle ? "Judul pengumuman tidak boleh kosong." : "Isi berita / pengumuman tidak boleh kosong.", "error");
+      return false;
+    }
     const formattedDate = formatDateIndo(annData.date || new Date());
-    const newAnn = {
-      id: Date.now(),
+    const cleanAnnData = {
       ...annData,
+      title: cleanTitle,
+      content: cleanContent,
       date: formattedDate
     };
+    const newAnn = {
+      id: Date.now(),
+      ...cleanAnnData
+    };
     setAnnouncements(prev => [newAnn, ...prev]);
-    showToast("Berita Ditambahkan", `Berita "${annData.title}" berhasil ditambahkan & disinkronkan.`, "success");
+    showToast("Berita Ditambahkan", `Berita "${cleanTitle}" berhasil ditambahkan & disinkronkan.`, "success");
     if (AppApi.isConnected()) {
       try {
         await AppApi.announcements.create({
-          title: annData.title,
-          content: annData.content,
+          title: cleanTitle,
+          content: cleanContent,
           image_url: annData.imageUrl || '',
           date: formattedDate
         });
@@ -718,17 +729,26 @@ function App({
         console.error("Gagal simpan pengumuman ke Supabase:", err);
       }
     }
+    return true;
   }, [showToast]);
   const handleUpdateAnnouncement = useCallback(async (id, updatedObj) => {
+    const cleanTitle = String(updatedObj?.title || '').trim();
+    const cleanContent = String(updatedObj?.content || '').trim();
+    if (!cleanTitle || !cleanContent) {
+      showToast("Data Belum Lengkap", !cleanTitle && !cleanContent ? "Judul pengumuman dan isi berita tidak boleh kosong." : !cleanTitle ? "Judul pengumuman tidak boleh kosong." : "Isi berita / pengumuman tidak boleh kosong.", "error");
+      return false;
+    }
     const formattedObj = {
       ...updatedObj,
+      title: cleanTitle,
+      content: cleanContent,
       date: formatDateIndo(updatedObj.date || new Date())
     };
     setAnnouncements(prev => prev.map(a => a.id === id ? {
       ...a,
       ...formattedObj
     } : a));
-    showToast("Berita Diperbarui", `Perubahan berita "${updatedObj.title}" berhasil disimpan.`, "success");
+    showToast("Berita Diperbarui", `Perubahan berita "${cleanTitle}" berhasil disimpan.`, "success");
     if (AppApi.isConnected()) {
       try {
         await AppApi.announcements.update(id, {
@@ -741,6 +761,7 @@ function App({
         console.error("Gagal update pengumuman ke Supabase:", err);
       }
     }
+    return true;
   }, [showToast]);
   const handleDeleteAnnouncement = useCallback(async id => {
     const target = announcementsRef.current.find(a => a.id === id);
@@ -1807,8 +1828,8 @@ function App({
           <div className="min-h-screen bg-aesthetic-pattern flex flex-col w-full text-slate-800 relative">
 
             
-            {showAdminMobileBell && <div className="fixed inset-0 z-[9999] pointer-events-auto">
-                <div className="fixed inset-0 bg-slate-900/30 z-[9999]" onClick={() => setShowAdminMobileBell(false)} />
+            {showAdminMobileBell && <ModalPortal><div className="fixed inset-0 z-[9999] pointer-events-auto">
+                <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-[2px] z-[9999]" onClick={() => setShowAdminMobileBell(false)} />
                 <div className="fixed inset-x-3 sm:inset-x-auto sm:right-8 top-[72px] sm:top-20 z-[10000] w-auto max-w-sm sm:w-96 mx-auto sm:mx-0 bg-white rounded-3xl shadow-2xl border border-slate-200 text-slate-800 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 max-h-[82vh] overflow-y-auto">
                   <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                     <div className="flex items-center gap-2">
@@ -1884,7 +1905,7 @@ function App({
                       </>}
                   </div>
                 </div>
-              </div>}
+              </div></ModalPortal>}
 
             
             <div className="md:hidden sticky top-0 z-40 bg-gradient-to-r from-[#072a6b] via-[#0d3b8f] to-[#1554c2] px-4 sm:px-6 py-3.5 border-b border-cyan-400/30 shadow-xl shadow-blue-950/20 flex items-center justify-between min-h-[66px] text-white">
@@ -1932,10 +1953,11 @@ function App({
             </div>
 
             
-            {isAdminMobileMenuOpen && <div className="md:hidden fixed inset-0 z-50 overflow-hidden animate-in fade-in duration-200">
-                <div className="absolute inset-0 bg-slate-950/85 transition-opacity" onClick={() => setIsAdminMobileMenuOpen(false)}></div>
+            {isAdminMobileMenuOpen && <ModalPortal><div className="md:hidden fixed inset-0 z-[9999] overflow-hidden animate-in fade-in duration-200">
+                <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm transition-opacity" onClick={() => setIsAdminMobileMenuOpen(false)}></div>
 
-                <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] min-h-[100dvh] smurf-mobile-drawer text-white flex flex-col justify-between shadow-2xl z-10 overflow-y-auto animate-in slide-in-from-right duration-300 relative">
+                <div className="absolute top-0 right-0 bottom-0 w-[88%] sm:w-[380px] max-w-[430px] h-[100dvh] smurf-mobile-drawer text-white flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-right duration-300">
+                  <div className="flex-1 min-h-0 overflow-y-auto flex flex-col justify-between relative z-10">
                   <div className="p-4 sm:p-5 relative z-10">
                     
                     <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
@@ -2093,9 +2115,10 @@ function App({
                   <div className="mt-auto relative z-10">
                     <SidebarBottomOrnament roleLabel="Panel Admin TU" />
                   </div>
+                  </div>
 
                   
-                  <div className="sticky bottom-0 bg-slate-950 border-t border-white/10 p-4 space-y-2 relative z-10">
+                  <div className="shrink-0 bg-slate-950 border-t border-white/10 p-4 space-y-2 relative z-10">
                     <button type="button" onClick={() => {
               fetchData(true);
               setIsAdminMobileMenuOpen(false);
@@ -2113,7 +2136,7 @@ function App({
                     </button>
                   </div>
                 </div>
-              </div>}
+              </div></ModalPortal>}
 
             <div className="w-full flex-1 bg-[#ebf1f8] flex flex-col md:flex-row min-h-screen mobile-full-height">
               

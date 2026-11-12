@@ -7,6 +7,12 @@ const AdminPengumumanView = React.memo(function AdminPengumumanView({
   const [showModal, setShowModal] = useState(false);
   const [editingAnn, setEditingAnn] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [formErrors, setFormErrors] = useState({
+    title: '',
+    content: ''
+  });
+  const titleInputRef = React.useRef(null);
+  const contentInputRef = React.useRef(null);
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -14,6 +20,10 @@ const AdminPengumumanView = React.memo(function AdminPengumumanView({
     date: formatDateIndo(new Date())
   });
   const openModal = (ann = null) => {
+    setFormErrors({
+      title: '',
+      content: ''
+    });
     if (ann) {
       setEditingAnn(ann);
       setFormData({
@@ -33,16 +43,40 @@ const AdminPengumumanView = React.memo(function AdminPengumumanView({
   };
   const handleSubmit = async e => {
     e.preventDefault();
+    const cleanTitle = String(formData.title || '').trim();
+    const cleanContent = String(formData.content || '').trim();
+    const nextErrors = {
+      title: cleanTitle ? '' : 'Judul pengumuman tidak boleh kosong.',
+      content: cleanContent ? '' : 'Isi berita / pengumuman tidak boleh kosong.'
+    };
+    if (nextErrors.title || nextErrors.content) {
+      setFormErrors(nextErrors);
+      if (nextErrors.title && titleInputRef.current) {
+        titleInputRef.current.focus();
+      } else if (nextErrors.content && contentInputRef.current) {
+        contentInputRef.current.focus();
+      }
+      return;
+    }
     const payload = {
       ...formData,
+      title: cleanTitle,
+      content: cleanContent,
       date: formatDateIndo(formData.date) || formatDateIndo(new Date())
     };
+    let saveResult = true;
     if (editingAnn) {
-      await onUpdateAnnouncement(editingAnn.id, payload);
+      saveResult = await onUpdateAnnouncement(editingAnn.id, payload);
     } else {
-      await onAddAnnouncement(payload);
+      saveResult = await onAddAnnouncement(payload);
     }
-    setShowModal(false);
+    if (saveResult !== false) {
+      setFormErrors({
+        title: '',
+        content: ''
+      });
+      setShowModal(false);
+    }
   };
   const handleImageFileChange = async e => {
     const file = e.target.files[0];
@@ -133,25 +167,67 @@ const AdminPengumumanView = React.memo(function AdminPengumumanView({
                 </div>)}
             </div>}
 
-          {showModal && <div className="fixed inset-0 bg-slate-900/75 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-                <h3 className="font-extrabold text-slate-800 text-base">{editingAnn ? 'Edit Berita Pengumuman' : 'Tambah Berita / Pengumuman Baru'}</h3>
+          {showModal && <ModalPortal><div className="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-[9999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-in fade-in" onClick={e => {
+            if (e.target === e.currentTarget) setShowModal(false);
+          }}>
+              <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl max-h-[90vh] flex flex-col my-auto relative border border-slate-200 animate-in zoom-in-95 duration-200">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 shrink-0">
+                  <h3 className="font-extrabold text-slate-800 text-base">{editingAnn ? 'Edit Berita Pengumuman' : 'Tambah Berita / Pengumuman Baru'}</h3>
+                  <button type="button" onClick={() => setShowModal(false)} className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition-colors" title="Tutup">
+                    <Icon name="x" size={18} />
+                  </button>
+                </div>
                 
-                <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+                <form onSubmit={handleSubmit} noValidate className="space-y-3 text-xs overflow-y-auto flex-1 pr-0.5">
+                  {(formErrors.title || formErrors.content) && <div role="alert" className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 font-bold flex items-start gap-2">
+                      <Icon name="alert-circle" size={16} className="shrink-0 mt-0.5 text-rose-600" />
+                      <span>Judul pengumuman dan isi berita wajib diisi (tidak boleh kosong).</span>
+                    </div>}
+
                   <div>
-                    <label className="block font-bold text-slate-700 uppercase mb-1">Judul Pengumuman</label>
-                    <input type="text" required placeholder="Contoh: Jadwal Libur & Kegiatan Pentas Seni" value={formData.title} onChange={e => setFormData({
-              ...formData,
-              title: e.target.value
-            })} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900" />
+                    <label className="block font-bold text-slate-700 uppercase mb-1">
+                      Judul Pengumuman <span className="text-rose-500">*</span>
+                    </label>
+                    <input ref={titleInputRef} type="text" required placeholder="Contoh: Jadwal Libur & Kegiatan Pentas Seni" value={formData.title} aria-invalid={Boolean(formErrors.title)} onChange={e => {
+              const val = e.target.value;
+              setFormData({
+                ...formData,
+                title: val
+              });
+              if (formErrors.title && val.trim()) {
+                setFormErrors(prev => ({
+                  ...prev,
+                  title: ''
+                }));
+              }
+            }} className={`w-full px-3.5 py-2.5 rounded-xl font-bold text-slate-900 border focus:outline-none focus:ring-2 ${formErrors.title ? 'bg-rose-50/50 border-rose-500 focus:ring-rose-500/30' : 'bg-slate-50 border-slate-300 focus:bg-white focus:ring-blue-500/30'}`} />
+                    {formErrors.title && <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                        <Icon name="alert-triangle" size={12} className="shrink-0" />
+                        <span>{formErrors.title}</span>
+                      </p>}
                   </div>
 
                   <div>
-                    <label className="block font-bold text-slate-700 uppercase mb-1">Isi Berita / Pengumuman</label>
-                    <textarea required rows="5" placeholder="Tuliskan isi detail pengumuman..." value={formData.content} onChange={e => setFormData({
-              ...formData,
-              content: e.target.value
-            })} className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl font-bold text-slate-900"></textarea>
+                    <label className="block font-bold text-slate-700 uppercase mb-1">
+                      Isi Berita / Pengumuman <span className="text-rose-500">*</span>
+                    </label>
+                    <textarea ref={contentInputRef} required rows="5" placeholder="Tuliskan isi detail pengumuman..." value={formData.content} aria-invalid={Boolean(formErrors.content)} onChange={e => {
+              const val = e.target.value;
+              setFormData({
+                ...formData,
+                content: val
+              });
+              if (formErrors.content && val.trim()) {
+                setFormErrors(prev => ({
+                  ...prev,
+                  content: ''
+                }));
+              }
+            }} className={`w-full px-3.5 py-2.5 rounded-xl font-bold text-slate-900 border focus:outline-none focus:ring-2 ${formErrors.content ? 'bg-rose-50/50 border-rose-500 focus:ring-rose-500/30' : 'bg-slate-50 border-slate-300 focus:bg-white focus:ring-blue-500/30'}`}></textarea>
+                    {formErrors.content && <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                        <Icon name="alert-triangle" size={12} className="shrink-0" />
+                        <span>{formErrors.content}</span>
+                      </p>}
                   </div>
 
                   <div>
@@ -189,7 +265,7 @@ const AdminPengumumanView = React.memo(function AdminPengumumanView({
                   </div>
                 </form>
               </div>
-            </div>}
+            </div></ModalPortal>}
         </div>;
 });
 
@@ -203,6 +279,7 @@ const AdminPengaduanView = React.memo(function AdminPengaduanView({
   const [replyText, setReplyText] = useState('');
   const [nowMs, setNowMs] = useState(Date.now());
   const [expandedStudents, setExpandedStudents] = useState({});
+  const [previewImage, setPreviewImage] = useState(null);
   const chatEndRef = React.useRef(null);
   const nextExpiryMs = useMemo(() => {
     const cur = Date.now();
@@ -271,6 +348,7 @@ const AdminPengaduanView = React.memo(function AdminPengaduanView({
     }
   }, [activeComplaints.length]);
   return <div className="h-[calc(100vh-6rem)] animate-in fade-in duration-300 flex flex-col md:flex-row gap-4">
+          {previewImage && <ImagePreviewModal imageUrl={previewImage.url} title={previewImage.title} onClose={() => setPreviewImage(null)} />}
           
           
           <div className={`w-full md:w-80 lg:w-96 bg-white rounded-3xl border border-slate-200 shadow-sm flex-col overflow-hidden shrink-0 ${activeChatId ? 'hidden md:flex' : 'flex'}`}>
@@ -447,7 +525,10 @@ const AdminPengaduanView = React.memo(function AdminPengaduanView({
                            </div>
                            <p className="text-xs sm:text-sm font-semibold leading-relaxed whitespace-pre-wrap">{msg.text}</p>
                            {msg.imageUrl && <div className="mt-2.5">
-                               <img src={msg.imageUrl} alt="Lampiran" loading="lazy" decoding="async" className="max-w-full max-h-64 object-cover rounded-xl shadow-md border border-slate-200 cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setPreviewImage(msg.imageUrl)} />
+                               <img src={msg.imageUrl} alt="Lampiran" loading="lazy" decoding="async" className="max-w-full max-h-64 object-cover rounded-xl shadow-md border border-slate-200 cursor-pointer hover:opacity-95 transition-opacity" onClick={() => setPreviewImage({
+              url: msg.imageUrl,
+              title: 'Lampiran Pengaduan - ' + (activeChat.studentName || 'Wali Murid')
+            })} />
                              </div>}
                          </div>
                          <span className="text-[10px] text-slate-500 font-bold mt-1 px-1">{formatDateTimeIndo(msg.time, activeChat.date)}</span>
